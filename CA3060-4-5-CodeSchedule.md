@@ -1,0 +1,806 @@
+# Chapter 4.5 Code (Instruction) Scheduling
+
+## Why Rearrange Code Sequence?
+
+<img src="img%5CCA3060-4-5-CodeSchedule_1.png" style="zoom: 50%;" />
+
+## Rescheduling Reduces Bubbles
+
+<img src="img%5CCA3060-4-5-CodeSchedule_2.png" style="zoom: 50%;" />
+
+## Dependence DAG: Scheduling Constraints
+
+<img src="img%5CCA3060-4-5-CodeSchedule_3.png" style="zoom: 50%;" />
+
+<img src="img%5CCA3060-4-5-CodeSchedule_4.png" style="zoom: 50%;" />
+
+## Three Types of Register Data Dependence
+
+#### 1. 流依赖 (Flow Dependence / RAW)
+
+- **全称**：Read After Write（写后读）。
+- **含义**：指令 $B$ 需要读取指令 $A$ 写入的结果。
+- **示例**：
+  - 指令 1：`lw $pr1, a`（将值写入 `$pr1`）
+  - 指令 3：`add $pr3, $pr1, $pr2`（读取 `$pr1` 的值）
+- **约束**：指令 1 必须在指令 3 之前执行，否则指令 3 拿到的是旧数据 。
+
+#### 2. 反依赖 (Anti-dependence / WAR)
+
+- **全称**：Write After Read（读后写）。
+- **含义**：指令 $B$ 会覆盖指令 $A$ 正在读取的寄存器。
+- **示例**：
+  - 指令 7：`sw $pr6, 0($pr5)`（正在读取 `$pr6` 和 `$pr5`）
+  - 指令 8：`lw $pr1, c`（假设后续指令将结果存入 $A$ 之前使用的寄存器）
+- **约束**：为了防止指令 $B$ 提前改写寄存器导致指令 $A$ 读错，指令 $A$ 必须在指令 $B$ 完成写操作前完成读取 。
+
+#### 3. 输出依赖 (Output-dependence / WAW)
+
+- **含义**：两条指令都要写入同一个寄存器。
+  - 指令 1：`lw $pr1, a` 
+  - 指令 8：`lw $pr1, c` 
+- **约束**：必须保证最后留在寄存器中的值是程序逻辑中“最后一条”指令写入的值 。
+
+```cpp
+std::vector<DAGNode> DAGBuilder::build(const std::vector<Instruction>& instructions) {
+    std::vector<DAGNode> nodes;
+    nodes.reserve(instructions.size());
+
+    for (size_t i = 0; i < instructions.size(); i++) {
+        nodes.emplace_back(static_cast<int>(i));
+    }
+    // Original version:
+    // detectRAW(instructions, nodes);
+    // detectWAR(instructions, nodes);
+    // detectWAW(instructions, nodes);
+    // for (auto& node : nodes) {
+    //     node.unscheduled_predecessors = static_cast<int>(node.predecessors.size());
+    // }
+    // return nodes;
+
+    // One-pass version:
+    std::unordered_map<std::string, int> lastWriter;
+    std::unordered_map<std::string, std::vector<int>> readersAfter;
+
+    for (size_t i = 0; i < instructions.size(); i++) {
+        const Instruction& inst = instructions[i];
+
+        // detectRAW & update detectWAR state
+        if (inst.src_regs.size() == 1) {
+            const auto& rs = inst.src_regs[0];
+            auto it = lastWriter.find(rs);
+            if (it != lastWriter.end()) { // Found RAW dependency
+                addEdge(nodes, it->second, static_cast<int>(i), DependencyType::RAW, rs);
+            }
+            readersAfter[rs].push_back(static_cast<int>(i));
+        } else if (inst.src_regs.size() == 2) {
+            const auto& rs1 = inst.src_regs[0];
+            const auto& rs2 = inst.src_regs[1];
+            auto it1 = lastWriter.find(rs1);
+            if (it1 != lastWriter.end()) { // Found RAW dependency
+                addEdge(nodes, it1->second, static_cast<int>(i), DependencyType::RAW, rs1);
+            }
+            readersAfter[rs1].push_back(static_cast<int>(i));
+            if (rs2 != rs1) {
+                auto it2 = lastWriter.find(rs2);
+                if (it2 != lastWriter.end()) { // Found RAW dependency
+                    addEdge(nodes, it2->second, static_cast<int>(i), DependencyType::RAW, rs2);
+                }
+                readersAfter[rs2].push_back(static_cast<int>(i));
+            }
+        } // else 0, pass
+
+        // detect WAW/WAR & update detectW state
+        if (inst.hasDestReg()) {
+            // detectWAW
+            const auto& destReg = inst.dest_reg;
+            auto it = lastWriter.find(destReg);
+            if (it != lastWriter.end()) {
+                addEdge(nodes, it->second, static_cast<int>(i), DependencyType::WAW, destReg);
+            }
+            // WAR: all readers since last write -> current writer
+            // Skip readerIdx == i: when an instruction reads then writes the same register
+            // (e.g. add x1, x1, x2), Step 1 already added i to readersAfter[destReg];
+            // we must not create a self-loop WAR edge i->i here.
+            // detectWAR
+            auto rit = readersAfter.find(destReg);
+            if (rit != readersAfter.end()) {
+                for (int readerIdx : rit->second) {
+                    // because in the separated detectWAR it's reversed (detext -> update)
+                    // now it's update -> detext
+                    if (readerIdx != static_cast<int>(i)) { 
+                        addEdge(nodes, readerIdx, static_cast<int>(i), DependencyType::WAR, destReg);
+                    }
+                }
+                rit->second.clear();
+            }
+            lastWriter[destReg] = static_cast<int>(i);
+        }
+    }
+
+    for (auto& node : nodes) {
+        node.unscheduled_predecessors = static_cast<int>(node.predecessors.size());
+    }
+
+    return nodes;
+}
+
+// Optimization: Only need to track the last write to each register
+// O((N * log R)， could be made to O (N)
+void DAGBuilder::detectRAW(const std::vector<Instruction>& instructions,
+                           std::vector<DAGNode>& nodes) {
+    std::map<std::string, int> lastWriter;
+
+    for (size_t i = 0; i < instructions.size(); i++) {
+        const Instruction& inst = instructions[i];
+
+        for (const auto& srcReg : inst.src_regs) {
+            auto it = lastWriter.find(srcReg);
+            if (it != lastWriter.end()) {
+                // Found RAW dependency
+                int writerIdx = it->second;
+                addEdge(nodes, writerIdx, static_cast<int>(i), DependencyType::RAW, srcReg);
+            }
+        }
+
+        // Update last writer
+        if (inst.hasDestReg()) {
+            lastWriter[inst.dest_reg] = static_cast<int>(i);
+        }
+    }
+}
+
+// O (N)
+void DAGBuilder::detectWAR(const std::vector<Instruction>& instructions,
+                           std::vector<DAGNode>& nodes) {
+    // TODO: Implement this function
+    // Hint:
+    // You need Track all readers of each register (after the last write)
+    // Iterate each instruction, If current instruction writes a register, check previous readers
+    // Add WAR dependency to all previous readers
+    // WAR latency is 0 because read happens at instruction start
+
+    std::unordered_map<std::string, std::vector<int>> readersAfter; // all readers of each register (after the last write)
+
+    for (size_t i = 0; i < instructions.size(); i++) {
+        const Instruction& inst = instructions[i];
+
+        // If current instruction writes a register, Add WAR dependency to all previous readers
+        if (inst.hasDestReg()) {
+            const auto& destReg = inst.dest_reg;
+            auto it = readersAfter.find(destReg);
+            if (it != readersAfter.end()) {
+                for (int readerIdx : it->second) {
+                    addEdge(nodes, readerIdx, static_cast<int>(i), DependencyType::WAR, destReg);
+                }
+                // Update readers of dest_reg
+                it->second.clear(); 
+            }
+        }
+
+        // Update readers of src_regs
+        if (inst.src_regs.size() == 1) {
+            readersAfter[inst.src_regs[0]].push_back(i);
+        } else if (inst.src_regs.size() == 2) {
+            const auto &rs1 = inst.src_regs[0];
+            const auto &rs2 = inst.src_regs[1];
+            readersAfter[rs1].push_back(i);
+            if (rs2 != rs1) readersAfter[rs2].push_back(i);
+        } // else 0, pass
+    }
+}
+
+// O (N)
+void DAGBuilder::detectWAW(const std::vector<Instruction>& instructions,
+                           std::vector<DAGNode>& nodes) {
+    // TODO: Implement this function
+    // Hint:
+    // Track the last instruction that wrote to each register
+    // WAW latency is 1, only need to guarantee order
+
+    std::unordered_map<std::string, int> lastWriter;
+
+    for (size_t i = 0; i < instructions.size(); i++) {
+        const Instruction& inst = instructions[i];
+        if (inst.hasDestReg()) {
+            auto it = lastWriter.find(inst.dest_reg);
+            if (it != lastWriter.end()) {
+                addEdge(nodes, it->second, static_cast<int>(i), DependencyType::WAW, inst.dest_reg);
+            }
+            // Update last writer
+            lastWriter[inst.dest_reg] = static_cast<int>(i);
+    }
+    }
+}
+```
+
+## Memory Dependency (due to potential aliasing)
+
+Scheduling memory instructions can be quite challenging:
+
+- Memory dependencies may be **unknown** (pointer aliasing) 在编译时，指针或数组索引的值往往是不确定的
+- Memory latencies are often unknown 内存访问的耗时取决于缓存命中与否
+- Speculative load/store may trap
+- Memory resources are often shared: DRAM, Bus, Interconnection network
+- Volatile variables (in OS kernels)
+
+由于存在别名风险，编译器必须采取**保守（Conservative）**策略 ：
+
+- **禁止越过**：除非能通过静态分析证明两个地址绝对不同，否则编译器通常不允许将 Load 指令移到 Store 指令之前，或将 Store 指令互相交换顺序。
+
+- **拓扑排序约束**：在构建依赖图（DAG）时，这些潜在的内存冲突会变成强制性的边（Arcs），限制了指令的调度空间 。
+
+## A Legal Schedule
+
+Any *topological sort* of the DAG represents a correct schedule — each node appears ==before its children==.
+
+Some legal schedules:
+- `1, 2, 3, 5, 9, 4, 8, 6, 10, 11, 7`
+- `9, 1, 2, 3, 4, 10, 6, 5, 8, 7, 11`
+
+Code scheduling = finding the **best** legal schedule. Possible schedules = N! — grows exponentially → Exhaustive search is infeasible; heuristics are used.
+
+## Operation Latency: Weight of Arcs
+
+Arc weight = ==operation latency==:
+
+| Operation | Latency |
+|-----------|--------|
+| Load | 2 cycles |
+| Multiply | 3 cycles |
+| Add | 1 cycle |
+
+*(Node numbers in DAG diagram indicate arc weights; critical path = longest weighted path.)*
+
+## General guideline
+
+==nodes on the critical paths should be scheduled **as early as possible**.==
+
+## Identify Critical Paths
+
+Traversing the DAG from the leaves towards the roots labeling each node with the maximum possible delay from that node to the end of the block. ( ==Reverse Topological Sort== )
+
+Maximum delay of each node  is computed as:
+
+$$
+MD = max ( \text{each child’s MD} + \text{arc\_weight} )
+$$
+
+<img src="img%5CCA3060-4-5-CodeSchedule_7.png" style="zoom: 50%;" />
+
+```cpp
+// O ( N + E ) 
+void Scheduler::computePriorities(const std::vector<Instruction>& instructions,
+                                  std::vector<DAGNode>& nodes) {
+    std::vector<bool> visited(nodes.size(), false);
+
+    // Calculate priority for each node
+    for (size_t i = 0; i < nodes.size(); i++) {
+        if (!visited[i]) {
+            computeCriticalPath(static_cast<int>(i), instructions, nodes, visited);
+        }
+    }
+}
+
+int Scheduler::computeCriticalPath(int nodeIdx,
+                                   const std::vector<Instruction>& instructions,
+                                   std::vector<DAGNode>& nodes,
+                                   std::vector<bool>& visited) {
+    // TODO: Implement this function
+    if (visited[nodeIdx]) return nodes[nodeIdx].priority;
+
+    visited[nodeIdx] = true;
+    int latency = instructions[nodeIdx].latency;
+    // Base case
+    if (nodes[nodeIdx].successors.empty()) {
+        nodes[nodeIdx].priority = latency;
+        return latency;
+    }
+
+    int maxRAW = 0, maxW = 0;
+    for (const auto& edge : nodes[nodeIdx].successors) {
+        int succPriority = computeCriticalPath(edge.target_node, instructions, nodes, visited);
+        if (edge.type == DependencyType::RAW) {
+            maxRAW = std::max(maxRAW, succPriority);
+        } else {
+            maxW = std::max(maxW, succPriority);
+        }
+    }
+    int priority = std::max(latency + maxRAW, maxW);
+    nodes[nodeIdx].priority = priority;
+    return priority;
+}
+```
+
+## Mark each node with Maximum Delay (yellow number)
+
+<img src="img%5CCA3060-4-5-CodeSchedule_5.png" style="zoom: 50%;" />
+
+## List Scheduling
+
+*Basic Block scheduling algorithm:*
+
+1. Build Dependence DAG
+2. Mark each node with maximum delay (MD) to end of block
+3. Traverse DAG root → leaves, selecting from a **candidate list**; track current cycle to minimize stalls
+
+<img src="img%5CCA3060-4-5-CodeSchedule_8.png" style="zoom: 50%;" />
+
+```cpp
+// O ( N * cycles + E) ~ O ( N ^ 2 )
+ScheduleResult Scheduler::schedule(const std::vector<Instruction>& instructions,
+                                   std::vector<DAGNode>& nodes,
+                                   TieBreakingPolicy policy) {
+    // TODO: Implement this function using provided API
+    // Algorithm 2: List Scheduling with Inflight Queue
+
+    // input
+    ScheduleResult result;
+    std::vector<int>& S = result.order;  
+    int n = static_cast<int>(instructions.size());
+    int cycle = 0;
+    computePriorities(instructions, nodes); // O ( N + E )
+    std::vector<int> ready = getReadyNodes(nodes);
+    std::vector<std::pair<int, int>> inflight; // set of (node, finish_cycle) pairs
+
+
+    while (static_cast<int>(S.size()) < n) { // O ( cycles ); N <= cycles <= N * max_latency
+        // issue one instruction (issue width = 1)
+        if (!ready.empty()) {
+            int best = selectBestNode(ready, nodes, instructions, policy); // O ( N ) * O ( N ) in total
+            // Remove best from ready
+            ready.erase(std::find(ready.begin(), ready.end(), best)); // O ( N ) * O ( N ) in total
+            // Append best to S
+            S.push_back(best); 
+            nodes[best].schedule_cycle = cycle; nodes[best].scheduled = true;
+            // Add (best, cycle + latency(best)) to inflight
+            inflight.push_back({best, cycle + instructions[best].latency});
+
+            // WAR/WAW order-only: release on issue
+            for (const auto& edge : nodes[best].successors) { // O ( E ) in total
+                if (edge.type != DependencyType::RAW) {  
+                    int succIdx = edge.target_node;
+                    nodes[succIdx].unscheduled_predecessors--;
+                    if (nodes[succIdx].unscheduled_predecessors == 0) {
+                        ready.push_back(succIdx);
+                    }
+                }
+            }
+        }
+
+        cycle++;
+
+        // retire finished ops
+        for (auto it = inflight.begin(); it != inflight.end(); ) { // O (N) * O (cycles) in total
+            auto [op, t] = *it;
+            if (t != cycle) { ++it; continue; }
+            it = inflight.erase(it);
+            for (const auto& edge : nodes[op].successors) {
+                if (edge.type == DependencyType::RAW) {
+                    if (--nodes[edge.target_node].unscheduled_predecessors == 0)
+                        ready.push_back(edge.target_node);
+                }
+            }
+        }
+    }
+
+    result.total_cycles = cycle;
+    return result;
+}
+
+// O (N log N + E)
+ScheduleResult Scheduler::scheduleFast(const std::vector<Instruction>& instructions,
+                                       std::vector<DAGNode>& nodes,
+                                       TieBreakingPolicy policy,
+                                       bool verbose) {
+    // TODO: BONUS: Optimize code as fast as you can
+       
+    ScheduleResult result;
+    std::vector<int>& S = result.order;
+    int n = static_cast<int>(instructions.size());
+    int cycle = 0;
+    computePriorities(instructions, nodes); // O ( N + E )
+
+    // Max-heap version of selectBestNode: O ( log N ) per call
+    auto cmp = [&](int a, int b) {
+        int pa = nodes[a].priority, pb = nodes[b].priority;
+        if (pa != pb) return pa < pb;
+        switch (policy) {
+            case TieBreakingPolicy::MOST_CHILD: {
+                int ca = static_cast<int>(nodes[a].successors.size());
+                int cb = static_cast<int>(nodes[b].successors.size());
+                if (ca != cb) return ca < cb;
+                break;
+            }
+            case TieBreakingPolicy::LPT: {
+                int la = instructions[a].latency, lb = instructions[b].latency;
+                if (la != lb) return la < lb;
+                break;
+            }
+            default: break;
+        }
+        return a > b;
+    };
+    std::priority_queue<int, std::vector<int>, decltype(cmp)> ready(cmp);
+    for (int i = 0; i < n; i++)
+        if (nodes[i].unscheduled_predecessors == 0) ready.push(i);
+    // Min-heap for retirement: O ( log N ) per call
+    auto cmp2 = [](std::pair<int,int> a, std::pair<int,int> b) { return a.first > b.first; };
+    std::priority_queue<std::pair<int,int>, std::vector<std::pair<int,int>>, decltype(cmp2)> inflight(cmp2);
+
+    while (static_cast<int>(S.size()) < n) { // O ( cycles ); N <= cycles <= N * max_latency 
+        if (!ready.empty()) {
+            int best = ready.top(); ready.pop(); // O (log N) * O ( N ) in total
+            S.push_back(best);
+            nodes[best].schedule_cycle = cycle; nodes[best].scheduled = true;
+            inflight.push({cycle + instructions[best].latency, best}); // O(log N)
+
+            for (const auto& edge : nodes[best].successors) {
+                if (edge.type != DependencyType::RAW) {
+                    int succIdx = edge.target_node;
+                    if (--nodes[succIdx].unscheduled_predecessors == 0)
+                        ready.push(succIdx); // O (E) in total
+                }
+            }
+        }
+
+        cycle++;
+
+        while (!inflight.empty() && inflight.top().first == cycle) { // O( log N ) * O ( N ) in total
+            auto [t, op] = inflight.top(); inflight.pop();
+            for (const auto& edge : nodes[op].successors) {
+                if (edge.type == DependencyType::RAW) {
+                    if (--nodes[edge.target_node].unscheduled_predecessors == 0)
+                        ready.push(edge.target_node); 
+                }
+            }
+        }
+    }
+
+    result.total_cycles = cycle;
+    return result;
+}
+```
+
+## Commonly Used Heuristics
+
+The following heuristics are used when selecting from the candidate list:
+
+1. Favor nodes that can start **without stalling**
+2. If tie: favor the node with **maximum delay** to end of block
+3. If still tie:
+   - Favor original order
+   - Favor nodes with a **large number of children**
+   - Favor nodes that are the **final use** of a register
+
+## Example
+
+Scheduling steps (using MD-based heuristic):
+
+<img src="img%5CCA3060-4-5-CodeSchedule_6.png" style="zoom: 50%;" />
+
+| **步骤** | **候选名单 (Clist)** | **选择的指令**      | **选择理由 (Heuristics)**                                    |
+| -------- | -------------------- | ------------------- | ------------------------------------------------------------ |
+| **1 **   | {1, 2, 9}            | **1 (lw $pr1, a)**  | MD 值最大 (7)，且为原始顺序第一条 。                         |
+| **2**    | {2, 9}               | **2 (lw $pr2, b)**  | MD 值最大 (7)，且此时不会因指令 1 停顿 。                    |
+| **3**    | {3, 5, 9}            | **9 (lw $pr7, d)**  | **关键点**：指令 3 和 5 依赖于指令 1 和 2 的 Load 结果。由于 Load 延迟为 2 ，此时选 3 或 5 会导致**停顿 (Stall)**。选 9 可以利用这个空隙，且不产生停顿 。 |
+| **4**    | {3, 5}               | **3 (add $pr3...)** | 此时指令 1 的结果已可用。3 的 MD (5) 大于 5 的 MD (3)，优先执行关键路径 。 |
+| **5**    | {4, 5}               | **4 (mul $pr4...)** | 指令 4 的 MD (4) 大于 5 的 MD (3) 。                         |
+| **6**    | {6, 10, 5}           | **5 (mul $pr5...)** | 此时指令 4 刚刚发射，其子节点 6 需等待 3 个周期 (Multiply 延迟) 。为了不浪费周期，选择 5 。 |
+| **7**    | {6, 10, 8}           | **8 (lw $pr1, c)**  | 指令 6 和 10 仍在等待前序乘法完成。选 8 填补空隙 。          |
+
+# Quiz 3
+
+### Section I (Single Answer)
+
+**1) Three common hazards can often reduce the efficiency of a pipelined datapath. Which of the following is not one of the three hazards?**
+A) Structure hazards
+B) Forward hazards
+C) Data hazards
+D) Control hazards
+**Correct Answer: B**
+
+**2) Which extension, if absent, would make RISC-V a fixed-length ISA?**
+A) A extension
+B) B extension
+C) C extension
+D) D extension
+E) E extension
+**Correct Answer: C**
+
+**3) Which of the following microarchitectures could have a CPI lower than 1?**
+A) Single-cycle data path implementation
+B) Multi-cycle data path implementation
+C) Pipelined implementation
+D) Superscalar implementation
+**Correct Answer: D**
+
+**4) When comparing the performance of single-cycle, multi-cycle, and pipelined data paths, which statements is correct?**
+A) Single-cycle > Multi-cycle > Pipelined
+B) Pipelined > Multi-cycle > Single-cycle
+C) Pipelined > Single-cycle > Multi-cycle
+D) Multi-cycle > Pipelined > Single-cycle
+**Correct Answer: B**
+
+**5) Frequent pipeline stalls are likely to occur when traversing a long linked list due to**
+A) Delay hazards
+B) Date hazards
+C) Data hazards
+D) Control hazards
+**Correct Answer: C** `ld x1, 0(x1)  // 将当前节点指向的下一个节点地址载入到寄存器 x1`
+
+**6) Branch prediction should be carried out during which stages of the pipeline?**
+A) IF
+B) ID
+C) EXE
+D) MEM
+E) WB
+**Correct Answer: A**
+
+**7) Which of the following functional units is the most difficult to pipeline?**
+A) Integer multiply
+B) Floating point add
+C) Floating point multiply
+D) Integer divide
+E) Fused multiply-and-accumulate (FMAC)
+**Correct Answer: D**
+
+**8) A Von Neumann machine is depicted on the right. What is the so-called “Von Neumann bottleneck” in a pipelined data path?**
+A) It is like a structural hazard
+B) It is like a data hazard
+C) It is like a control hazard
+D) It is like a memory hazard
+**Correct Answer: A**
+
+**9) Which of the following microarchitectures is unlikely to be used by Apple’s M4 processor (i.e., the latest one)?**
+A) Dynamic branch prediction
+B) Pipelined data path
+C) Static branch prediction
+D) BTB-based prediction
+**Correct Answer: C**
+
+**10) Which RV32I instruction has the greatest impact on the clock rate of the single-cycle data path?**
+A) JALR X0, 0(X2)
+B) LW X1,4(X2)
+C) SLL X1,X2,X3
+D) LUI X5, 0x12345
+**Correct Answer: B**
+
+---
+
+### Section II (multiple answers)
+
+**11) MIPS (Microprocessor without Interlocked Pipeline Stages) reduces hardware cost by using software to avoid hazards, making the processor cheaper and faster. What was the primary reason for its lack of success?**
+A) Compatibility and Scalability
+B) Non-competitive performance
+C) Incompatible with x86
+D) John Hennessy was too occupied.
+**Correct Answer: A**
+
+**12) In which cases should callee-saved registers be considered for allocation?**
+A) Leaf routines
+B) A temporary value used heavily across multiple calls
+C) Temporaries in expression evaluation
+D) C Strings
+E) Local variables
+**Correct Answer: B, E**
+
+**13) Which of the following is a common hardware technique to reduce the penalty of data hazards?**
+A) Data forwarding
+B) A deeper pipeline
+C) Data Bypassing
+D) Compiler code scheduling
+**Correct Answer: A, C**
+
+**14) Most modern microprocessors have split I/D caches. Why?**
+A) To avoid structural hazards in the pipeline
+B) To get a higher cache hit rate
+C) To increase reliability
+D) To increase the cache access bandwidth
+**Correct Answer: A, D**
+
+**15) Compared to a pipelined data path, a single-cycle data path typically has:**
+A) Higher throughput
+B) Faster clock rate
+C) Simple control logic
+D) A longer instruction latency
+E) A lower CPI
+**Correct Answer: C, E**
+
+**16) Function A calls function B. In function A, three registers live across the call to B: \$s1, \$t0, and \$a1. What registers must be saved/restored across the call (caller-save)?**
+A) \$s1
+B) \$t0
+C) \$a1
+D) None of them
+**Correct Answer: B, C**
+
+**17) What are the essential principles of designing a pipelined datapath?**
+A) Multi-stage partitioning
+B) Overlapped execution
+C) Increased throughput
+D) Lowered instruction latency
+E) Improved resource utilization
+**Correct Answer: A, B, C, E**
+
+**18) Which of the following are techniques used to reduce the penalty caused by control hazards?**
+A) Pipeline stalls
+B) BTB (Branch Target Buffer)
+C) BHT (Branch History Table)
+D) Data Bypassing
+E) Data forwarding
+**Correct Answer: B, C**
+
+**19) What (HW/SW) strategies can reduce pipeline stalls caused by data hazards?**
+A) Deeper pipeline
+B) Data forwarding
+C) Out-of-Order instruction execution
+D) Compiler instruction scheduling
+E) Branch prediction
+**Correct Answer: B, C, D**
+
+**20) Which of the following are considered “Microarchitecture states”?**
+
+> ==微架构状态是指为了提高处理器性能（如流水线化、分支预测）而引入的**内部硬件状态**。==
+>
+> - **不可见性**：程序员在编写汇编代码时，无法直接读写这些状态。
+> - **实现相关**：不同的处理器（例如同样是 RISC-V 架构，但一个是 5 级流水线，一个是 7 级流水线）其微架构状态完全不同。
+>
+> ==ISA 状态是指指令集规范中定义的、必须存在的状态。==
+>
+> - **可见性**：程序员必须知道这些状态才能编写正确的程序。
+> - **必须性**：任何兼容该指令集的处理器都必须维护这些状态的逻辑正确性。
+
+A) BHT
+B) BTB
+C) Floating-point registers
+D) PC
+E) Pipelined registers
+**Correct Answer: A, B, E**
+
+**21) In practice, what might occur if we increase the number of pipeline stages from 5 to 20?**
+A) The clock rate becomes 4X faster
+B) The branch misprediction penalty would increase
+
+> 在 5 级流水线中，分支结果可能在第 2 或第 3 阶段就能确定。
+>
+> 在 20 级流水线中，由于流水线变深，确定分支结果的阶段会靠后（例如第 10 阶段）。一旦预测失败，需要**刷新（Flush）**掉的指令数量从 2-3 条激增到十几条，损失的周期数大幅增加。
+
+C) The data hazard penalty would increase
+
+> 级数越深，指令之间的“距离”越远。例如，一个 `Load` 指令产生的数据可能要到第 15 级才写回，而下一条指令在第 2 级就需要这个数据。
+>
+> 即使有前推（Forwarding），由于阶段相隔太远，硬件连线变得极其复杂，往往无法覆盖所有路径，导致必须插入更多的**停顿（Stall）**周期。
+
+D) The CPI would increase
+E) More pipelined registers will be required
+**Correct Answer: B, C, D, E**
+
+**22) What information is used to index a branch prediction table in correlated branch prediction (also known as 2-level adaptive branch prediction)?**
+A) Current PC
+B) Branch instruction address
+C) PC+4
+D) Global branch history
+**Correct Answer: A, D**
+
+**23) Which of the following could be effective for static branch predictions?**
+A) Predict a backward branch taken
+B) Predict a forward “beq rs1, x0” not taken
+C) Predict the “beq rs1, rs2” not taken
+D) Predict the blt instructions taken
+E) Predict the JALR instruction not taken
+**Correct Answer: A, B**
+
+**24) Why is a BHT (Branch History Table) usually untagged?**
+A) Simple
+B) Fast access
+C) Consume less energy
+D) Good for high-performance microprocessors
+E) Cost-effective
+**Correct Answer: A, B, C, E**
+
+**25) Which of the following control signals must be propagated through the pipelined registers to the WB stage?**
+A) Rd (target register)
+B) WRen (write-enable)
+C) WBsel (Write back selection)
+D) ALUctl (ALU control)
+**Correct Answer: A, B, C**
+
+**26) Which of the following statements about single-cycle data path implementation is true?**
+A) CPI is 1, every instruction must finish in one cycle
+B) The clock cycle must accommodate the slowest instruction
+C) The resources in the data path cannot be reused in the same cycle
+D) The result is written back to the register file in the same clock cycle.
+**Correct Answer: A, B, C**
+
+**27) A basic block has 50 instructions; how many legal schedules are possible?**
+A) In the best case, there is only one schedule
+B) In the best case, there are 50 legal schedules
+C) In the worst case, there are 50! possible schedules
+D) It is quadratic; the worst case has 502 schedules
+**Correct Answer: A, C**
+
+**28) A compiler can reorder instructions to avoid data hazards. However, what limitations does it often encounter?**
+A) Code scheduling is error-prone
+B) Memory dependencies may not be known due to possible memory aliasing
+C) Structural hazards are hard to deal with
+D) Memory operation latencies are unknown and non-deterministic
+**Correct Answer: B, D**
+
+**29) In our RV32I pipelined data path, which stage requires two adders?**
+A) IF
+B) ID
+C) EXE
+D) MEM
+E) WB
+**Correct Answer: C**
+
+**30) When running a binary tree search on a pipelined data path, what hazards are likely to occur?**
+A) Dependence hazards
+B) Structure hazards
+C) Data hazards
+D) Control hazards
+E) Branch hazards
+**Correct Answer: C, D**
+
+**31) Why do some RV pipelined data path designs utilize a comparison unit to execute the compare-and-branch instructions instead of using the standard ALU?**
+A) To avoid structural hazards
+B) Avoid setting the wrong ‘taken/not-taken’ due to integer subtraction overflows.
+C) The ALU at the EXE stage is needed for R-type instructions and Load/Store instructions
+D) Comparison operation does not trap
+**Correct Answer: B**
+
+**32) Intel Pentium 4 has 31 pipeline stages. A branch instruction is resolved pretty late, near the 31st stage. If the branch misprediction rate is 2%, what would be the performance impact? (Assuming 20% of instructions are branches, and the average CPI is 1).**
+A) 2%
+B) 6%
+C) 20%
+D) 12%
+E) 60%
+**Correct Answer: D**
+
+> [!IMPORTANT]
+>
+> $$CPI_{actual} = CPI_{ideal} + (Stall\ Cycles\ per\ Instruction)$$
+>
+> $$Stall\ Cycles = (分支指令占比) \times (分支预测失败率) \times (分支惩罚代价)$$
+
+**33) What information is stored in the pipelined registers?**
+A) Control signals
+B) Data (ALU results, Register values, Immediates)
+C) Addresses (PC, PC+4, memory address)
+D) Register designators
+
+> 这就是你之前纠结的 **`rd` (Destination Register)**。
+>
+> - **原因**：虽然它只是 5 位二进制数，但它是 WB 阶段唯一的“导航地址”。如果没有在流水线寄存器里存下 `rd` 的编号，当指令到达 WB 阶段时，处理器将不知道该把算好的数据写给哪个寄存器。
+
+**Correct Answer: A, B, C, D**
+
+**34) Which RV32I branch/jump instructions are most difficult to predict?**
+A) Conditional branches such as BLT/BEQ/BNE
+B) Unconditional jumps such as JAL, X0, target
+C) Function calls such as JAL X1, function_name
+D) Indirect branch for switches, such as JALR, 4(X1)
+E) Return branch, such as JALR, X0, 0($ra)
+
+> 虽然它也用了 `JALR` 格式，但它有一个专门的硬件优化手段：**返回地址栈（Return Address Stack, RAS）**。 当程序执行 `JAL` 调用函数时，硬件会把返回地址压入这个小型的硬件栈；遇到 `ret`（即 `JALR x0, 0(ra)`）时，直接从栈顶弹出地址即可。因此，函数返回的预测准确率极高。
+
+**Correct Answer: D**
+
+**35) Intel Itanium has a post-increment load instruction: `LW rd, imm(rs1)`. Its register transfer behavior is as follows: `rd <- mem[rs1 + imm]`; `rs1 <- rs1 + imm`. Why does RISC-V not adopt this instruction?**
+A) This instruction is rarely used by the compiler
+B) This instruction requires two register write ports
+
+> **标准 RISC-V 指令**：绝大多数指令（如 `add`, `lw`, `mul`）最多只写入 **一个** 目的寄存器。因此，寄存器堆（Register File）只需要 **1个写端口（Write Port）**。
+>
+> **后自增 Load 指令**：
+>
+> 1. 它要写 `rd`（存入从内存读出的数据）。
+> 2. 它还要写 `rs1`（存入 `rs1 + imm` 的新地址）。
+>
+> **后果**：为了支持这一条指令，你必须给整个寄存器堆增加第二个写端口。
+>
+> - **硬件代价**：增加写端口会显著增加寄存器堆的面积、功耗，并可能降低时钟频率。对于追求极简的 RISC-V 来说，为了这一条指令增加全局硬件成本是不划算的。
+
+C) This instruction breaks the regularity: rs1 is both a source and a destination.
+D) This instruction is NIH (Not-Invented-Here)
+**Correct Answer: B, C**

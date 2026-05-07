@@ -1,0 +1,122 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+CMakeLists.txt
+include/data_lab.hpp
+src/data_lab.cpp
+test/test_data_lab.cpp
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="CMakeLists.txt">
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/heads/main.zip
+)
+# 注意：这一步会下载代码并将其加入你的项目中
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+
+cmake_minimum_required(VERSION 3.10) # 幻灯片写的是 VERSION 4.0，但这可能过高，建议先试用 3.10+
+
+project(data_lab LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23) 
+# 1. 定义库目标 (Library target)
+add_library(data_lab src/data_lab.cpp)
+target_include_directories(data_lab PUBLIC include)
+
+# 2. 启用测试
+enable_testing()
+
+# 3. 定义测试可执行文件
+add_executable(test_data_lab test/test_data_lab.cpp)
+
+# 4. 链接库 (将 data_lab 和 gtest_main 链接到测试程序)
+target_link_libraries(test_data_lab data_lab gtest_main)
+
+# 5. 注册测试
+add_test(NAME DataLabTests COMMAND test_data_lab)
+</file>
+
+<file path="include/data_lab.hpp">
+#pragma once
+
+namespace data_lab {
+    /**
+     * @brief Adds two integers
+     * @param a First integer
+     * @param b Second integer
+     * @return Sum of a and b
+     */
+    int add(int a, int b);
+}
+</file>
+
+<file path="src/data_lab.cpp">
+#include "data_lab.hpp"
+
+namespace data_lab {
+    int add(int a, int b) {
+        return a + b;
+    }
+}
+</file>
+
+<file path="test/test_data_lab.cpp">
+#include <gtest/gtest.h>
+#include "data_lab.hpp"
+
+// 定义一个测试套件 AddTest，测试用例名为 AddPositiveNumbers
+TEST(AddTest, AddPositiveNumbers) {
+    // 使用 EXPECT_EQ 宏断言结果是否相等
+    EXPECT_EQ(data_lab::add(2, 3), 5);
+    EXPECT_EQ(data_lab::add(10, 20), 30);
+    EXPECT_EQ(data_lab::add(100, 200), 300);
+}
+</file>
+
+</files>

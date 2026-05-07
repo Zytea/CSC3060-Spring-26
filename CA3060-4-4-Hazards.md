@@ -1,0 +1,322 @@
+# 4.4: Pipeline Hazards
+
+> [!IMPORTANT]
+>
+> $$CPI_{actual} = CPI_{ideal} + (Stall\ Cycles\ per\ Instruction)$$
+>
+> $$Stall\ Cycles = (分支指令占比) \times (分支预测失败率) \times (分支惩罚代价)$$
+
+## 1.1 Hazards: Pipeline Challenges
+
+In addition to the imperfect work distribution at each stage and the overhead caused by **"fill" and "drain,"** a pipelined implementation must address three major challenges: ==data hazards== ==,== ==structural hazards== , and ==control hazards== .
+
+These hazards prevent the subsequent instructions from overlapping with previously issued instructions. They are typically blocked (**stalled**) at the ID stage, significantly reducing pipeline efficiency.
+
+> *Fill → Pipe Full → Drain*
+
+## 2 Structure Hazards
+
+This refers to a conflict arising due to ==hardware resource limitations== within the pipeline.
+
+### 1. 产生原因
+
+- **访存资源冲突 (Von Neumann Architecture)**：在冯·诺依曼架构中，程序指令和数据存储在同一个内存中 。
+  - **冲突点**：当一条指令处于 **MEM（访存）**阶段读取数据时，另一条较新的指令正处于 **IF（取指）**阶段尝试从同一内存中获取指令 。
+  - 这导致两条指令在同一时钟周期内竞争唯一的存储器访问端口 。
+- **功能部件非流水线化**：例如除法器 。
+  - 除法操作通常需要很多个时钟周期（如 32 或 64 个）才能完成 。
+  - 如果两条除法指令紧挨着进入流水线，由于除法单元被占用，后一条指令将无法开始执行 。
+- **错误的流水线设计 (Early Write Back)**：
+  - 如果为了优化让 R-type 指令提前在第 4 个周期（原本是 MEM 阶段）就进行 **WB（写回）** 。
+  - 这可能会与之前一条正处于正常 WB 阶段（第 5 个周期）的 Load 指令产生冲突，两者同时竞争寄存器堆的写入端口 。
+
+Structure hazards are less frequent in ==scalar architectures==, since registers have sufficient number of ports, functional units are either single-cycle execution or are pipelined (except for divide), instruction and data memory are separated. We may need two adders since each instruction needs to increment PC and calculate arithmetic.
+
+<img src="img%5CCA3060-4-4-Hazards_1.png" style="zoom:50%;" />
+
+### 2. 解决方法
+
+- **流水线停顿 (Pipeline Stall)**：硬件检测到资源冲突时，强制后续指令在 **ID（译码）**阶段等待 。这会在流水线中插入“气泡”（bubble），虽能保证正确性但会降低效率 。
+- **增加硬件资源**：
+  - 使用 **哈佛架构 (Harvard Machine)**：将指令存储器（I-cache）和数据存储器（D-cache）分开，使取指和访存可以同时进行 。
+  - 增加寄存器堆的读写端口 。
+  - 添加多个或流水线化的功能单元（如多个乘法/除法器） 。
+- **指令调度 (Instruction Reordering)**：
+  - **静态调度**：由编译器在编译时重新排列指令顺序 。
+  - **动态调度**：由硬件在运行时调整指令执行顺序 。
+- **指令集设计 (ISA Design)**：避免设计需要过多端口的指令（如自动增量指令），或禁止在 ALU 操作中直接使用内存操作数 。
+
+> *R-type instructions do not access data memory, so can they write back to register early?*
+>
+> No. **Early WB Causes Structural Hazards**
+
+## 3 Data Hazards
+
+* Data hazards happen when the pipeline must stall because previous instructions in the pipeline have not yet generated the data needed for the current instruction.
+* Data hazards arise from data dependencies. For example,
+  * Add **X9,** X0, X1	// results are ready at the end of the EXE stage, and write back to reg X9 at WB
+  * Sub X10, **X9,** X3	// needs to read data at the ID stage (stage 2)
+* In the worst-case scenario, the pipeline may be stalled until the previous instruction writes back the data to register X9. Only then can the new instruction begin to read during the Instruction Decode (ID) stage. This would result in **three wasted cycles**, creating three pipeline *bubbles* .
+* Three cases to discuss further:
+  * Register accesses
+  * ALU results
+  * Load data hazards
+
+### 1. Register Access Issues
+
+![](img%5CCA3060-4-4-Hazards_2.png)
+
+### 2. ALU Result Access Issues
+
+![](img%5CCA3060-4-4-Hazards_3.png)
+
+### Solution 1: Pipeline Stall at ID stage
+
+![](img%5CCA3060-4-4-Hazards_4.png)
+
+> *Delayed by two clock cycles*
+
+### Solution 2: Data Forwarding (Bypassing)
+
+![](img%5CCA3060-4-4-Hazards_5.png)
+
+#### Data Forwarding for Load Instructions
+
+<img src="img%5CCA3060-4-4-Hazards_6.png" style="zoom:50%;" />
+
+**原理**：一旦数据在流水线部件（如 ALU）中计算出来，就直接通过硬件连线将其传给需要的后续指令，而不必等待它写回寄存器堆 。
+
+**实现**：需要在数据通路中增加额外的连接和**前推控制逻辑** 。
+
+**注意**：有些冒险（如 Load 指令后的紧跟使用）无法仅靠前推解决，仍需停顿一个周期 。
+
+## Detect Data Hazards 
+
+* Hazard conditions
+  * EX/MEM.RegRd | MEM/WB.RegRd= ID/EX.RegRs1 | ID/EX.RegRs2
+* Some ==corner cases==
+  * Do not forward if instruction does not write register → **check if RegWr is asserted**
+  * Do not forward if destination register is `$0` → **check if RegRd = 0**
+
+## Solution 3: Compiler Code Transformations
+
+* ==MIPS== (Micro-Processor without Interlocked Pipe Stages) implemented a micro-processor with no pipelined interlocks. To deal with data hazards, the compiler must **reorder** instructions to avoid data hazards. If no instructions to be placed between a **long-enough generate-and-use gap**, NOPs must be inserted.
+* Most pipelined microprocessors do have hardware interlocks. So the compiler reorders instructions to reduce the number of interlocks (or stalls) occur at runtime.
+* Reordering at compile time is very cost effective, except for
+  * Memory dependences are often unknown
+  * Scheduling (reordering) scope is often limited by branches, indirect branches, and call/ret.
+
+## Compiler Code Scheduling Example
+
+![](img%5CCA3060-4-4-Hazards_8.png)
+
+![](img%5CCA3060-4-4-Hazards_9.png)
+
+## 4 Control Hazards
+
+Control hazards are due to branch instructions (conditional jumps ) and JAL/JALR instructions (unconditional jumps). Branch instructions alter the normal flow of the program execution by jumping to a different set of instructions.
+
+The pipeline can't know for sure which instruction will be executed next until **the branch condition is evaluated** (or the target address is computed). This can lead to the pipeline fetching and processing incorrect instructions.
+
+Control hazards are crucial because branch instructions occur frequently, ranging from 15% to 30%. Historical studies indicate that there is one branch per 4 to 5 instructions.
+
+### 1. Branch Outcome Available at MEM stage
+
+![](img%5CCA3060-4-4-Hazards_10.png)
+
+![](img%5CCA3060-4-4-Hazards_11.png)
+
+Suppose 20% of instructions are branches, and CPI is 1. This flushed instruction may account for 60% of penalty. 0.2*3 = 0.6 
+Well, say 50% of the branches are fall through, then the penalty is down to 30%
+
+![](img%5CCA3060-4-4-Hazards_13.png)
+
+**Assuming:20% of branches ; 50% of the branches taken**
+
+**Average CPI = 1Penalty = 3 (flushed inst) \* 0.2 \* 0.5 = 0.3 CPI**
+
+**So the penalty would be 30%** -60%
+
+## 2.  Branch Outcome Available at EXE stage
+
+![](img%5CCA3060-4-4-Hazards_14.png)
+
+![](img%5CCA3060-4-4-Hazards_15.png)
+
+**So the penalty would be 20%** - 50%
+
+## 1. Simply Predict the Branch is Not Taken: 30-40%
+
+**原理**：硬件总是假设分支条件不成立，即默认执行下一条顺序指令（PC+4） 。
+
+**结果**：如果预测正确，流水线全速运行，没有任何延迟 。
+
+**修正**：如果实际发生了跳转（Guess is wrong），则必须**刷新（Flush）**流水线中已经取出的错误指令，并从正确的目标地址重新取指 。
+
+![](img%5CCA3060-4-4-Hazards_16.png)
+
+### 2. Static Branch Prediction: 65% to 90%
+
+* Branch prediction could be determined at ==compile time== .
+* Compiler sets the prediction
+* Hardware can assist, for example
+  * Predict a ==*backward branch as taken*== (because loop back branches are likely to take)
+  * Predict a ==*forward branch as fall-through*== (because the compiler always puts the then part in the fall-through path).
+* The ISA may reserve a bit in branch instructions as a prediction bit
+* HP (Hewlett Packard) used the register order to indicate prediction.
+  * Example: (`beq r3,r4,8` → predict not taken) (`beq r4,r3,8` → predict taken)
+
+### 3. Dynamic Branch Prediction: 90%-99%
+
+* Dynamic Branch Predictions are made at ==Runtime==
+* One common approach is to have a **branch history table**
+  * 记录最近分支指令的地址（PC）及其结果（跳转或不跳转） 。
+  * To execute a branch
+    * Check the prediction table; expect the same outcome
+    * Start fetching from fall-through or target
+    * If wrong, flush the pipeline and change the prediction
+
+#### A Simple Branch History Table
+
+| Tag / Key | Branch History | Program |
+|:---------:|:--------------:|:-------:|
+| — | — | `bne` |
+| `000001110010` | 0 (NT) | `beq` |
+| `000001110110` | — | `ld` |
+| — | — | `sw` |
+| `000001111000` | 1 (T) | — |
+
+One bit history here, but could be multi-bits
+
+Branch prediction table may not have tag/key: history data has only 1 or 2 bits, but tag takes 30-46 bits !!
+
+In practice, the **lower several bits of the PC address** are used to index the BHT !
+
+### Branch Prediction at IF Stage
+
+* At the IF stage, the instruction address (i.e. PC) is used to index the BHT
+  * If the BHT entry lacks history, predict **NT**.
+  * For a branch instruction, the branch outcome updates the BHT entry.
+* If the BHT is not tagged, “aliased” entries could result in higher branch mispredictions.
+* Untagged BHT is simple, fast, has low power consumption, and is less costly.
+* However, high-performance microprocessors tend to use tagged BHT
+
+## 1. 1-bit Predictor
+
+Inner loop branches **mispredicted twice**!
+
+```
+outer: …
+  …
+  inner: …
+    …
+    beq …, …, inner   // inner loop back
+  …
+  beq …, …, outer   // outer loop back
+```
+
+- **Mispredict** as *taken* on the **last** iteration of inner loop (should fall through)
+- **Mispredict** as *not taken* on the **first** iteration of inner loop next time (should take)
+→ Inner loop always causes 2 mispredictions per outer iteration
+
+## 2. 2-bit Predictor (FSM): 85%–95%
+
+Only change prediction on two successive mispredictions
+
+<img src="img%5CCA3060-4-4-Hazards_17.png" style="zoom:50%;" />
+
+*states: 00=strongly NT, 01=weakly NT, 10=weakly T, 11=strongly T*
+
+## 3. Correlated Prediction: 94-96%
+
+* Correlated Branch Prediction is also called ==2-level adaptive branch prediction== .
+* **Global Branch History Register (GHB)**
+  * Shift Register: 这是一个**移位寄存器**，记录了处理器最近执行过的若干条分支指令的真实结果（跳转或不跳转） 。
+  * Shifting on Branch: 每当执行一个分支，其结果就会被移入 GHB，并挤出最旧的一位记录 。
+
+* **Pattern History Table (PHT)**
+  * Indexed by GHB: The PHT is a table of **2-bit saturating counters**. Each entry corresponds to a unique pattern of recent branch outcomes captured by the GHB.
+  * Indexing: The GHB's contents are used to index the PHT. 它不直接由 PC 索引，而是由 **GHB 的内容**（有时是 PC 与 GHB 组合后的哈希值）进行索引 。
+  * Counter Update: The 2-bit counter at the indexed entry is incremented if the branch is taken and decremented if it's not taken. 它记录了在特定的“历史模式”下，当前分支跳转的概率 。
+
+Example 1:
+
+```c
+if (a==2) a=0;   // Branch 1
+if (b==2) b=0;   // Branch 2
+if (a!=b) {...}; // Branch 3
+```
+
+If it is always the case: Branch 1 taken AND Branch 2 taken → Branch 3 is **NOT taken**
+
+- GHB = `11` → Branch 3 falls through
+- GHB = `00`/`01`/`10` → needs prediction
+
+## Branch Prediction Accuracy
+
+Always predict fall‑through: about 30-40%.
+
+Backward‑taken / forward‑not‑taken: 60- 70%.
+
+Static prediction based on compiler analysis 80-85%
+
+Static prediction guided with program profiles: 80–90%.
+
+Single‑bit dynamic BHT: 70–80%.
+
+Two‑bit FSM (saturating counter): 85–95%.
+
+Global two-level correlated branch prediction: 94-96%
+
+Local two-level prediction: 93-97%
+
+Tournament prediction: 96-97%
+
+TAGE predictor: 97-99% ( Intel,AMD,ARM , APPLE,..)
+
+## Prediction: Whether and Where
+
+* ==Whether== : need to predict the branch is taken or not
+* ==Where== : need to know where does the branch jump to?
+* Even with predictor, still need to calculate the target address
+  * 1-cycle or 2-cycle penalty for a taken branch (depends on whether the target address is calculated in the ID or in the EXE stage)
+* **Branch Target Buffer (BTB)**
+  * Cache of target addresses
+  * **缓存机制**：BTB 就像一个小型 Cache，专门存储最近执行过的分支指令的 **PC 地址** 及其对应的 **目标跳转地址**。
+  * Target addresses are usually unchanged ( ==*immediate is not changed*== )
+  * **工作流程**：
+    1. 在 **IF（取指）阶段**，直接用当前指令的 **PC 地址**去索引 BTB 。
+    2. 如果 BTB **命中（Hit）** 且预测器预测该分支为 **Taken**，处理器可以**立即**从缓存的目标地址开始取指 。
+* How about ==*indirect branch*== ? ==*Function returns*== ? ==*Function pointers*== ?
+
+## Branch Target Buffer
+
+![](img%5CCA3060-4-4-Hazards_18.png)
+
+## Control Signals Used at Each Stage
+
+* ID stage
+  * Data path: rs1, rs2 designators
+  * Control: `immed_sel`,
+  * `Rd`, and `WRen`, are actually from the WB stage ( ==Unlike the single cycle data path !!== )
+* EX stage
+  * Data Path: `rs1`, `rs2 contents`, `PC`, `immed value`,
+  * Control: `Asel`, `Bsel`, `ALUsel`
+* MEM stage
+  * Data path: `ALUout` (Address), `rs2 content`,
+  * Control: `MemRW` (read/write),`BrLt`, `Breq`
+* WB stage
+  * Data path: `ALUout`, `PC+4`(for link reg), `MEMout`,
+  * Control: `Wbsel`, `rd designator`, `WRen`
+
+![](img%5CCA3060-4-4-Hazards_19.png)
+
+Signals for EX (`ALUOp`, `A/Bsel`, `ALUctl`...) are used **1 cycle later**
+
+Signals for MEM (`MemWr`, `Branch`) are used 2 cycles later
+
+Signals for WB (``MemtoReg`, `MemWr`) are used **3 cycles later**
+
+`RegDst` (`rd`) is passed along to the WB stage
+
+![](img%5CCA3060-4-4-Hazards_21.png)
