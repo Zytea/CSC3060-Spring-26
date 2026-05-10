@@ -3,7 +3,7 @@
 ## Exam Facts
 
 - ==**Memory hierarchy**==: small/fast/expensive near CPU; large/slow/cheap far away.
-- **Management**: regs/local/scratchpad memory by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
+- **Management**: regs by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
 - **Broad "cache" examples**: L1/L2/L3, TLB, BTB, BHT/branch predictor table.
 - **SRAM vs DRAM**: SRAM fast/no refresh/cache; DRAM dense/cheap/refresh/main memory.
 - ==**Memory wall**==: CPU speed vs DRAM latency/bandwidth gap.
@@ -13,7 +13,7 @@
 - **Cache parameters**: `S=C/(B*E)`, `b=log2(B)`, `s=log2(S)`, `t=m-s-b`.
 - **Modern L1D**: set-associative, write-back, write-allocate; hit latency about **3-4 cycles**.
 - **I-cache easier**: no CPU stores and no dirty bit; JIT/self-modifying code needs I-cache flush/invalidate/coherence.
-- ==**MSHR**==: non-blocking cache tracks outstanding misses; L3 MSHR count depends on memory latency + bus width/bandwidth; CSC3050 also counts #sharing cores.
+- ==**MSHR**==: non-blocking cache tracks outstanding misses; Quiz4 key: L3 MSHR count depends on **memory latency + bus width/bandwidth**.
 - **AMAT**: $HT+MR\times MP$; multi-level AMAT uses local miss rates and fails when misses overlap.
 - **4C misses**: compulsory/cold, conflict/collision, capacity, coherence.
 - **Large line helps**: spatial locality, tag overhead, compulsory misses; hurts miss penalty/bandwidth/fewer lines.
@@ -25,7 +25,6 @@
 | Level | Example | Managed by |
 |---|---|---|
 | L0 | regs | compiler |
-| local/scratchpad | GPU/shared local memory | programmer/compiler |
 | L1/L2/L3 | SRAM caches | hardware |
 | L4 | DRAM / VM pages | OS + MMU |
 | L5/L6 | disk/remote | OS/filesystem/apps |
@@ -488,8 +487,6 @@ Fixes:
 - batch multiple independent traversals.
 
 Sorting locality: quicksort, insertion sort, bubble sort have high data locality; heapsort is poor.
-
-Cray/vector note: vector loads/stores exploit regular streams, but without data caches they cannot exploit irregular temporal/spatial locality well, especially pointer-aliasing-heavy languages.
 
 Hardware vs software cache:
 

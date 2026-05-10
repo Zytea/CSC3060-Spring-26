@@ -13,13 +13,13 @@
 - **RISC-V integer overflow**: does **not** trap; software checks if needed.
 - **Right shift**: signed usually arithmetic; unsigned logical.
 - **IEEE fp32/fp64**: `s|exp8|frac23`, bias 127; `s|exp11|frac52`, bias 1023.
-- **IEEE standards**: IEEE 754-1985 covers fp32/fp64; IEEE 754-2008 adds fp16/quad. Quiz: bfloat16/FP8/FP4 not 754-2008.
+- **IEEE standards**: IEEE 754-1985 covers fp32/fp64; IEEE 754-2008 adds fp16/quad; bfloat16/FP8/FP4 are AI formats, not core IEEE formats.
 - **Exact binary decimal**: after reducing fraction, denominator must be a power of 2.
 - **Quiz exact decimals**: `0.5`, `0.0625` exact; `0.1`, `0.2`, `0.3` not exact.
 - **Strict FP**: `+,-,*` are not associative; compiler cannot freely reassociate without fast-math.
 - ==**FMA**==: `a*b+c` with one final rounding; about `5-6` cycles, not multiply+add latency.
 - **`bfloat16`**: `s|exp8|frac7`; fp32 exponent range, less precision.
-- **FP4/FP8 use**: ML throughput/power/bandwidth, **not** accuracy; not IEEE 754-2008 in quiz.
+- **FP4/FP8 use**: ML throughput/power/bandwidth, **not** accuracy.
 - **Saturation arithmetic**: clips overflow at bounds; high-yield for audio/video/quantized AI.
 - **Latency facts**: int multiply `3-5`, int divide `~32`, SP FP add `4`, SP FP multiply `5`, FP->int `3-5`.
 
@@ -328,8 +328,8 @@ A decimal is exactly representable in binary iff, after reduction, denominator i
 | fp32 | `s|exp8|frac23` | 127 |
 | fp64 | `s|exp11|frac52` | 1023 |
 | fp16 | `s|exp5|frac10` | 15 |
-| bfloat16 | `s|exp8|frac7` | 127; not IEEE 754-2008 quiz answer |
-| fp8/minifloat | often `s|exp4|frac3` | AI format, not IEEE 754-2008 quiz answer |
+| bfloat16 | `s|exp8|frac7` | 127; fp32-like range |
+| fp8/minifloat | often `s|exp4|frac3` | AI throughput/bandwidth format |
 | fp4/nibble-float | often `s|exp2|frac1` | AI format, throughput/bandwidth/power |
 
 `float` exactly represents all integers from `0` through $2^{24}$; above that, spacing exceeds 1.

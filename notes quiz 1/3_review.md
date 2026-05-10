@@ -17,7 +17,7 @@
 - **Return pattern**: `jalr x0,ra,0`; class quiz infers this as procedure return.
 - **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
 - **No `LWU` in RV32I**: `LW` already fills the 32b GPR; zero/sign extension difference matters only when `XLEN>32` (e.g., RV64).
-- **RV64I-only quiz clues**: `LD`, `SD`, `LWU`, and wide shifts such as `slli rd,rs,48`.
+- **RV64I-only clues**: `LD`, `SD`, `LWU`; not valid RV32I base instructions.
 - **Offsets**: B/J immediates have implicit bit0=0; range is in **2-byte units** because compressed `C` may use 16b instrs.
 
 ## 1. Assembly Language Instructions
@@ -75,7 +75,7 @@ RISC may increase instr count, but often lowers CPI/cycle time.
 
 RV64 adds `LD`, `SD`, `LWU`, `ADDW`, `SLLIW`, etc.
 
-Project/quiz shorthand: RV32IM = RV32I plus integer multiply/divide (`M`).
+RV32IM = RV32I plus integer multiply/divide (`M`); running `mul` on RV32I without `M` causes illegal-instruction exception/emulation.
 
 ### 2.2 Architectural State
 
@@ -413,7 +413,7 @@ RISC-V uses explicit compare-and-branch (`beq/blt/...`), not hidden condition-co
 
 | Proposal | Class answer |
 |---|---|
-| 1024 GPRs | no: longer access/cycle, more save/restore/context-switch, longer instr encoding; **not** "compiler harder" in quiz |
+| 1024 GPRs | no: longer access/cycle, more save/restore/context-switch, longer instr encoding; compilers still cannot keep arrays/strings/stack in regs |
 | fast procedure call single instr | usually no: complex stack/register side effects |
 | register pairs for wider data | hurts regularity; use extensions/ABI rules |
 | static branch-prediction bit | not worth encoding cost for modern dynamic predictors |

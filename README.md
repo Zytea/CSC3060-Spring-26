@@ -1,6 +1,8 @@
-即使这是开卷考试，我已经把ppt要点总结成各个md,但考出来还是一坨屎
+现在我要考的是CSC3060 Final
 
-现在我要你审查各个我考场上查阅用的md，看看我md的内容和quiz和cmu15-213（注意我们csc3060和他们教的相当不同（我们是riscv而不是x86,而且一共从1-into学到7-linking，而且具体内容也不同，总之如果冲突以考纲以quiz和ppt为准），但大量题目都是同一个源头,所以应当查看`exams\raw`和`Quiz`来辅助审查看看我总结的和考试考的区别在哪，以及我的md该增删哪些（毕竟资料页数越少越好））
+即使这门课是开卷考试，我已经把ppt要点总结成各个md,但之前CSC3060 quiz考出来还是一坨屎
+
+现在我要你审查各个我考场上查阅用的md，看看我md的内容和quiz和cmu15-213（注意我们csc3060和他们教的相当不同（我们是riscv而不是x86,而且一共从1-into学到7-linking，而且具体内容也不同，总之如果冲突以考纲以quiz和ppt为准），但大量题目都是同一个源头,所以应当查看`exams\raw`和`Quiz`来辅助审查）
 
 一切的目的尽可能提高我这次csc3060 final的考试成绩
 
@@ -224,7 +226,10 @@ Who the fucking know what is so-called ` 20b imm × 2 `? If you have read `notes
 
 
 # Harness
-你需要生成的是1_review.md,2_review.md,3_review.md, 4_review.md
+你负责审查并优化的是*_review.md，共计12份。目标是涵盖可信任源的所有知识点，同时符合readme的convention要求，以保证这些md将作为CSC3060 Final 开卷考试时我快捷，准确，优质的参考。（终极目标是，即使是一个根本没上过这门课的人，靠这12份资料也能满分完成2h的CSC3060 final）
+你可信任并作为你的md基础的参考的是CSC3060 quiz/ppt/我自己的md (1.md,...,4.md,CA3060-4-1-ProcessorArchitecture.md, etc.)
+次一级的是CSC3050 quiz，大部分题目是重合的，但是你的更改需要审查
+最次的是CMU exam，小部分重合，你的更改更需要审查
 
 4_1_review.md,..., 6_review.md,5_review.md,...7_review.md
 

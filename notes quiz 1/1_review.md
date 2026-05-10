@@ -247,9 +247,9 @@ $$
 |---|---|
 | **concurrency** | multiple activities in progress; time-sliced (context switching) |
 | **parallelism** | actually execute at same time |
-| **ILP** | multiple instrs from one thread overlap/issue<br>pipeline, superscalar, OoO, scheduling, branch prediction |
-| **DLP / SIMD** | same op over many data elements<br>SIMD/vector/RVV/subword parallelism; GPU is DLP-style |
-| **TLP** | independent threads/tasks run in parallel<br>multicore, SMT, OS threads |
-| **MLP** | multiple outstanding memory ops/misses<br>non-blocking cache, MSHR, interleaved memory banks, OoO memory overlap |
+| **ILP** | · multiple instrs from one thread overlap/issue<br>· pipeline, superscalar, OoO, scheduling, branch prediction |
+| **DLP / SIMD** | · same op over many data elements<br>· SIMD/vector/RVV/subword parallelism; GPU is DLP-style |
+| **TLP** | · independent threads/tasks run in parallel<br>· multicore, SMT, OS threads |
+| **MLP** | · multiple outstanding memory ops/misses<br>· non-blocking cache, MSHR, interleaved memory banks, OoO memory overlap |
 
 **Parallelism implies concurrency; concurrency does not imply parallelism.**

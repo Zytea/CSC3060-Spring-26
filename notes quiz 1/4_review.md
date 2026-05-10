@@ -195,7 +195,7 @@ Quiz allocation anchors:
 No nested calls -> can often use `t`/`a` regs and return without stack frame, unless it needs local spills or modifies `s` regs.
 
 > [!IMPORTANT]
-> CSC3050 quiz anchor: a leaf routine should try `a0-a7`, `t0-t6`, especially `x28-x31`; **not** `s0-s11`, because saving/restoring callee-saved regs costs memory ops.
+> Leaf routine should try caller-saved regs: `a0-a7`, `t0-t6` (`x5-x7`, `x28-x31`); **not** `s0-s11`, because saving/restoring callee-saved regs costs memory ops.
 
 ### 11.2 Non-Leaf
 
