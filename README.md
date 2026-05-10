@@ -107,7 +107,7 @@ $$
 >
 > 90% improvable, target speedup `4x`: $4=\frac{1}{0.1+0.9/k}\Rightarrow k=6$
 >
->  (this is just for demonstration, as I don need a example for such a simple knowledge point, as you can see that in quizzes the instructor don’t test anything beyond this formular and I haven’t see any traps in applying this for problem solving)
+>  (this is just for demonstration, as I don't need a example for such a simple knowledge point, as you can see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; **this is the major criterion for whether to include an example or not!!!**)
 ```
 
 Bad example (inefficient in height and for look up):
@@ -148,3 +148,6 @@ Good example (efficient!):
 > [!NOTE]
 - $\forall$ FP format, Do not assume all-0 bits mean valid.
 ```
+
+
+6. If you have gone though the quizz and exams files. If you see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; otherwise, include it or use [!NOTE] or [!IMPORTANT] whenever appropriate; **this is the major criterion for whether to include an example or not!!!**
