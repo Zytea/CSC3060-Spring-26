@@ -221,27 +221,3 @@ Generated in ID, propagated through pipeline registers:
 > - **`RegWr` / WRen** (write enable)
 > - **`WBsel`** (ALU vs Mem vs PC+4)
 > NOT `ALUctl` (used in EX, not propagated to WB).
-
-## Quiz Cheat Sheet
-
-| Q | A |
-|---|---|
-| Three hazards | Structural, Data, Control |
-| "Forward hazard"? | NOT a hazard (trick) |
-| Reduce data hazards (HW) | Forwarding/bypassing, OoO |
-| Reduce data hazards (SW) | Compiler scheduling |
-| Reduce control hazards | BTB + BHT + prediction (NOT data forwarding) |
-| Best stage for branch prediction | **IF** |
-| Why BHT untagged | simple, fast, low energy, cost-effective |
-| Index for correlated prediction | **PC ⊕ GHR** |
-| BTB predicts | **where** |
-| BHT predicts | **whether** |
-| Hardest branch to predict | **JALR for switch/vtable** |
-| 1-bit predictor mispredict pattern | 2× per inner loop |
-| Static rules | backward→taken, forward→not-taken |
-| WB-stage signals | rd, RegWr, WBsel |
-| Apple M4 unlikely uses | static-only prediction |
-| 5→20 stages | mispred↑, data-haz↑, CPI↑, more pipeline regs |
-| Von-Neumann bottleneck | structural hazard |
-| Linked-list traversal hazards | data hazards (load-use chain) |
-| Binary-tree traversal hazards | data + control hazards |

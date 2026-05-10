@@ -155,17 +155,3 @@ if (edge.type == DependencyType::RAW)
 else  // WAR/WAW
     release at producer.issue_cycle
 ```
-
-## Quiz Cheat Sheet
-
-| Q | A |
-|---|---|
-| True dependence | **RAW** |
-| Legal schedule | any **topological order** of DAG |
-| Critical path | longest weighted path |
-| Schedule critical nodes | **early** |
-| Compiler scheduling limits | aliasing + unknown latency |
-| Reduce data-hazard stalls | forwarding, OoO, compiler scheduling |
-| #schedules best/worst | 1 / N! |
-| Cannot move load past store if | addresses may alias |
-| Use `restrict` to | tell compiler no aliasing → enable schedule/vectorize |

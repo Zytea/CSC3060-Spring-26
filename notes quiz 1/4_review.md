@@ -194,21 +194,3 @@ A():
 ```
 
 Use **caller-saved** in A — saves are only executed on the rare else-branch.
-
-## Summary Cheat Sheet
-
-| Question | Answer |
-|---|---|
-| Args | a0–a7 |
-| Return | a0 (a1) |
-| Return addr | ra (caller-saved) |
-| Stack ptr | sp |
-| Temps | t0–t6 (caller-saved) |
-| Saved | s0–s11 (callee-saved) |
-| Stack align (RV-Linux) | **16B** |
-| `ret` | `jalr x0, ra, 0` |
-| Result reg | **a0** |
-
-> [!IMPORTANT] Quiz mantra:
-> - **Caller** saves caller-saved regs before a call (only ones live after).
-> - **Callee** saves callee-saved regs at entry (only ones it modifies) and restores at exit.

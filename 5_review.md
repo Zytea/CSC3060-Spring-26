@@ -310,27 +310,3 @@ Other reductions: max/min, AND, OR, XOR, parity, product.
 | `volatile` variables | restrict reordering |
 | Memory consistency | constrains stores/loads |
 | Separate compilation | hides cross-module facts unless `-flto` |
-
-## Quiz Cheat Sheet
-
-| Q | A |
-|---|---|
-| First opt step | turn on `-O` |
-| Cross-module inlining | **`-O3 -flto`** |
-| Embedded / size | **`-Os`** |
-| Aggressive opt | `-O3` |
-| FP reassoc allowed | `-Ofast` / `-ffast-math` |
-| 1000× speedup possible | **cascading DCE** |
-| No locality goal | **loop unrolling** |
-| Class-discussed opt | **loop transformations for locality** |
-| CSE legal for | **integer types (long long, char, int)** |
-| CSE NOT legal for | float / double |
-| Inlining good candidates | **small, const args, called once in loop** |
-| Inlining bad | recursive, large, many call sites |
-| Fix aliasing penalty | **`restrict` + local scalar copy** |
-| Latency-bound code | linked list, tree, single query |
-| Bandwidth-bound code | matrix multiply, streaming |
-| Compiler limits | aliasing, FP semantics, volatile, side effects, separate compile, runtime data |
-| Compiler can't | change algorithm |
-| Multi-accumulator helps | breaks dep chain → CPE ≈ latency/k |
-| Optimal CPE = | max(critical path, FU bound, load/store BW) |

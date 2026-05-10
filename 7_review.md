@@ -369,35 +369,3 @@ GOT.plt entry initialized to "lazy resolver"; first call goes through resolver, 
 | 3 | Link | creates `.plt` stub (`auipc/ld/jalr`) |
 | 4 | Link | reserves GOT slot in `.got.plt` |
 | 5 | Run-time | dynamic linker fills GOT slot with real addr |
-
-## Quiz Cheat Sheet
-
-| Q | A |
-|---|---|
-| Standard Unix linker | **`ld`** |
-| Detailed ELF info | **`readelf`** |
-| NOT a linker job | **loading into memory** |
-| Three object file kinds | relocatable, executable, shared |
-| `.a` is | **archived collection of `.o` + index** |
-| Dynamic-linking data structures | **GOT + PLT** |
-| PLT lives in | `.text`/`.plt` |
-| GOT & GOT.plt live in | `.data` |
-| Dynamic linking benefits | **RAM savings, centralized updates, fast build link** (NOT "faster exec") |
-| `.symtab` includes | global vars, external funcs, static locals (NOT stack locals) |
-| Wrong symbol rule | **"Two weak symbols are not allowed"** (they ARE allowed) |
-| `.so .a .o` descriptions | all true (none incorrect, quiz: NONE wrong) |
-| Where relocation info comes from | **compiler/assembler**, in `.rel.text/.rel.data` |
-| Library order | put libs **after** objects (left→right scan) |
-| Why your malloc beats libc's | resolves before libc.a is scanned |
-| LD_PRELOAD | force load `.so` first → interpose symbols (e.g., `malloc`) |
-| LD_PRELOAD can't interpose | `_start` (statically linked in `crt1.o`) |
-| What linker can do | LTO, symbol resolution, page-align tuning, relocate var/func refs |
-| Linker benefits | modularity, fast recompile, code reuse, maintenance |
-| Linker doesn't | type-check, load into memory, compile |
-| Strong vs weak | strong = funcs+init globals; weak = uninit globals/extern |
-| 1 strong + N weak | strong wins |
-| 2 strong | error |
-| Inlining candidates | small, const args, called once-in-loop |
-| Linker error fix `undefined reference` | add lib `-lfoo`, define symbol, fix order |
-| Linker error fix `multiple definition` | one def, others `extern` |
-| ELF header tools | `readelf -h` |

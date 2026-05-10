@@ -163,18 +163,3 @@ Subset: `lw, sw, add, sub, and, or, beq, jal`.
 | Resource sharing | none | yes | yes (across instrs) | yes |
 
 > Single-cycle "advantages" vs pipelined: **Simple control + lower CPI (=1)**. Drawback: long clock, low throughput.
-
-## 11. Quiz Cheat Sheet
-
-| Q | A |
-|---|---|
-| Which µ-arch can have CPI<1? | **Superscalar** (with pipelining) |
-| Highest throughput | **Superscalar + pipelined** |
-| What sets single-cycle clock? | The slowest instruction (typically `LW`) |
-| `RegWr=0` for what? | **Branches, Stores** |
-| Why need 2 adders in EX? | One for ALU result, one for branch target (`PC+imm`) |
-| Why split I-mem and D-mem? | Avoid structural hazard in 1 cycle |
-| Why dedicated compare unit for branch? | Avoid wrong outcome from sub overflow |
-| RV32I regfile ports | 2R / 1W |
-| FMA reads | 3 sources per issue |
-| 2-issue superscalar GPR | ~4R / 2W |
