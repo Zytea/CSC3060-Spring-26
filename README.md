@@ -58,7 +58,7 @@ You must exactly follow the structure below,
 
 ```
 
-5. do not use ---, as these occupy an exatra line, and you should always keep in mind that the longer the notes, porportionally the harder it is to search during the exam. ==Every word counts!!!==, be cautious, but always be efficiently informative (i.e, you should not miss on any point that may be tested).
+5. do not use ---, as these occupy an exatra line, and you should always keep in mind that the longer the notes, porportionally the harder it is to search during the exam. ==Every word counts!!!==, be cautious, but always be efficiently informative (i.e, you should not miss on any point that may be tested). ==!!!Note that Clarity, precision and organization are way more important than saving some tiny characters.!!!==
 
 e.g., 0 is more efficient than zero, $\alpha$ better than `\alpha`,
 

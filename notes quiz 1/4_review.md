@@ -2,157 +2,183 @@
 
 ## Exam Facts
 
-- ==**Calling convention**==: rules for **arg passing, return val, frame, save/restore, fp**.
-- Args/returns: **a0-a7**; return val ==**a0**== (a1 too on RV32 for 64b).
-- ==**Caller-saved**==: `ra, t0-t6, a0-a7`. Caller saves before call **only if value live across call**.
-- ==**Callee-saved**==: `s0-s11, sp`. Callee saves at entry **only if it modifies them**.
-- `sp` restored before return; ==RV-Linux stack alignment **16B**==.
-- **Leaf** routine (no calls inside) → use `a/t`, often no frame.
-- **Non-leaf with values live across calls** → use `s` (1 save+1 restore vs 2N around N calls).
-- ==**Use cases**==:
-  - **Caller-saved good for**: leaf routines, expression-eval temps.
-  - **Callee-saved good for**: temps heavily used **across multiple calls**, ==**local scalar variables**==, CSEs reused across calls.
-  - NOT for: arrays/strings (they live in memory).
-- ==**Quiz**==: A calls B; `s1, t0, a1` live across B. **A saves/restores `t0` and `a1`** (caller-saved); `s1` is B's job.
+- ==**Calling convention**==: rules for args, returns, stack, register save/restore, frame setup/cleanup.
+- RISC-V args: `a0-a7`; returns: `a0`/`a1`; call: `jal ra,func`; return: `jalr x0,ra,0`.
+- ==Caller-saved==: `ra`, `t0-t6`, `a0-a7`. Callee may clobber them.
+- ==Callee-saved==: `sp`, `s0-s11`. Callee must restore if modified.
+- Stack grows down; RISC-V Unix ABI stack alignment at calls: **16B**.
+- Leaf routine: prefer caller-saved/temp regs; no call means no caller-save spill needed for call preservation.
+- Long-lived values across many calls: prefer callee-saved regs. Short temporaries: caller-saved.
+- If function A calls B and `t0/a1` are live across the call, A must save/restore them. If `s1` is live, B must preserve it only if B changes it; A need not save it just because of call.
 
 ## 1. Procedure Call Steps
 
-1. Caller places args in `a0-a7`.
-2. Caller saves any caller-saved regs needed after call.
-3. `jal ra, callee` → `ra=PC+4`, jump.
-4. Callee prologue: `addi sp,sp,-k`, save `ra` (if non-leaf), save `s` regs it modifies.
-5. Callee computes; result in `a0`.
-6. Callee epilogue: restore `s`/`ra`, deallocate frame, `ret`.
-7. Caller restores any saved caller-saved regs.
+![](assets/4.1.png)
+
+Typical call flow:
+
+1. Caller places args in `a0-a7` and/or stack.
+2. Caller saves live caller-saved regs if needed.
+3. Caller executes `jal ra,callee`.
+4. Callee allocates frame and saves callee-saved regs it will modify.
+5. Callee computes return value in `a0`/`a1`.
+6. Callee restores frame/registers and returns with `ret`.
+7. Caller reads return value and restores saved caller-saved regs.
 
 ## 2. Stack Layout
 
-Stack grows **down**; `sp` = current top. Frame: saved `ra`, saved `s` regs, locals, spills, outgoing args, dynamic arrays.
+![](assets/4.2.png)
 
-`fp` (s0) optional; if used, stable anchor → locals via `imm(fp)`.
+Stack grows toward lower addresses. A frame may contain:
 
-```
-high
-| caller frame  |
-| outgoing args |
-| saved ra      |
-| saved s regs  |
-| local vars    |
-| spills        |  ← sp
-low
-```
+- outgoing/incoming stack args beyond `a0-a7`.
+- saved `ra` and old `fp/s0`.
+- local variables/spills.
+- saved callee-saved registers.
+- dynamic arrays (`alloca`/VLA).
+
+> [!IMPORTANT]
+> `sp` must be restored before return; `s0/fp` is optional but useful for stable offsets.
 
 ## 3. RISC-V Procedure Support
 
-- `jal ra, target`: save PC+4 to ra, jump.
-- `ret = jalr x0, ra, 0`.
-- Interop with libs/OS/external code requires **ABI compliance**.
+| Mechanism | Instr/reg |
+|---|---|
+| Call | `jal ra, target` |
+| Return | `ret` = `jalr x0, ra, 0` |
+| Stack pointer | `sp` (`x2`) |
+| Frame pointer | `s0/fp` (`x8`) |
+| Return address | `ra` (`x1`) |
+
+Example prologue/epilogue:
+
+```asm
+addi sp,sp,-16
+sw   ra,12(sp)
+sw   s0,8(sp)
+addi s0,sp,16
+...
+lw   s0,8(sp)
+lw   ra,12(sp)
+addi sp,sp,16
+ret
+```
 
 ## 4. Register Convention
 
-| ABI | x-reg | Save |
-|---|---|---|
-| `zero` x0 | const 0 | — |
-| `ra` x1 | return addr | **caller** |
-| `sp` x2 | stack ptr | preserved |
-| `gp/tp` x3/x4 | global/thread | preserved |
-| `t0-t6` x5-7,28-31 | temps | **caller** |
-| `s0(fp)/s1` x8-9 + `s2-s11` x18-27 | saved | **callee** |
-| `a0-a7` x10-17 | args/ret | **caller** |
+| ABI | x-reg | Meaning | Save rule |
+|---|---|---|---|
+| `zero` | x0 | 0 | fixed |
+| `ra` | x1 | return address | caller |
+| `sp` | x2 | stack pointer | callee |
+| `gp` | x3 | global pointer | platform |
+| `tp` | x4 | thread pointer | platform |
+| `t0-t2` | x5-x7 | temporaries | caller |
+| `s0/fp` | x8 | saved/frame pointer | callee |
+| `s1` | x9 | saved | callee |
+| `a0-a7` | x10-x17 | args/returns | caller |
+| `s2-s11` | x18-x27 | saved | callee |
+| `t3-t6` | x28-x31 | temporaries | caller |
 
-## 5. Caller-Saved (volatile)
+## 5. Caller-Saved (Volatile)
 
-> "Caller, save it if you need it after the call."
+==Caller-saved== means: if caller needs the value after a call, caller saves it before the call and restores after.
 
-- Callee may clobber freely.
-- Caller saves **only the live-across-call ones**.
+Includes: `ra`, `t0-t6`, `a0-a7`.
 
-```
-addi sp,sp,-4
-sw   t1,0(sp)
-jal  ra, B
-lw   t1,0(sp)
-addi sp,sp, 4
-```
+Good for:
 
-## 6. Callee-Saved (non-volatile)
+- short-lived temporaries.
+- expression evaluation.
+- leaf routines.
+- values not live across calls.
+- values live only across rare/cold calls if saving in cold path is cheaper.
 
-> "Callee, restore them if you touched them."
+Example:
 
-- Saved at entry, restored before return.
-- 1 save + 1 restore total, regardless of inner-call count.
-
-```
+```asm
+; t0 and a1 are live across call to B
 addi sp,sp,-8
-sw   ra,4(sp)
-sw   s1,0(sp)
-mul  s1,a0,a1
-jal  ra, B
-jal  ra, C
-add  a0,s1,s1
-lw   s1,0(sp)
-lw   ra,4(sp)
-addi sp,sp, 8
+sw   t0,4(sp)
+sw   a1,0(sp)
+jal  ra,B
+lw   a1,0(sp)
+lw   t0,4(sp)
+addi sp,sp,8
+```
+
+## 6. Callee-Saved (Non-Volatile)
+
+==Callee-saved== means: callee must restore original value if it modifies the register.
+
+Includes: `sp`, `s0-s11`.
+
+Good for:
+
+- local scalar variables that live through most of a function.
+- CSE/common values reused across multiple calls.
+- loop variables/live values in non-leaf routines.
+
+Example:
+
+```asm
+# function uses s1
+addi sp,sp,-16
+sw   s1,12(sp)
+...
+lw   s1,12(sp)
+addi sp,sp,16
 ret
 ```
 
 ## 7. Cost Analysis
 
-Value used before/between/after N calls:
+If value `v` is live across `m` calls:
 
-| Class | Save/restore cost |
+| Register choice | Save/restore cost |
 |---|---|
-| Caller-saved | 2N (around each call) |
-| Callee-saved | 2 (1 entry + 1 exit) |
+| caller-saved | `2m` memory ops if saved around each call |
+| callee-saved | 2 memory ops in function prologue/epilogue if modified |
 
-⇒ Use **callee** when N≥2 in **hot path**.
-> Calls in **cold path** (else of `if`) → **caller** is cheaper (saves only on cold path).
+> Use callee-saved when `v` survives many calls; use caller-saved when `v` is temporary or calls are rare.
 
 ## 8. Allocation Rules
 
-| Value type | Pick |
+| Case | Prefer |
 |---|---|
-| Short-lived expr temp | `t`/`a` |
-| Local scalar, long-lived | `s` |
-| Live across multiple calls | `s` |
-| CSE used across calls | `s` |
-| Leaf routine | `t`/`a`, no save |
-| Calls only in cold path | caller-saved |
-| Arrays/strings/aggregates | **memory** |
+| leaf routine temporaries | caller-saved (`t`, `a`) |
+| expression temps | caller-saved |
+| value live across one rare call | caller-saved around cold path |
+| local scalar live across whole function | callee-saved (`s`) |
+| value live across many calls | callee-saved |
 
 ## 9. Worked Examples
 
-### 9.1 Nothing Live across Call
+### 9.1 Nothing Live Across Call
 
+```asm
+lw  t0,-4(fp)
+lw  t1,-8(fp)
+add t2,t0,t1
+sw  t2,-12(fp)
+jal ra,B
+add a0,a0,a0
 ```
-A:
-    lw   t0,-4(fp)
-    lw   t1,-8(fp)
-    add  t2,t0,t1
-    jal  ra, B          # nothing live across
-    add  a0,a0,a0
-    ret
-```
-> No save/restore needed.
+
+No pre-call save is needed if no caller-saved value is needed after `B`.
 
 ### 9.2 Leaf Routine
 
-> Use caller-saved liberally; no save/restore; often no frame.
+A leaf function calls nobody. It can use caller-saved regs freely unless it must preserve values for its own caller by convention.
 
-### 9.3 A calls B; `s1, t0, a1` live across
+### 9.3 A Calls B; `s1`, `t0`, `a1` Live Across
 
-| Reg | Class | Action |
-|---|---|---|
-| `s1` | callee | **B**'s job (if B modifies) |
-| `t0`, `a1` | caller | **A** saves+restores around call |
+- `t0`: caller-saved -> A saves/restores if needed after B.
+- `a1`: caller-saved -> A saves/restores if needed after B.
+- `s1`: callee-saved -> A does not save solely because of B; B must restore if B modifies `s1`.
 
-==Answer: A saves/restores **`t0` and `a1`** only.==
+Quiz answer: save/restore ==**`t0` and `a1`**== across the call.
 
 ### 9.4 Calls in Cold Path
 
-```c
-A():
-  if (hot) { /* no calls */ }
-  else { B(); C(); D(); }
-```
-Use **caller-saved** in A — saves only paid on else branch.
+If calls happen only in a rare `else`, caller-saved may be cheaper: save only on the cold path instead of every invocation.

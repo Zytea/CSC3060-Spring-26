@@ -2,230 +2,285 @@
 
 ## Exam Facts
 
-- ==**ISA**==: SW/HW interface; RV is **open, modular, license-free, load/store**.
-- ==**RV32I**==: 32b addr space + **32 GPRs**; 32b instr (16b w/ **C ext**).
-- ==**RV32E**==: embedded, **only 16 GPRs**.
-- Naming `RV{32/64/128}{I/E}{M,A,F,D,C,V}`. Base must be I or E. `RV32EM` ✓; `RV32MI` ✗.
-- "32" in RV32I = ==**32b addr + 32b GPR width**==, NOT "32 instr" / "32 GPRs".
-- **Architectural state**: RV32I = 32 GPRs + PC + CSRs; RV32IFD adds FP regs; RV32IFV adds vector regs.
-- ==**Microarch state**== (NOT saved on interrupt): pipeline regs, BHT, BTB, L1I/L1D, write buffer.
-- ==**ABI**== = ISA + OS syscalls + calling convention.
-- RV uses **register-register ALU**, **load/store memory access**, few regular formats.
-- Branch imm = **PC-relative, scaled by 2B** (C ext) → range ≈ ==**±4 KB**==.
-- JAL ≈ ±1 MiB; ==**JALR reaches full 4 GB**== via `rs1+imm`; AUIPC+JALR for far calls.
-- Natural alignment avoids data crossing **cache-line / page boundaries**.
-- RV-Linux ABI stack alignment = ==**16B**== at calls.
-- `LUI` (U, 20b) + `ADDI` for 32b consts; ==if low12 sign-bit is 1, **bump upper +1**== (`li` does this).
-- **No `LWU` in RV32I** (`LW` already 32b).
-- **No `LW rd,(rs1+rs2)`**: needs scaling, breaks regularity, no instr-count savings.
-- **No post-increment load**: needs **2 reg write ports**; rs1 = both src+dst → breaks regularity.
-- **No 128/1024 GPRs**: smaller=faster, longer instr fields, more save/restore overhead, arrays/structs in mem anyway.
-- ==**Hart**==: HW thread (PC/GPRs/CSRs).
+- ==**ISA**==: contract/interface between software and hardware.
+- RISC-V: open, modular, load/store, regular formats; no required cache hierarchy.
+- ISA name: `RV{32/64/128}{I/E}{M,A,F,D,C,V}`. Base is `I` or `E`. `RV32EM` valid; `RV32MI` invalid.
+- ==**RV32E**== has only **16 GPRs**; RV32I has 32 GPRs.
+- In `RV32I`, `32` means **32b address space** and **32b GPR width**, not 32 regs/instrs.
+- C extension absent -> RISC-V would be fixed-length 32b ISA.
+- RV32I arch state: **32 GPRs + PC + CSRs**. RV64IFV adds FP regs + vector regs.
+- Microarch state: pipeline regs, BHT, BTB, L1I/L1D; **not saved on interrupt**.
+- ABI = **ISA + OS syscall interface + calling convention**.
+- Natural alignment avoids data crossing **cache-line/page boundaries**.
+- Branch offset: PC-relative, 2B-scaled, signed 12b encoded + implicit 0 -> about **+-4 KiB**.
+- `JAL`: PC-relative, 2B-scaled, about **+-1 MiB**. `JALR`: `rs1+imm`, can reach full RV32 address space with loaded base.
+- `LUI+ADDI` for 32b constants; if low12 has sign bit 1, bump upper by 1.
+- No `LW rd,(rs1+rs2)`: needs scaling/complex addressing, breaks load/store regularity, often saves no instr in loops.
+- No post-increment load: needs **2 write ports** and makes `rs1` both source+destination.
 
 ## 1. ISA Design
 
 ### 1.1 CISC vs RISC
 
-| | CISC (x86, VAX) | RISC (RV, ARM, MIPS) |
+| | CISC | RISC / RISC-V |
 |---|---|---|
-| Instr | many, **var-length**, complex | few, **fixed**, simple |
-| Mem access | many addr modes | **load/store only** |
-| Pipeline | hard | regular |
-| Code size | small | larger (I-cache helps) |
+| Instr length | variable | mostly fixed 32b (16b with C) |
+| Addressing modes | many | few |
+| Memory operands | many instrs | only load/store |
+| Decode/pipeline | harder | easier |
 
-==**CPU time = IC × CPI × cycle**==. RISC: more IC, lower CPI, shorter cycle.
-> Modern x86 decodes complex instr into RISC-like µ-ops internally. ISA quality measured by **compiler usability**.
+==**CPU time = IC x CPI x cycle time**==. RISC may increase IC but lowers CPI/cycle time.
 
 ### 1.2 RISC Philosophy
 
-1. **Simplicity favors regularity** — fixed size, few formats, opcode in fixed bits.
-2. **Smaller = faster** — limit instr/regs/addr modes.
-3. **Make common case fast** — ops in regs, immediate ops.
-4. **Good compromises** — balance format vs operand count.
+1. Simplicity favors regularity.
+2. Smaller is faster.
+3. Make common case fast.
+4. Good design demands compromise.
 
 ## 2. RV32I Instructions and State
 
 ### 2.1 Categories
 
-- ALU R-type: `add sub and or xor sll srl sra slt sltu`
-- ALU I-type: `addi andi ori xori slti sltiu slli srli srai`
-- Loads (I): `lb lh lw lbu lhu` (no `lwu`); Stores (S): `sb sh sw`
-- Branches (B): `beq bne blt bge bltu bgeu`; Jumps: `jal` (J), `jalr` (I)
-- U-type: `lui auipc`; system/CSR: `ecall ebreak csrrw csrrs csrrc`
+| Category | Examples |
+|---|---|
+| R ALU | `add sub and or xor sll srl sra slt sltu` |
+| I ALU | `addi andi ori xori slti sltiu slli srli srai` |
+| Loads | `lb lh lw lbu lhu`; RV64 adds `ld lwu` |
+| Stores | `sb sh sw` |
+| Branches | `beq bne blt bge bltu bgeu` |
+| Jumps | `jal jalr` |
+| U | `lui auipc` |
+| System/CSR | `ecall ebreak csrrw csrrs csrrc` |
 
-> No `BLE/BGT`: swap operands of `BLT/BGE`. Range check `0≤x<y` via unsigned `BGEU` (1 instr).
+> No `BLE/BGT`: swap operands with `BLT/BGE`. `0 <= x < y` can use unsigned compare `bgeu x,y,out`.
 
 ### 2.2 Architectural State
 
-- RV32I: **32 GPRs + PC + CSRs**; RV32IFD: + 32 FP regs; RV32IFV: + vector regs.
-- ==`x0` hard-wired 0==: clear (`sub x9,x0,x8`), copy (`add x1,x0,x2`), cmp-zero (`beq x5,x0,L`), mem test (`lw x0,0(x1)`).
-- CSRs: `cycle, instret, hartid, mepc, mcause, mstatus, mtvec, mscratch`.
+| ISA | Architectural state |
+|---|---|
+| RV32I | 32 GPRs + PC + CSRs |
+| RV64IFD | GPRs + PC + CSRs + 32 FP regs |
+| RV64IFV | GPRs + PC + CSRs + FP regs + vector regs |
+
+`x0` is hardwired 0: clear/copy/compare-zero/discard load result.
 
 ### 2.3 Register Ports
 
-- RV32I scalar: ==**2R / 1W**==.
-- 2-issue superscalar (int): ~**4R / 2W**.
-- 2-issue RV64IFD with FMA: FP ==**6R / 2W**== (FMA = 3 src/issue).
+- RV32I scalar register file: ==**2 read + 1 write**==.
+- 2-issue superscalar integer: about **4R/2W**.
+- 2-issue RV64IFD with FMA: FMA has 3 FP sources -> **6R/2W** FP regfile.
 
 ## 3. Instruction Formats
 
-| Type | Use | Fields |
+![](assets/3.3.1.png)
+
+| Type | Use | Key fields |
 |---|---|---|
-| **R** | reg-reg ALU | `funct7\|rs2\|rs1\|funct3\|rd\|opcode` |
-| **I** | imm ALU, loads, JALR | `imm[11:0]\|rs1\|funct3\|rd\|opcode` (12b signed) |
-| **S** | stores | imm split, no rd |
-| **B** | branches | imm split, **PC-rel × 2B**, no rd |
-| **U** | `lui auipc` | 20b upper imm |
-| **J** | `jal` | 20b imm × 2 |
+| **R** | reg-reg ALU | `funct7 rs2 rs1 funct3 rd opcode` |
+| **I** | imm ALU, loads, `jalr` | `imm[11:0] rs1 funct3 rd opcode` |
+| **S** | stores | `imm[11:5] rs2 rs1 funct3 imm[4:0] opcode`; no `rd` |
+| **B** | branches | split imm, no `rd`; PC-relative target |
+| **U** | `lui auipc` | 20b upper immediate in bits 31:12 |
+| **J** | `jal` | split 20b immediate + implicit low 0 |
 
-==Regularity==: opcode bits 0-6, rd 7-11, rs1 15-19, rs2 20-24. B/J imm rearranged to share sign-extension HW.
+==Regularity==: `opcode[6:0]`, `rd[11:7]`, `rs1[19:15]`, `rs2[24:20]` stay in fixed positions when present.
 
-> R-type: `rd = rs1 (funct3,funct7) rs2`. ADD/SUB: `funct7=0000000/0100000`. SRL/SRA same.
-> I-type: 12b signed sign-extended. Shifts: `inst[30]` distinguishes SRLI/SRAI.
+### 3.1 Immediate Encoding Precisely
 
-### 3.1 Alignment + Memory Operands
+| Type | Immediate value |
+|---|---|
+| I | `signext(inst[31:20])` |
+| S | `signext({inst[31:25], inst[11:7]})` |
+| B | `signext({inst[31],inst[7],inst[30:25],inst[11:8],0})` |
+| U | `inst[31:12] << 12` |
+| J | `signext({inst[31],inst[19:12],inst[20],inst[30:21],0})` |
 
-- ==**Natural alignment**==: addr is multiple of object size.
-- Compiler maintains: `char` 1B, `short` 2B, `int` 4B, `long` 8B (LP64), `double` 8B.
-- Avoids cache-line/page crossing → no double TLB miss / page fault.
+![](assets/3.8.png)
 
-#### 3.1.1 Struct Rules
+> [!IMPORTANT]
+> B/J immediates are not "multiply by 2" after an arbitrary field. The encoded bits are rearranged and have an **implicit low 0 bit** because targets are 2B-aligned for the C extension.
 
-1. Each member at multiple of **its own alignment**.
-2. **Total size** padded to multiple of **largest member's alignment**.
-3. ==Field order **fixed** in C== (binary compat, pointer arithmetic).
+### 3.2 Alignment + Memory Operands
 
-> [!IMPORTANT] Independent locals **may** be reordered; struct fields **may NOT**.
+==**Natural alignment**==: address is a multiple of object size.
 
-#### 3.1.2 Worked Example (Quiz1 #14, RV64IFD)
+| Type | Size/alignment under LP64 |
+|---|---:|
+| `char` | 1 |
+| `short` | 2 |
+| `int` / `float` | 4 |
+| `long` / `double` / pointer | 8 |
 
-```
+Avoids data crossing cache-line/page boundaries, which could need two cache accesses/TLB checks/page faults.
+
+#### 3.2.1 Struct Rules
+
+1. Each field starts at offset multiple of its own alignment.
+2. Struct total size is padded to multiple of largest field alignment.
+3. C struct field order is fixed; compiler may reorder independent locals, **not struct fields**.
+
+#### 3.2.2 Worked Example (Quiz1 #14)
+
+```c
 struct S1 { int white; long count; char c; long red; int green; char d; int blue } A[1000];
 ```
 
-| Field | Offset | Bytes |
+RV64IFD / LP64:
+
+| Field | Offset | Note |
+|---|---:|---|
+| `white` | 0 | 4B, then pad to 8 |
+| `count` | 8 | 8B |
+| `c` | 16 | 1B, then pad to 24 |
+| `red` | 24 | 8B |
+| `green` | 32 | 4B |
+| `d` | 36 | 1B, then pad to 40 |
+| `blue` | 40 | 4B |
+| total | 48 | pad to 8B multiple |
+
+`A[10].blue = 0`: offset `10*48 + 40 = 520` -> ==**`sw x0, 520(x1)`**==.
+
+### 3.3 Branches and Jumps
+
+| Instr | Target/effect | Range idea |
 |---|---|---|
-| `int white` | 0 | 4 (+pad 4) |
-| `long count` | 8 | 8 |
-| `char c` | 16 | 1 (+pad 7) |
-| `long red` | 24 | 8 |
-| `int green` | 32 | 4 |
-| `char d` | 36 | 1 (+pad 3) |
-| `int blue` | 40 | 4 (+pad 4) |
-| total | | **48** |
+| branch | `PC + signext(B-imm)` | `[-4096,+4094]` bytes |
+| `jal rd,label` | `rd=PC+4; PC=PC+J-imm` | about `+-1 MiB` |
+| `jalr rd,rs1,imm` | `rd=PC+4; PC=(rs1+signext(imm)) & ~1` | via base reg, full address space possible |
 
-`A[10].blue=0` → offset = `10*48 + 40 = 520` → ==**`SW x0, 520(x1)`**==.
+Common forms:
 
-> Stack/frame alignment per ABI: ==**RV-Linux 16B**== (older 8B). CRT enforces before main.
-
-### 3.2 Branches and Jumps
-
-- ==Branch==: `PC + imm × 2`, signed 12b → ==**±4 KB**==.
-- ==Store==: `rs1 + imm`, byte offset.
-> Trap: branch ≠ store offset semantics — branch is PC-relative (2B-scaled), store is base-register-relative (byte).
-- Branch imm scaled by **2** (not 4) so 16b compressed instructions can be targets.
-- JAL: 20b imm × 2 → ±1 MiB. AUIPC+JALR: full 4 GB.
-- ==**JALR rd,rs1,imm**==: `rd=PC+4; PC=(rs1+imm)&~1`.
-
-#### 3.2.1 JAL / JALR Uses
-
-```
-jal  x0, label    ; j label (no link)
-jal  x1, func     ; call (link to ra)
-jalr x0, x1, 0    ; ret
-jalr x0, rs1, 0   ; indirect jump (switch / vtable)
+```asm
+jal  x0, label      # unconditional jump, no link
+jal  ra, func       # call
+jalr x0, ra, 0      # ret
+jalr x0, t0, 0      # indirect jump: switch/vtable/function pointer
 ```
 
-> No separate JUMP/CALL: `JAL/JALR + rd=x0/ra` covers both. Return prediction: HW uses ==**RAS**== + recognizes `JALR x0,ra,0` as return; wrong if ra repurposed.
+> Store offset is `rs1 + byte_offset`; branch offset is **PC-relative**. Do not mix them.
 
-### 3.3 Constants and Addressing (LUI, AUIPC)
+### 3.4 Constants and Addressing
 
+```asm
+; target: x1 = 0x12345678
+lui  x1, 0x12345      # x1 = 0x12345000
+addi x1, x1, 0x678
 ```
-# 0x12345678
-lui  x1, 0x12345     # x1 = 0x12345000
-addi x1, x1, 0x678   # x1 = 0x12345678
+
+If low12 sign bit is 1:
+
+```asm
+; target: x1 = 0x12345800; addi imm is signed -0x800
+lui  x1, 0x12346
+addi x1, x1, -0x800
 ```
 
-> [!IMPORTANT] If low12 sign-bit set (e.g., `0x800`), `addi` sign-extends negative. **Bump upper +1** to compensate; pseudo `li` does this automatically.
-> ```
-> # 0x12345800
-> lui  x1, 0x12346
-> addi x1, x1, -0x800
-> ```
-
-`AUIPC rd,imm`: `rd = PC + (imm<<12)`. With JALR → far PC-rel calls.
+`li` pseudo-instruction handles this. `auipc rd,imm` computes `PC + (imm<<12)`; `auipc+jalr` supports far PC-relative calls.
 
 ## 4. Assembly vs Binary
 
-Assembler provides: mnemonics, **pseudo-instructions** (`mv, j, li, nop, ret, bnez, beqz`), labels.
+Assembler conveniences:
+
+- labels instead of numeric PC offsets.
+- pseudo-instrs: `li`, `mv`, `nop`, `j`, `ret`, `beqz`, `bnez`.
+- relocation records for unresolved labels/symbols.
 
 ## 5. ABI / Register Convention
 
-| ABI | x-reg | Role | Save |
+| ABI | x-reg | Role | Preserved by |
 |---|---|---|---|
-| `zero` | x0 | const 0 | — |
-| `ra` | x1 | return addr | **caller** |
-| `sp` | x2 | stack ptr | preserved |
-| `gp/tp` | x3/x4 | global/thread ptr | preserved |
-| `t0-t2` | x5-7 | temps | **caller** |
-| `s0/fp` | x8 | saved/frame ptr | **callee** |
-| `s1` | x9 | saved | **callee** |
-| `a0-a1` | x10-11 | args / **return val** | **caller** |
-| `a2-a7` | x12-17 | args | **caller** |
-| `s2-s11` | x18-27 | saved | **callee** |
-| `t3-t6` | x28-31 | temps | **caller** |
+| `zero` | x0 | constant 0 | fixed |
+| `ra` | x1 | return address | caller |
+| `sp` | x2 | stack pointer | callee |
+| `gp/tp` | x3/x4 | global/thread ptr | fixed platform |
+| `t0-t2` | x5-x7 | temps | caller |
+| `s0/fp` | x8 | saved/frame ptr | callee |
+| `s1` | x9 | saved | callee |
+| `a0-a7` | x10-x17 | args; `a0/a1` returns | caller |
+| `s2-s11` | x18-x27 | saved | callee |
+| `t3-t6` | x28-x31 | temps | caller |
 
-- Args: a0-a7 (extras spill to stack); return: ==**a0**== (a1 too on RV32 for 64b).
-- Calls: `jal ra, target`; returns: `ret = jalr x0, ra, 0`.
+- First 8 integer args: `a0-a7`; return value: `a0` (and `a1` for wider RV32 returns).
+- Stack alignment at calls in RISC-V Unix ABI: **16B**.
+- `a0-a7`, `t0-t6`, `ra` may be clobbered across calls.
 
-### 5.1 Common RV32I Codegen
+## 6. Common RV32I Codegen
 
-| C op | RV32I |
+Assume function args: unsigned `a` in `a0`, signed `b` in `a1`, signed `c` in `a2`.
+
+| C expression | Good RV32I code |
 |---|---|
-| `a*4` | `slli rd, a0, 2` |
-| `a/8` (unsigned) | `srli rd, a0, 3` |
-| `a%128` | `andi rd, a0, 0x7F` |
-| `b>>3` (signed) | `srai rd, a1, 3` |
-| `b/8` (signed div) | `bge a1,x0,+8; addi a1,a1,7; srai rd,a1,3` |
-| `pow(2,a)` | `addi rd,x0,1; sll rd,rd,a0` |
-| `b*61` | `slli t0,a1,6; slli t1,a1,2; sub t0,t0,t1; add t0,t0,a1` (=64b−4b+b) |
-| `a=(b>=c)` | `slt a0,a2,a1; xori a0,a0,1` |
+| `a*4` | `slli t0,a0,2` |
+| `b*61` | `slli t0,a1,6; slli t1,a1,2; sub t0,t0,t1; add t0,t0,a1` |
+| `a/8` unsigned | `srli t0,a0,3` |
+| `b>>3` | `srai t0,a1,3` |
+| `b/8` signed | `bge a1,x0,L; addi a1,a1,7; L: srai t0,a1,3` |
+| `a%128` | `andi t0,a0,0x7f` |
+| `pow(2,a)` | `addi t0,x0,1; sll t0,t0,a0` |
+| `a=(b>=c)` | `slt a0,a1,a2; xori a0,a0,1` |
 
-> [!IMPORTANT] Signed `b/8` needs **biasing** when negative: `if(b<0) b+=7;` then `srai 3` (else `-9>>3=-2` instead of `-1`).
+> Signed divide by power of 2 rounds toward 0, while arithmetic shift rounds toward `-inf`; add bias for negative values.
 
-### 5.2 Software Multiply (no `M` ext)
+### 6.1 Software Multiply Without `M`
 
-```
-xor a0,a0,a0
-mult_loop:
+```asm
+xor  a0,a0,a0        # result=0
+loop:
     andi t0,a2,1
     beqz t0,skip
     add  a0,a0,a1
 skip:
     slli a1,a1,1
     srli a2,a2,1
-    bnez a2,mult_loop
+    bnez a2,loop
 ```
 
-## 6. Exceptions / Interrupts
+## 7. Exceptions / Interrupts
 
-HW: save `mepc, mcause, mstatus.MPP`; jump to `mtvec`; raise privilege.
-SW: save GPRs to mem at `mscratch`; decode; adjust `mepc` (+4/+2); restore; `MRET`.
+On trap/interrupt, save/restore architectural state; microarchitectural state can be regenerated.
 
-> Illegal instr (e.g., `mul` on RV32I): handler can **emulate** in SW.
-> Precise exceptions easier in-order; OoO needs reorder buffer + commit.
+Typical machine-mode flow:
 
-## 7. ISA Design Issues / Quiz Traps
+1. HW writes `mepc`, `mcause`, updates `mstatus`, jumps to `mtvec`.
+2. Handler saves GPRs if needed.
+3. Handle event; may adjust `mepc`.
+4. Restore regs; `mret`.
 
-- **128 GPRs?** No: slower regfile, wider instr, more save/restore, arrays still in mem.
-- **3-operand FMA alt** `rd=rs1*rs2+rd` saves operand but rd is both src+dst → ==breaks regularity== (extra read port for rd).
-- **Post-increment load** rejected: 2 write ports; rs1 src+dst.
-- **Compare-and-branch** vs flag: RV picks compare-and-branch (no global flag, simple pipeline).
-- **No `LW rd,(rs1+rs2)`**: needs scaling; in loops, `addi` advances base — no savings.
+Illegal instruction (e.g., `mul` on RV32I) can be emulated by software handler.
 
-### 7.1 GDB / Bomb Lab
+## 8. ISA Design Issues / Quiz Traps
 
-- ==`print $a0`== / `p $a0`: reg in **decimal**.
-- `print/x $a0`: hex; `info registers`: all GPRs; `x/d addr`: memory.
-- ==`a0-a7,t0-t6,ra` are caller-saved== → may be clobbered across calls.
-- Bomb is **NOT guaranteed cross-platform**; goal: correct inputs, NOT brute force.
+### 8.1 128 GPRs?
+
+Usually no:
+
+- more bits per register specifier -> larger instr or fewer opcode/imm bits.
+- larger/slower register file, more ports expensive.
+- more save/restore at calls/context switches.
+- arrays/structs/strings still live in memory, so memory ops do not disappear.
+
+### 8.2 Three-Operand FMA Alternative
+
+To avoid R4, define `rd = rs1 * rs2 + rd`. It preserves dot-product use, but breaks RV regularity because ==**rd is both source and destination**==; it also pressures read ports.
+
+### 8.3 No `LW rd,(rs1+rs2)`
+
+For `A[i]`, address is `base + i * sizeof(element)`, not just `base+i`.
+
+- If load scales `rs2`, addressing mode becomes complex.
+- If compiler first computes scaled index, no instr-count savings.
+- In loops, compiler often increments base pointer by 1/2/4/8 with `addi`.
+- R-type-like 3-reg load breaks regular load/store format regularity.
+
+### 8.4 No Post-Increment Load
+
+`rd <- mem[rs1+imm]; rs1 <- rs1+imm` is rejected because it needs **two register writes** and makes `rs1` both source and destination.
+
+## 9. GDB / Bomb Lab
+
+- `print $a0` / `p $a0`: print register `a0` in decimal.
+- `print/x $a0`: hex.
+- `info registers`: all regs.
+- `x/d addr`: examine memory at address.
+- Bomb goal: infer correct inputs without exploding; not brute force; executable is not universally portable to every RISC-V platform.

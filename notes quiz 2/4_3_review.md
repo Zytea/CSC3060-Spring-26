@@ -2,117 +2,108 @@
 
 ## Exam Facts
 
-- ==**Pipelining**==: overlap stages of consecutive instrs to **increase throughput** (NOT single-instr latency).
-- 5 stages: ==**IF, ID, EX, MEM, WB**==.
-- Ideal N-stage for n instrs: $T = (n + N - 1) \cdot T_{stage}$. **Fill/drain = N − 1**.
-- Speedup limited by **slowest stage**, imbalance, pipeline-reg overhead, hazards.
-- Scalar pipe CPI≈1; ==**superscalar CPI<1**==.
-- Pipeline-friendly ISA: fixed/regular instr, simple formats, load/store, few addr modes.
-- MIPS-without-interlocks failed mainly due to ==**compatibility/scalability**==, NOT non-competitive perf.
-- EX needs ==**TWO adders**== (ALU + branch target).
-- Pipeline regs: ==**IF/ID, ID/EX, EX/MEM, MEM/WB**== — store **ctrl + data + addr + reg designators**.
-- ==**MEM/WB has least info**==; ==**ID/EX has most**==.
-- ==In-order retirement at WB== ⇒ precise architectural state for traps. OoO precise state needs reorder buffer + commit.
-- Hardest functional unit to pipeline: ==**integer divide**==.
-- Quiz latencies (cyc): int **mul 3-5**, **div ~32**, **FADD 4**, **FMUL 5**, **FMA 5-6**, **FP→int 3-5**.
-- Deep pipe (5→20): clock NOT 4× faster; ==**branch-misprediction↑, data-hazard↑, CPI↑, more pipeline regs**==.
-- Long pipe less desirable when: frequent mispredictions / heavy data deps / freq I-cache misses / freq calls.
-- Split L1I/L1D ⇒ avoid IF↔MEM struct hazard + double bandwidth.
+- ==**Pipelining**==: partition datapath into stages and overlap different instrs; improves **throughput**, not single-instr latency.
+- 5 classic stages: ==**IF, ID, EX, MEM, WB**==.
+- Ideal N-stage time for n instrs: $T=(n+N-1)T_{stage}$; fill/drain cost = `N-1`.
+- Pipeline speedup is limited by slowest stage, pipeline-register overhead, hazards, and fill/drain.
+- Scalar pipeline CPI about 1; superscalar can have CPI <1.
+- Pipeline-friendly ISA: fixed/regular instrs, load/store design, few addressing modes.
+- MIPS without interlocks failed mainly from **compatibility/scalability**, not raw performance.
+- EX stage needs **two adders** in common RV datapath: ALU/address/compare path + branch target `PC+imm`.
+- Pipeline regs store **control + data + addresses + register designators**.
+- `ID/EX` usually has most info; `MEM/WB` least.
+- In-order retirement at WB gives precise architectural state; OoO precise state needs reorder buffer/commit.
+- Hardest common FU to pipeline: **integer divide**.
+- Deep pipeline 5->20: clock not 4x faster; branch/data penalties, CPI, pipeline-register count increase.
+- Deep pipeline less desirable for **frequent branch mispredictions, heavy data dependencies, frequent I-cache misses**. Ordinary memory ops/procedure calls alone are not enough.
 
-## 1. Pipelining Concept
+## 1. Pipelining
 
-Like an assembly line: each stage works on a different instruction simultaneously.
+Pipeline partitioning:
 
-> [!IMPORTANT] Pipelining is **throughput-driven**, not latency-driven. Single-instr latency may even **increase** by pipeline-reg overhead.
-
-## 2. Five Stages
-
-| Stage | Action |
+| Stage | Work |
 |---|---|
-| **IF** | Fetch using PC; compute `PC+4`; **branch prediction** |
-| **ID** | Decode + read regs; sign-extend imm; generate control |
-| **EX** | ALU op / addr calc / branch compare + target |
-| **MEM** | Data cache R (load) or W (store) |
-| **WB** | Write result to regfile |
+| **IF** | fetch instr using PC; compute/choose next PC; branch prediction happens here |
+| **ID** | decode; read `rs1/rs2`; generate imm/control |
+| **EX** | ALU op, effective address, branch compare/target |
+| **MEM** | data cache read/write for load/store |
+| **WB** | write result to GPR |
 
-> EX needs **two adders**: ALU + branch target (`PC+imm`).
+> [!IMPORTANT]
+> Pipelining can increase single-instr latency because the instr passes through all stages plus pipeline-register overhead. It improves completed instrs per time.
 
-### 2.1 Stages by Instr Type
+## 2. Five Stages by Instruction Type
 
-| Type | Uses |
-|---|---|
-| B-type (BEQ…) | IF→ID→EX |
-| S-type (SW…) | IF→ID→EX→MEM (no WB) |
-| R / I-ALU / U / J | IF→ID→EX→WB |
-| Load (LW…) | IF→ID→EX→MEM→WB |
+| Instr type | Useful stages | Architectural result |
+|---|---|---|
+| B-type branch | IF, ID, EX | update PC if taken; no WB |
+| S-type store | IF, ID, EX, MEM | write data memory; no WB |
+| R/I ALU | IF, ID, EX, WB | write ALU result |
+| U/J | IF, ID, EX, WB | write upper/PC+4 result |
+| Load | IF, ID, EX, MEM, WB | write loaded data |
 
-> All 5 stages still clocked through (NOPs in unused stages).
+Even if a stage has no useful work, the pipeline slot still advances.
 
 ## 3. Latency vs Throughput
 
-If stages 100ps regfile r/w, 200ps else:
+Example stage delays: regfile read/write 100 ps, other stages 200 ps.
 
-| Implementation | Max clock | Latency |
-|---|---|---|
-| Single-cycle | 1/800ps = 1.25GHz | 800ps |
-| Multi-cycle | 1/200ps = 5GHz | varies |
-| 5-stage pipe | 5GHz throughput | 5×200 = 1000ps |
-
-Pipe wins on **throughput** (1 inst / 200ps).
+| Impl | Clock | Single instr latency | Throughput |
+|---|---:|---:|---:|
+| Single-cycle | 800 ps | 800 ps | 1 instr / 800 ps |
+| Multi-cycle | 200 ps | depends on stages | not overlapped |
+| 5-stage pipe | 200 ps | about 1000 ps | 1 instr / 200 ps ideal |
 
 ## 4. Pipeline Speedup
 
-$$\text{Speedup}=\frac{n\cdot T_{long}}{(n+N-1)\cdot T_{stage}}\xrightarrow{n\to\infty}\frac{T_{long}}{T_{stage}}$$
+$$
+\text{Speedup}=\frac{nT_{single}}{(n+N-1)T_{stage}}\to\frac{T_{single}}{T_{stage}}\quad(n\to\infty)
+$$
 
-Ideal speedup ≈ N when stages balanced.
+Ideal speedup near N only when stages are balanced and hazards absent.
 
-> [!IMPORTANT] Pipeline speedup limits: stage imbalance (slowest caps throughput), pipeline-reg delay, fill/drain (N−1), hazards.
+## 5. Pipeline-Oriented ISA Design
 
-## 5. Pipeline-Oriented ISA Design (RV)
+RISC-V helps pipelining:
 
-- ==Fixed-length 32b instr== (16b w/ C-ext) → easy IF + ID.
-- Few **regular formats** → decode + read regs in one step.
-- **Load/store** is only mem access → addr in EX (3rd stage), DMem in MEM (4th).
-- Simple instrs ⇒ few stages.
-
-> CISC: x86 1–17B instr → cannot fetch+decode in one cycle (must decode to µops first).
+- Fixed 32b instrs, except optional C extension.
+- Regular `rs1/rs2/rd` positions -> decode/read in ID.
+- Load/store only -> address in EX, data memory in MEM.
+- Simple operations -> no long microcoded paths for normal integer ops.
 
 ## 6. Pipeline Lessons
 
-1. Pipe boosts **throughput**, not latency.
-2. Limited by **slowest stage**.
-3. Multiple instrs in flight using different resources.
-4. Ideal speedup ≈ N.
-5. **Fill/drain** = N−1 cyc.
-6. Avoid bubbles from data + control deps.
+- More stages improve potential clock but increase branch/data penalty and register overhead.
+- More pipeline registers are required as depth increases.
+- Pipeline throughput can be hurt by structural, data, and control hazards.
+- Split L1I/L1D avoids IF vs MEM structural conflict and doubles access bandwidth.
 
-> Pipelining everywhere: DRAM, caches, FPU, GPU, network packets.
+## 7. Long-Latency Ops and Retirement
 
-## 7. Long-Latency Ops & Retirement
+Options for long ops:
 
-Two options:
-1. **Stall** at EX until done.
-2. **Separate long-latency pipe** so subsequent indep instrs proceed.
+1. Stall instruction in EX until FU completes.
+2. Use separate pipelined/iterative FU so independent younger instrs can proceed.
 
-> [!IMPORTANT]
-> - In-order retirement at WB ⇒ precise architectural state.
-> - RV avoids HW int-overflow trap ⇒ OoO retirement is viable.
-> - OoO + precise state needs **reorder buffer + commit logic**.
-> - Hardest to pipeline: ==**integer divide**==.
+Precise traps require architectural state to update in program order. In simple in-order pipelines, retirement/writeback order is in order. In OoO, use ROB/commit.
 
 ## 8. Pipeline Registers
 
-| Register | Stores |
+| Register | Carries |
 |---|---|
-| **IF/ID** | fetched instr + PC |
-| ==**ID/EX** (most info)== | regfile data, imm, decoded ctrl, rs1/rs2/rd, PC, PC+4 |
-| **EX/MEM** | ALU result, store-data, branch target, MEM/WB ctrl, rd |
-| ==**MEM/WB** (least info)== | mem data, ALU result, rd, WB ctrl |
+| `IF/ID` | fetched instr, PC/PC+4 |
+| `ID/EX` | reg values, imm, PC/PC+4, decoded control, `rs1/rs2/rd` |
+| `EX/MEM` | ALU result, store data, branch target/outcome, MEM/WB control, `rd` |
+| `MEM/WB` | memory data, ALU result/PC+4, WB control, `rd` |
 
-> Carry **ctrl + data + addr + reg designators**. Same-cycle WB+ID of same reg: write 1st half / read 2nd half.
+> Quiz: pipeline registers store **control, data, addresses, register designators**.
 
-## 9. Hazards Preview (full in 4.4)
+Same-cycle register-file convention: WB writes in first half, ID reads in second half, reducing apparent WB->ID hazard.
 
-- **Structural**: HW resource conflict ⇒ split I/D cache.
-- **Data**: producer not yet written ⇒ forwarding/bubble.
-- **Control**: branch outcome unknown ⇒ predict + flush on miss.
+## 9. Hazards Preview
+
+| Hazard | Meaning | Main fixes |
+|---|---|---|
+| Structural | same HW resource needed by two stages | duplicate/pipeline resource, split I/D cache |
+| Data | consumer needs value before producer provides it | forwarding, stall, scheduling, OoO |
+| Control | next PC unknown/wrong | prediction, BTB/BHT, flush on miss |
