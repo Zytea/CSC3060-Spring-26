@@ -25,7 +25,7 @@
 - ==**Constant folding**==: compute constants at compile time.
 - ==**DCE**==: remove computations whose results are never used; cascading DCE may unlock 1000x-style cases.
 - ==**CSE**==: compute repeated expression once if no intervening side effects/alias.
-- CSE/reassociation safe for exact integer ops if no overflow UB; unsafe for `float/double` unless fast-math permits.
+- CSE/reassociation quiz answer: **`long long` and `char`**, not `float/double` unless fast-math permits.
 - ==**LICM**==: move loop-invariant computation outside loop.
 - ==**Inlining**==: remove call overhead and enable constant propagation/DCE; risk = code bloat/I-cache pressure.
 

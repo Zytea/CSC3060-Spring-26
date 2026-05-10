@@ -61,6 +61,7 @@ I-cache easier than D-cache because it normally has no processor stores; JIT/pat
 - With cache misses in CPI: extra CPI = memory-instruction fraction * miss rate * miss penalty.
 - Single-cycle cache miss quiz: base CPI 1 + `0.4*0.05*100 = 3.0`.
 - Line holds `block size / element size` elements; in a cold cache, first access to a line is a compulsory miss.
+- Bandwidth-heavy features: **large lines, prefetching, non-blocking caches, write-through**.
 
 ## Reducing Misses
 
@@ -90,7 +91,7 @@ Large line:
 - Inclusive: lower level contains copies of upper; easier coherence, wastes capacity.
 - Exclusive: levels avoid duplication; more effective capacity, more movement complexity.
 - NINE = non-inclusive non-exclusive.
-- Nonsense traps: L1I write-back/copy-back, L3 write-through, contradictory inclusive/exclusive chains.
+- Nonsense traps: L1I write-back/copy-back, L3 write-through, L1D 4-way backed by DM L2, contradictory inclusive/exclusive chains.
 
 ## Coherence
 

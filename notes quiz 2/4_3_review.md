@@ -8,12 +8,13 @@
 - Pipeline speedup limited by **slowest stage**, imbalance, pipeline-reg overhead, hazards.
 - CPI of simple scalar pipeline approaches 1; superscalar can be <1.
 - Pipeline-oriented ISA: fixed/regular length, simple formats, load/store, few addressing modes.
+- MIPS without interlocks failed mainly due to **compatibility/scalability**, not because performance was noncompetitive.
 
 ## Five Stages
 
 - **IF**: fetch instruction using PC; often compute `PC+4`.
 - **ID**: decode, read regs, generate control, immediate.
-- **EX**: ALU op, address calc, branch compare/target.
+- **EX**: ALU op, address calc, branch compare/target; RV pipeline EX may need **two adders** (ALU/address + branch target).
 - **MEM**: data cache access for loads/stores.
 - **WB**: write result to register file.
 

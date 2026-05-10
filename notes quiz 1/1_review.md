@@ -22,6 +22,7 @@
 - `0x00000000`: may be `int 0`, IEEE FP `+0.0`, address `0`, instruction bits, or padding.
 - Character `'0'` is `0x30`, so string `"0000"` is `0x30 0x30 0x30 0x30`, not all-0 bytes.
 - 128 all-0 bits can be **four single-precision `+0.0`** values.
+- Quiz trap: do not claim 128 all-0 bits is one quad FP value unless the format is specified.
 > [!IMPORTANT]
 > A bit string has no fixed type; always ask **which format / ISA / context** interprets it.
 
@@ -36,7 +37,7 @@
 | **Assemble** | `.s -> .o` | assembly -> relocatable machine code |
 | **Link** | `.o + libs -> exe` | resolve symbols; relocate addresses |
 
-Commands: `gcc -E`, `gcc -S`, `gcc -c`, `gcc hello.o -o hello`.
+Commands: `gcc -E`, `gcc -S`, `gcc -c`, `gcc hello.o -o hello`; compilation tools are preprocessor/compiler/assembler/linker, not OS/ChatGPT.
 
 > [!IMPORTANT]
 > **Loading** happens when OS starts an executable; it is not one of the 4 compilation phases.
