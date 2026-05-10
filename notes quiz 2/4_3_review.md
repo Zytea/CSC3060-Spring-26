@@ -58,6 +58,15 @@ I3:            IF  ID  EX  MEM WB
 
 Even if an instr has no useful work in a stage, it still occupies the stage slot.
 
+Effective useful stages before pipeline padding:
+
+| Instr class | Useful end stage |
+|---|---|
+| branch | EX: compare + target decision |
+| store | MEM: memory write |
+| ALU/U/J | WB: write result/`PC+4` |
+| load | WB: write loaded data |
+
 ## 4. Divide Single-Cycle Datapath into 5 Stages
 
 Pipeline clock is set by slowest stage + pipeline register overhead.
@@ -113,6 +122,8 @@ Precise trap requirement:
 ```text
 architectural state must look as if all older instrs completed and no younger instr completed
 ```
+
+RISC-V avoids integer arithmetic exceptions, which makes aggressive execution/retirement simpler than an ISA where every overflowing add can trap.
 
 ## 10. Multiple Instructions On the Fly
 

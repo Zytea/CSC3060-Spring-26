@@ -11,7 +11,7 @@
 - **Pipeline**: overlapped instrs, high throughput, hazards add stalls.
 - **CPI < 1**: only superscalar/multiple-issue style, not ordinary scalar pipeline.
 - **Throughput order**: **superscalar+pipelined > pipelined > multi-cycle > single-cycle**.
-- **Scalar RV32I regfile**: **2 read ports + 1 write port**.
+- **Scalar RV32I regfile**: **2 read ports + 1 write port**; reads are combinational, writes are clocked.
 - **Branch signed compare**: subtraction sign can be wrong on overflow; use comparator or `sign(A-B)^overflow`.
 
 ## 1. Processors and Logic Designs
@@ -91,6 +91,14 @@ clock edge -> state outputs stable -> combinational logic -> setup before next e
 ```
 
 Clock period must cover clk-to-Q + critical path + setup + skew.
+
+Regfile timing:
+
+| Action | Timing |
+|---|---|
+| read `rs1/rs2` | combinational after addresses settle |
+| write `rd` | clock edge when `RegWr=1` |
+| branches/stores | `RegWr=0` |
 
 ## 6. Abstract RV32I Datapath
 
@@ -177,7 +185,7 @@ Limitations:
 
 - slowest instr sets clock for all.
 - resources cannot be reused in same cycle.
-- result is written back at the same clock edge that completes the instruction.
+- result is committed on the clock edge after the combinational path, not early inside the cycle.
 - separate I/D memories or caches avoid IF/MEM structural hazard.
 - multiply/divide bad fit for one cycle.
 

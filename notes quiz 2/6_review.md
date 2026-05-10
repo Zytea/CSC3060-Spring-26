@@ -48,6 +48,8 @@ Locality:
 
 GPU global memory: high-end NVIDIA uses **HBM**.
 
+SRAM is expensive because it uses many transistors per bit, has lower density, and is more complex/low-volume than DRAM.
+
 ### 2.2 Memory Wall
 
 ==**Memory wall**==: processor improves faster than main-memory latency/bandwidth.
@@ -62,6 +64,8 @@ Mitigation:
 ## 3. Cache Basics
 
 ### 3.1 Cache Line / Set / Lookup
+
+==**Cache line/block**==: fixed-size copy of contiguous lower-level bytes. Hit = requested block present; miss = fetch from lower level and pay miss penalty.
 
 ```text
 addr = [ tag ][ set index ][ block offset ]
@@ -91,6 +95,16 @@ b = 5, s = 9, t = 32-9-5 = 18
 ```
 
 Quiz4 #4 answer: **tag 18, set index 9, block offset 5**.
+
+Total cache bits:
+
+$$
+DataBits=C\times8,\quad Lines=S\times E,\quad MetadataBits\approx Lines\times(1+t+d)
+$$
+
+`d=1` if a dirty bit is used; add coherence-state bits for multicore caches.
+
+Set number and byte offset are address fields, not stored per line.
 
 ### 3.3 Address Decomposition
 
@@ -128,6 +142,8 @@ Conflict miss pattern:
 access A,B,A,B,... where set(A)==set(B), tag(A)!=tag(B)
 ```
 
+In a direct-mapped cache, addresses separated by a multiple of cache size map to the same set.
+
 ### 4.2 Set-Associative Trace
 
 On access:
@@ -145,6 +161,8 @@ For element size `e` and line size `B`, one cache line holds `B/e` contiguous el
 row-major row scan miss rate ~= 1/(B/e) if no conflict/capacity issue
 column scan with large stride often ~= 100% miss
 ```
+
+Streaming pattern: one stream of `e`-byte elements has miss rate about `e/B`; `k` independent streams work similarly only if associativity can hold the `k` live lines and their sets do not conflict.
 
 Trace assumptions often say locals are in registers and instruction fetches are ignored.
 
@@ -172,6 +190,15 @@ for (j=0;j<C;j++)
 ```
 
 ## 5. Placement / Associativity / Block Size
+
+The 4 cache-design questions:
+
+| Question | Mechanism |
+|---|---|
+| where can a block go? | placement / associativity |
+| how is a block found? | index + tag compare |
+| which block is evicted? | replacement policy |
+| what happens on writes? | write policy |
 
 | Org | Meaning | Pros/cons |
 |---|---|---|
@@ -285,6 +312,12 @@ True LRU data structure: **stack**.
 
 ==**Victim cache**==: small fully-associative buffer of recently evicted lines; helps direct-mapped conflict misses.
 
+LRU/FIFO trap: if set holds `A,B,C`, then access `A`, then miss on `D`; LRU evicts `B`, FIFO evicts `A`.
+
+Belady optimal minimizes misses, not necessarily traffic if dirty writebacks have different cost from clean evictions.
+
+Victim cache vs 2-way: victim cache is tiny/fully-associative behind direct-mapped L1; 2-way doubles choices in every set but costs more tag compare/replacement in L1.
+
 ## 10. Multi-Level Caches
 
 | Level | Typical |
@@ -309,6 +342,11 @@ High-yield facts:
 | NINE | non-inclusive, non-exclusive |
 
 NINE = non-inclusive, non-exclusive cache.
+
+Operations:
+
+- inclusive eviction from lower level may invalidate/back-invalidate upper-level copies.
+- exclusive L1 eviction moves the line to L2; L1 miss/L2 hit migrates/swap-fills it back to L1.
 
 Question pattern:
 

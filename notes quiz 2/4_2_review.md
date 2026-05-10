@@ -10,8 +10,11 @@
 - **`WBSel`**: load -> memory; ALU/I/U -> ALU/imm; JAL/JALR -> `PC+4`.
 - **`ALUCtrl`**: depends on `ALUOp + funct3 + funct7[5]`.
 - **`funct7[5]`**: distinguishes `ADD/SUB` and `SRL/SRA`.
+- **HDL control**: synthesizable Verilog/VHDL logic can map opcode/funct bits to a netlist of control signals.
 
 ## 1. High-Level Control Signals
+
+Control is the "brain"; datapath is the "brawn". Control chooses mux inputs and enables writes.
 
 | Instr | `RegWr` | `MemRd` | `MemWr` | `ALUSrc` | `WBSel` | Next PC |
 |---|---:|---:|---:|---:|---|---|

@@ -251,6 +251,8 @@ Left-to-right scan:
 
 If unresolved after scan -> link error.
 
+If `main.o` defines `malloc`, references to `malloc` can resolve before libc's archive member is pulled; this is why your own `malloc` can override libc's during static linking.
+
 ### 10.2 Library Order Matters
 
 ```bash
@@ -291,6 +293,8 @@ gcc main.o ./libv.so -o prog
 
 At load: `ld-linux.so` maps deps, resolves needed relocations/lazy bindings.
 
+`PT_INTERP` in the executable names the dynamic linker path; the kernel maps the program and `ld-linux.so`, then the dynamic linker maps needed `.so` files.
+
 ### 11.2 Run-Time Dynamic Linking
 
 ```c
@@ -302,11 +306,19 @@ dlclose(h);
 
 Used for plugins/modules.
 
+### 11.3 Runtime Interposition
+
+`LD_PRELOAD=./wrap.so prog` loads `wrap.so` first, so same-name functions can intercept later library calls.
+
+Limit: cannot replace code already executed before interposition, such as `_start`; wrappers often intercept `__libc_start_main` or libc functions instead.
+
 ## 12. PIC, GOT, PLT
 
 ==**PIC**==: position-independent code; shared library code works at any load address.
 
 Dynamic linking uses **GOT + PLT**; not jump table or section header table.
+
+PIC data trick: code and data keep a fixed relative distance inside the loaded object, so code can use PC-relative addressing to reach the GOT.
 
 ### 12.1 GOT
 

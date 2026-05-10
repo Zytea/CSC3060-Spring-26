@@ -13,6 +13,7 @@
 - **Scalar RV32I regfile**: **2R/1W**.
 - **`JAL` vs `JALR`**: `JAL` PC-relative ~$\pm1$ MiB; `JALR` uses `rs1+imm12`, can reach full RV32 address space via register, clears bit 0.
 - **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
+- **No `LWU` in RV32I**: `LW` already fills the 32b GPR; zero/sign extension difference matters only when `XLEN>32` (e.g., RV64).
 
 ## 1. Assembly Language Instructions
 
@@ -77,7 +78,7 @@ RV64 adds `LD`, `SD`, `LWU`, `ADDW`, `SLLIW`, etc.
 | RV64IFD | GPRs, PC, CSRs, FP regs |
 | RV64IFV | GPRs, PC, CSRs, FP regs, vector regs |
 
-`x0` is hardwired 0: clear/copy/compare/discard.
+`x0` is hardwired 0: clear, copy, compare, discard result, or memory hint/probe (`lw x0,0(x1)`).
 
 CSR examples: `cycle`, `instret`, `mepc`, `mcause`, `mtvec`, `mstatus`.
 
@@ -168,6 +169,17 @@ Range: 13-bit signed byte offset with bit0=0 -> about $\pm4$ KiB.
 
 > [!IMPORTANT]
 > S-type offset is base-relative byte offset. B-type offset is PC-relative with implicit low `0` and **no `rd`**.
+
+No `BGT/BLE` needed: swap operands.
+
+```asm
+# if x > y  -> y < x
+blt  y,x,L
+# if x <= y -> y >= x
+bge  y,x,L
+```
+
+Unsigned bounds check trick: signed negative index becomes huge as unsigned, so `bgeu idx,len,out` catches `idx < 0 || idx >= len`.
 
 ### 3.6 U-Type
 
@@ -329,6 +341,14 @@ rs1 = rs1+imm
 ```
 
 Why: two register writes, `rs1` both source/destination, harder forwarding/hazards/precise exceptions.
+
+### 6.5 Compare-and-Branch vs Condition Codes
+
+RISC-V uses explicit compare-and-branch (`beq/blt/...`), not hidden condition-code flags.
+
+| Compare-and-branch | Condition codes |
+|---|---|
+| no implicit flag dependence; less architectural state; easier OoO/precise state | can reuse one compare for several branches, but flags create hidden dependencies |
 
 ## 7. Exceptions, CSRs, GDB
 

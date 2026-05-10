@@ -30,6 +30,14 @@ Stack frame may contain:
 - outgoing/incoming stack args.
 - alignment padding.
 
+Call lifetime:
+
+| Time | Stack responsibility |
+|---|---|
+| before call | caller saves live caller-saved regs and places extra args |
+| during callee | callee saves modified `s` regs/`ra`, allocates locals |
+| after return | callee restored its frame; caller restores its own saved temps |
+
 > [!IMPORTANT]
 > **Stack security**: stack frame stores local data plus control data (`ra`, old `fp/s0`, saved regs). An unchecked stack-buffer write can overwrite saved `ra` and hijack control flow.
 

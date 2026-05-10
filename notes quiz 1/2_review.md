@@ -3,8 +3,10 @@
 ## Exam Facts
 
 - **Byte-addressed memory**: pointer = virtual address of first byte; pointer type controls interpretation.
+- ==**Word size**==: nominal pointer/GPR size; `w`-bit machine has addresses `0..2^w-1`.
 - **32b address space**: $2^{32}$ bytes = **4 GiB**.
 - **LP64 sizes**: `char 1`, `short 2`, `int 4`, `long 8`, pointer 8, `float 4`, `double 8`.
+- ==**ABI**==: ISA + OS + calling convention; binary code is not portable across incompatible ABIs.
 - **Little endian**: least significant byte at lowest address.
 - **Unsigned conversion trap**: if either C integer operand is `unsigned`, the other becomes `unsigned`.
 - ==**Two's complement**==: `TMin=-2^{w-1}`, `TMax=2^{w-1}-1`, `UMax=2^w-1`; `-TMin == TMin`.
@@ -27,8 +29,11 @@
 | byte | 8 bits, smallest addressable unit |
 | address | byte index in virtual/physical memory |
 | pointer | address + type-directed interpretation |
+| word size | nominal pointer/GPR size; controls address-space size |
 
 Useful powers: `2^10=1 KiB`, `2^20=1 MiB`, `2^30=1 GiB`, `2^32=4 GiB`.
+
+If an unsigned `int` computation can exceed $2^{32}-1$ but stays below $2^{64}$, use `uint64_t` / `unsigned long long`.
 
 ### 1.2 Decimal, Binary, Hex
 
@@ -85,6 +90,8 @@ For `int x=12345=0x00003039`:
 > [!IMPORTANT]
 > `*((char*)p + k)` reads byte `k`. `((T*)p)[k]` advances by `k*sizeof(T)`.
 
+Text strings are usually more portable than binary data. Binary code depends on the ABI: ISA + OS + calling convention.
+
 ## 3. Boolean, Bitwise, Logical, Shift
 
 ### 3.1 Bitwise vs Logical
@@ -98,6 +105,8 @@ For `int x=12345=0x00003039`:
 2 && 1 == 1
 2 & 1  == 0
 ```
+
+**Short-circuit** examples: `a && n/a` avoids divide-by-0 when `a==0`; `p && p->next` avoids null dereference.
 
 ### 3.2 Shifts
 
@@ -187,6 +196,13 @@ $$
 x +^u_w y = (x+y)\bmod 2^w
 $$
 
+Unsigned overflow tests:
+
+| Op | Overflow/underflow test |
+|---|---|
+| `s = x+y` | `s < x` or `s < y` |
+| `d = x-y` | `d > x` |
+
 Signed add overflow:
 
 ```text
@@ -266,6 +282,8 @@ A decimal is exactly representable in binary iff, after reduction, denominator i
 | fp16 | `s|exp5|frac10` | 15 |
 | bfloat16 | `s|exp8|frac7` | 127 |
 
+`float` exactly represents all integers from `0` through $2^{24}$; above that, spacing exceeds 1.
+
 Normalized:
 
 $$
@@ -340,6 +358,8 @@ Default: round to nearest, ties to even.
 |---|---:|
 | `12.5` | 12 |
 | `13.5` | 14 |
+
+IEEE rounding modes: nearest-even, toward 0, toward $+\infty$, toward $-\infty$.
 
 ### 7.2 FP Operation Traps
 

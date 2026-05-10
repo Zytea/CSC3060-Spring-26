@@ -38,11 +38,13 @@
 | `-O` / `-O1` | basic safe opts |
 | `-O2` | default recommended |
 | `-O3` | more unrolling/vectorization/inlining; may bloat |
+| `-O4` | class note: treated as `-O3 -flto`/LTO style optimization |
 | `-Ofast` | fast but may break strict FP |
 | `-Os` | optimize for size |
 | `-flto` | link-time whole-program optimization |
 | `-march=native` | use local CPU ISA |
 | `-mtune=native` | tune scheduling for local CPU |
+| `-fprofile-generate/use` | PGO: collect then use runtime profiles |
 
 ## 3. Why Compiler Optimization Is Hard
 
@@ -54,6 +56,7 @@ Compiler must preserve visible behavior:
 - `volatile`, atomics, I/O.
 - possible traps/exceptions.
 - separate compilation without LTO.
+- no algorithm/domain/runtime knowledge.
 - optimal scheduling/register allocation is hard.
 
 ## 4. Basic Compiler Optimizations
@@ -65,6 +68,8 @@ Compiler must preserve visible behavior:
 | local block | folding, local CSE, DCE |
 | function/global CFG | LICM, global CSE, register allocation |
 | whole-program | LTO, interprocedural inlining |
+
+==**CFG**==: control-flow paths. ==**DFG**==: value movement. ==**DDG**==: scheduling order constraints.
 
 ### 4.2 Constant Folding / Propagation
 
@@ -176,6 +181,8 @@ If `*a,*b` are frequently used and do not alias, use **`restrict`** or **manual 
 
 `memcpy(restrict dst, restrict src, ...)` can be much faster because the compiler can assume no aliasing, then vectorize/reorder memory accesses more aggressively.
 
+Compiler diagnostics such as `data dependence`, `cannot vectorize`, or `cannot reorder memory operations` often mean possible aliasing blocks optimization.
+
 ### 5.3 Function Calls in Loops
 
 ```c
@@ -208,9 +215,13 @@ Costs:
 
 Too much unrolling can be slower due to I-cache/code size, register pressure, limited FUs.
 
+Unroll-by-4 is incorrect without a cleanup path when `n` is not a multiple of 4.
+
 ### 6.2 Instruction Scheduling
 
 Move independent loads/ops earlier to hide latency, but do not move stores/loads across possible aliases.
+
+Scheduling example trap: moving loads from `B/C` before stores to `A` is wrong if `A` overlaps `B` or `C`.
 
 ## 7. CPE / Critical Path
 

@@ -32,10 +32,14 @@ Hazards insert bubbles or flush wrong-path instrs.
 | non-pipelined divider | back-to-back divide | pipeline or stall |
 | too few regfile ports | two writes same cycle | more ports or schedule |
 | too few adders | `PC+4` and branch target | add adder |
+| early WB design | ALU instr writes in stage 4 while load writes in WB | keep common WB stage or add ports/scheduling |
 
 Von Neumann bottleneck in pipeline = structural hazard.
 
 Split I/D caches help because they avoid IF/MEM conflict and increase access bandwidth; not primarily for hit rate.
+
+> [!IMPORTANT]
+> Moving R-type WB earlier can create a structural hazard with other instrs that write the regfile at the normal WB time.
 
 ## 3. Data Hazards
 
@@ -150,6 +154,7 @@ Static useful rules:
 
 - backward branch taken.
 - forward `beq rs1,x0` often not taken in class quiz.
+- if a BHT entry has no history, the simple default is **not taken**.
 
 ### 5.2 1-bit vs 2-bit BHT
 
@@ -174,6 +179,8 @@ Why untagged:
 - cheap/cost-effective.
 
 Cost: aliasing between branches.
+
+High-performance predictors may add tags or richer metadata; simple class BHTs are often untagged.
 
 ### 5.4 Correlated / 2-Level
 

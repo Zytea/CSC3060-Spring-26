@@ -11,7 +11,9 @@
 - **`gcc` phases**: `preprocess -> compile -> assemble -> link`; **loading is not a gcc compilation phase**.
 - **Relocatable `.o`**: not executable; unresolved symbol addresses/calls need linker relocation.
 - **Linker jobs**: `symbol resolution + relocation + section merging + library handling`.
+- **Hardware org**: bus carries `address + data + control`; CPU contains **PC + register file + ALU**.
 - **OS abstractions**: ==**process, virtual memory, file**==.
+- **System calls**: controlled transfer into kernel for protected OS services.
 - **Memory hierarchy illusion**: memory appears **fast + large + cheap**.
 - **Amdahl**: speedup is limited by the unimproved fraction.
 
@@ -112,10 +114,12 @@ Bus questions:
 
 ```text
 shell reads command
--> OS loads executable from disk to memory
+-> OS loads executable from disk to memory, often via DMA
 -> CPU starts at entry
 -> program/OS writes bytes to terminal
 ```
+
+==**DMA**==: device/disk moves bytes directly to memory; CPU sets up the transfer instead of copying every byte itself.
 
 ## 4. Caches and Storage Hierarchy
 
@@ -146,7 +150,11 @@ Locality:
 
 - ==**Process**==: running program + context (`PC`, regs, address-space state, OS metadata).
 - ==**Thread**==: execution stream in a process; shares address space, has own PC/regs/stack.
-- System calls enter kernel mode for protected OS services.
+- Process switch changes address-space context and has stronger isolation; thread switch is cheaper but shares code/global data.
+- ==**System call**==: application requests OS service by entering kernel mode, then returns.
+- ==**Virtual memory**==: each process sees its own address space; page 0 is normally unmapped to catch `NULL`; heap grows up, stack grows down; shared libs can map the same physical pages into many processes.
+- ==**Virtualization**==: one physical CPU/memory/I/O system is presented as many processes, virtual address spaces, files, or VMs.
+- When one process blocks on I/O, the OS can context-switch the CPU to another runnable process.
 
 ## 6. Important Themes
 

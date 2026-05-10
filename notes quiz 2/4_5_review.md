@@ -84,6 +84,8 @@ Final value must come from later write.
 
 Ignore `x0` as destination.
 
+WAR/WAW are name dependences. Register renaming can remove them; RAW cannot be removed without changing the computation.
+
 ## 4. Memory Dependence / Aliasing
 
 Do not reorder unless proven safe:
@@ -104,6 +106,8 @@ Safe evidence:
 - `restrict`.
 - proven non-overlapping arrays.
 - no volatile/I-O/call/trap issue.
+
+When aliasing is unknown, the dependence DAG must include conservative memory-order edges.
 
 ## 5. Operation Latency and Arc Weights
 
