@@ -4,11 +4,11 @@
 
 - ==**Computer system**==: **hardware + system software** that run application programs.
 - ==**Computer architecture**==: **interface between software and hardware**; broader = `ISA + microarchitecture + system design`.
-- **System programs**: `OS`, compiler, assembler, linker, loader. **Application**: ChatGPT/browser/game.
-- ==**Bits + context**==: same bits can be `int`, FP, instr, address, char bytes, struct fields.
+- **System programs**: `OS`, compiler, assembler, linker, loader. 
+- ==**Bits + context**==: same bits can be `int`, FP, instruct, address, char bytes, struct fields.
 - **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; Unicode covers many languages.
-- **128 all-0 bits**: integer zeros or fp32/fp128 `+0.0`; **not** ASCII `"0000"` (`0x30` bytes).
-- **`gcc` phases**: `preprocess -> compile -> assemble -> link`; **loading is not a gcc compilation phase**.
+- **128 all-0 bits**: integer zeros or fp32/fp128 `+0.0`; **not** ASCII `"0000"` (`0x30` bytes) 
+- **`gcc` phases**: `preprocess -> compile -> assemble -> link`; loading ❌ 
 - **Relocatable `.o`**: not executable; unresolved symbol addresses/calls need linker relocation.
 - **Linker jobs**: `symbol resolution + relocation + section merging + library handling`.
 - **Hardware org**: bus carries `address + data + control`; CPU contains **PC + register file + ALU**; bus interface handles protocol conversion/queueing/buffering.
@@ -88,7 +88,7 @@ Common linker errors:
 Basic execution cycle:
 
 ```text
-PC -> fetch instr -> decode -> execute/load/store/branch -> writeback -> next PC
+PC -> fetch instruct -> decode -> execute/load/store/branch -> writeback -> next PC
 ```
 
 | Component | Role |
@@ -97,7 +97,7 @@ PC -> fetch instr -> decode -> execute/load/store/branch -> writeback -> next PC
 | I/O devices | keyboard, display, disk, network adapter |
 | Main memory | byte array storing **instructions + data** |
 | ==**CPU / processor**== | engine that interprets/executes instrs; contains **PC + register file + ALU** |
-| PC | one-word register holding **address of next instr** |
+| PC | one-word register holding **address of next instruct** |
 | Register file | named word-size registers |
 | ALU | arithmetic/logic/address calculation |
 | I/O bridge | translates/connects different bus protocols |
@@ -188,14 +188,45 @@ graph LR
 
 - ==**Process**==: running program + context (`PC`, regs, address-space state, OS metadata).
   - **Context switching** between processes, managed by **OS**.
-
+  - ==**System call**==: application requests OS service by entering kernel mode, then returns.
+  - **Pros:** High isolation, security, scalability
 - ==**Thread**==: execution stream in a process; shares address space, has own PC/regs/stack.
-- Process switch changes address-space context and has **stronger isolation**; thread switch is cheaper but shares code/global data.
-- ==**System call**==: application requests OS service by entering kernel mode, then returns.
-- ==**Virtual memory**==: each process sees its own address space; page 0 is normally unmapped to catch `NULL`; heap grows up, stack grows down; shared libs can map the same physical pages into many processes.
+  - **Pros:**  Low overhead, Fast communication, efficiency.
+
+
+- ==**Virtual memory**==: each process sees its own **address space**; page 0 is normally unmapped to catch `NULL`;  shared libs `.so` can **map the same physical pages into many processes**.
+
+  ```
+    /  Higher Address  \
+   ┌────────────────────┐
+   │Kernel virtual mem  │  ↑ Memory invisible to user code
+   ├────────────────────┤
+   │     User stack     │  ┐  (created at run time)
+   │         │          │  │  Downwards growth
+   │         ▼          │  │
+   ├────────────────────┤  │
+   │   Memory-mapped    │  │  (Shared libraries like printf)
+   │      region        │  │
+   ├────────────────────┤  │
+   │         ▲          │  │
+   │         │          │  │  Upwards growth
+   │   Run-time heap    │  ┘  (created by malloc)
+   ├────────────────────┤
+   │  Read/write data   │  ┐  Loaded from the
+   ├────────────────────┤  │  hello executable file
+   │Read-only code/data │  ┘
+   ├────────────────────┤
+   │         0          │  <- Program start
+   └────────────────────┘
+    \  Lower Address   /
+  
+  ```
+
 - ==**Unix I/O / file**==: uniform byte-stream abstraction for disks, terminals, networks, etc.
+
+  > `Open()`, `Close()`, `Read()`, `Write()`, `Lseek()`
+
 - ==**Virtualization**==: one physical CPU/memory/I/O system is presented as many processes, virtual address spaces, files, or VMs.
-- When one process blocks on I/O, the OS can context-switch the CPU to another runnable process.
 
 ## 6. Important Themes
 
@@ -212,10 +243,9 @@ $$
 
 | Term | Meaning |
 |---|---|
-| concurrency | multiple activities in progress; may be time-sliced |
-| parallelism | actually execute at same time |
-| ILP | multiple instrs from one thread overlap/issue |
-| DLP | same op over many data elements |
-| SIMD/vector | one instr, multiple data lanes |
+| **concurrency** | multiple activities in progress; time-sliced (context switching) |
+| **parallelism** | actually execute at same time |
+| **ILP** | - multiple instructs from one thread overlap/issue<br>- pipelining, superscalar, OOE |
+| **DLP** | same op over many data elements (loop; SIMD/vector) |
 
-Parallelism implies concurrency; concurrency does not imply parallelism.
+**Parallelism implies concurrency; concurrency does not imply parallelism.**
