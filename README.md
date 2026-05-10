@@ -4,7 +4,7 @@
 
 一切的目的尽可能提高我这次csc3060 final的考试成绩
 
-- Note Convention
+# Note Convention
 
 - notes md should be english
 
@@ -50,9 +50,65 @@ For example,
 
 ```
 
-5. do not use ---, as these occupy an exatra line, you should always keep in mind that the longer the notes, porportionally the harder it is to search during the exam. ==Every word counts!!!==, be cautious, but always be efficiently informative (i.e, you should not miss on any point that may be tested).
+5. do not use ---, as these occupy an exatra line, and you should always keep in mind that the longer the notes, porportionally the harder it is to search during the exam. ==Every word counts!!!==, be cautious, but always be efficiently informative (i.e, you should not miss on any point that may be tested).
 
-e.g., 0 is more efficient than zero.
+e.g., 0 is more efficient than zero, $\alpha$ better than `\alpha`,
+
+$$
+\text{formula}
+$$
+
+can only be used when it is important, that is,
+bad example:
+```
+If fraction `\alpha` of old time is improved by factor `k`:
+
+$$
+T_{new} = (1-\alpha)T_{old} + \frac{\alpha T_{old}}{k}
+$$
+
+$$
+\text{Speedup} = \frac{1}{(1-\alpha)+\frac{\alpha}{k}}
+$$
+
+If serial/unimproved fraction is `\beta`:
+
+$$
+\text{Max Speedup} = \frac{1}{\beta}
+$$
+
+High-yield examples:
+
+- 80% parallelizable, infinite processors: **max speedup `= 1/0.2 = 5x`**.
+- 80% parallelizable, 1000 processors:
+
+$$
+\text{Speedup}=\frac{1}{0.2+0.8/1000}\approx 5
+$$
+
+- 90% improvable, target speedup `4x`:
+
+$$
+4=\frac{1}{0.1+0.9/k}\Rightarrow k=6
+$$
+
+> 
+```
+
+Good example (Keep in mind that the notes will be printed in A4, so there is a limit on the length of latex lines, be cautious):
+```
+If $\alpha$ of old time is improved by factor $k$:
+
+$$
+T_{new} = (1-\alpha)T_{old} + \frac{\alpha T_{old}}{k}; \quad \text{Speedup} = \frac{1}{(1-\alpha)+\frac{\alpha}{k}} \leq  \frac{1}{1-\alpha}
+$$
+
+> Example:
+>
+> 90% improvable, target speedup `4x`: $4=\frac{1}{0.1+0.9/k}\Rightarrow k=6$
+>
+>  (this is just for demonstration, as I don need a example for such a simple knowledge point, as you can see that in quizzes the instructor don’t test anything beyond this formular and I haven’t see any traps in applying this for problem solving)
+```
 
 Bad example (inefficient in height and for look up):
 ```
