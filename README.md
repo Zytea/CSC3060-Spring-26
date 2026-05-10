@@ -14,7 +14,13 @@
 
 for example, 
 ```
-==**A computer system**==: ==hardware & system software== that work together to run application programs.
+==**Computer system**==: **hardware + system software** that work together to run application programs.
+
+> [!IMPORTANT] 
+> ...
+
+> Example:
+> ...
 ```
 
 2. latex formulas, tables, diagrams, pics, bullet points, etc. whenever appropriate
@@ -42,4 +48,47 @@ For example,
 
 ...
 
+```
+
+5. do not use ---, as these occupy an exatra line, you should always keep in mind that the longer the notes, porportionally the harder it is to search during the exam. ==Every word counts!!!==, be cautious, but always be efficiently informative (i.e, you should not miss on any point that may be tested).
+
+e.g., 0 is more efficient than zero.
+
+Bad example (inefficient in height and for look up):
+```
+- A bit pattern may represent:
+  - an integer,
+  - a floating-point number,
+  - an instruction,
+  - an address,
+  - characters,
+  - media data,
+  - array/struct fields.
+
+> [!IMPORTANT]
+> Do not identify a bit pattern without its interpretation context.
+
+Examples:
+
+| Bit Pattern                  | Possible Meaning                                    |
+| ---------------------------- | --------------------------------------------------- |
+| `0000...0000`                | integer `0`                                         |
+| `0000...0000` as IEEE single | `+0.0`                                              |
+| `0000...0000` as instruction | may be a legal/illegal instruction depending on ISA |
+| `0x30`                       | ASCII character `'0'`, not numeric zero             |
+
+**Quiz-style trap**
+
+- 128 all-zero bits can be **four single-precision `+0.0`** values.
+- Character string `"0000"` is made of ASCII bytes `0x30`, not zero bytes.
+- For wider FP formats, do not assume all-zero bits mean an arbitrary valid object unless the format says so.
+```
+
+Good example (efficient!):
+```
+- A bit pattern may represent (e.g., 32 bit `0x0...0`):
+    - variables: `int 0`, `float 0.0`, arrays/structs, addresses, etc.
+    - instructions ISA
+> [!NOTE]
+- $\forall$ FP format, Do not assume all-0 bits mean valid.
 ```
