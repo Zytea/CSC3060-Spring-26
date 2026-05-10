@@ -29,22 +29,24 @@ for example,
 
 4. follow the organization structure, if you are unsure, use the one for my notes like those in `1.md`, ..., `4.md`, `CA3060-4-1-ProcessorArchitecture.md`, etc.
 
-For example, 
+You must exactly follow the structure below, 
 ```
 # Lec 1: Introduction
 ## Exam Facts
 ...
 
-## 1.1 Information is bits + context
+## 1. Information is bits + context
 ...
 
-### 1.1.1 ... (Though you can use subsections like this, try to keep it concise and avoid nesting too much)
+### 1.1 ...
 
 ...
 
-## 1.2 Program Compilation：4 Phases 
+#### 1.1.1 ...(Though you can use subsections like this, try to keep it concise and avoid nesting too much)
 
 ...
+
+### 1.2 Program Compilation：4 Phases 
 
 ...
 
