@@ -14,8 +14,6 @@
 
 ## 1. High-Level Control Signals
 
-![](assets/CA3060-4-2-Control_0.png)
-
 | Signal | Expression idea | Meaning |
 |---|---|---|
 | `PCSrc` | branch taken or `JAL/JALR` | select non-`PC+4` next PC |
@@ -100,8 +98,6 @@ endcase
 
 ## 4. Complete Single-Cycle Datapath
 
-![](assets/CA3060-4-2-Control_2.png)
-
 Required flows:
 
 - fetch instr with PC.
@@ -113,8 +109,6 @@ Required flows:
 - next PC mux selects `PC+4` or target.
 
 ## 5. Example: `sw x2, offset(x1)`
-
-![](assets/CA3060-4-2-Control_5.png)
 
 Data movement:
 
@@ -137,8 +131,6 @@ Control:
 | `PCSrc` | `PC+4` |
 
 ## 6. Example: `beq x1,x2,imm`
-
-![](assets/CA3060-4-2-Control_6.png)
 
 Data movement:
 

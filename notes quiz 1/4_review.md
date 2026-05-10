@@ -13,8 +13,6 @@
 
 ## 1. Procedure Call Steps
 
-![](assets/4.1.png)
-
 Typical function call:
 
 1. Caller places args in `a0-a7`; extra args go on stack.
@@ -28,8 +26,6 @@ Typical function call:
 
 ## 2. Stack Allocation Before/During/After Call
 
-![](assets/4.2.png)
-
 Stack frame may contain:
 
 - outgoing/incoming stack arguments.
@@ -42,8 +38,6 @@ Stack frame may contain:
 Before call: caller frame active. During callee: `sp` moves down to allocate callee frame. After return: `sp` is restored to pre-call value.
 
 ## 3. Frame Allocation
-
-![](assets/image-20260205031951262.png)
 
 Frame pointer `fp`/`s0` is optional but useful when stack offsets are not fixed or debugging needs a stable base. `sp` points to current stack top and may move for dynamic allocation.
 

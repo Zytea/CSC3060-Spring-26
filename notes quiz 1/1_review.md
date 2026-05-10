@@ -30,8 +30,6 @@ Memory is usually byte-addressed: 1 byte = 8 bits. A pointer value is the virtua
 
 ## 2. Program Compilation: 4 Phases
 
-![](assets/1.2.png)
-
 | Phase | Tool | Input -> output | Main job |
 |---|---|---|---|
 | Preprocess | `cpp`, `gcc -E` | `.c -> .i` | expand `#include`, macros, conditional compilation, remove comments |
@@ -157,8 +155,6 @@ Basic instruction cycle:
 5. Update `PC`.
 
 ### 4.2 Running `hello`
-
-![](assets/1.4.2.png)
 
 High-level flow:
 

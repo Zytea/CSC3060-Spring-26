@@ -6,6 +6,10 @@
 
 # Note Convention
 
+```
+clarity/precision/organization > 省字符 > 什么都不做
+```
+
 - notes md should be english
 
 - notes should be readable and concise for quick reference during the exam, so 
@@ -23,7 +27,7 @@ for example,
 > ...
 ```
 
-2. use unicode art, latex formulas, tables, diagrams, pics (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary), bullet points, etc. whenever appropriate
+2. use unicode art (I used lots of pics in my mds but you can convert into unicode if it is super important, e.g., instruction types), latex formulas, tables, diagrams,  (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary, but unicode art is preferred), bullet points, etc. whenever appropriate
 
 $$
 \text{formula}
@@ -60,7 +64,6 @@ Good example:
 ├─────────────────────────┬───────────────────┼───────────┼─────────────┤
 │     imm[20|10:1|11]     │    imm[19:12]     │    rd     │   opcode    │ J-type
 └─────────────────────────┴───────────────────┴───────────┴─────────────┘
-
 ```
 
 

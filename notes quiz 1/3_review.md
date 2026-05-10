@@ -97,34 +97,39 @@ CSR examples: `cycle`, `instret`, `mepc`, `mcause`, `mtvec`, `mstatus`, `mhartid
 
 ## 3. Instruction Encoding Formats
 
-### 3.0 Overview
-
 | Function class | Format | Instrs |
 |---|---|---|
-| reg-reg ALU | R-type | `ADD SUB AND OR XOR SLT SLTU SLL SRL SRA` |
-| imm ALU | I-type | `ADDI ANDI ORI XORI SLTI SLTIU SLLI SRLI SRAI` |
-| load | I-type | `LB LH LW LBU LHU` |
-| store | S-type | `SB SH SW` |
-| conditional branch | B-type | `BEQ BNE BLT BGE BLTU BGEU` |
-| jump | J/I-type | `JAL`, `JALR` |
-| upper immediate | U-type | `LUI AUIPC` |
+| reg-reg ALU | R | `ADD SUB AND OR XOR SLT SLTU SLL SRL SRA` |
+| imm ALU | I | `ADDI ANDI ORI XORI SLTI SLTIU SLLI SRLI SRAI` |
+| load | I | `LB LH LW LBU LHU` (RV64: `LWU LD`) |
+| store | S | `SB SH SW` |
+| conditional branch | B | `BEQ BNE BLT BGE BLTU BGEU` |
+| jump | J / I | `JAL` / `JALR` |
+| upper immediate | U | `LUI AUIPC` |
 
-| Format | Operands | Size | Key feature |
-|---|---|---:|---|
-| R-type | 3 regs | 32b | no immediate |
-| I-type | 2 regs + 12b imm | 32b | signed 12b immediate |
-| S-type | 2 regs + 12b imm | 32b | no `rd`; store data comes from `rs2` |
-| B-type | 2 regs + split branch imm | 32b | no `rd`; PC-relative |
-| U-type | 1 reg + 20b imm | 32b | imm occupies bits 31:12 |
-| J-type | 1 reg + split jump imm | 32b | PC-relative link jump |
+```text
+31           25 24       20 19       15 14   12 11        7 6           0
+┌─────────────┬───────────┬───────────┬───────┬───────────┬─────────────┐
+│   funct7    │    rs2    │    rs1    │funct3 │    rd     │   opcode    │ R-type
+├─────────────┴───────────┼───────────┼───────┼───────────┼─────────────┤
+│        imm[11:0]        │    rs1    │funct3 │    rd     │   opcode    │ I-type
+├─────────────┬───────────┼───────────┼───────┼───────────┼─────────────┤
+│  imm[11:5]  │    rs2    │    rs1    │funct3 │ imm[4:0]  │   opcode    │ S-type
+├─────────────┼───────────┼───────────┼───────┼───────────┼─────────────┤
+│imm[12|10:5] │    rs2    │    rs1    │funct3 │imm[4:1|11]│   opcode    │ B-type
+├─────────────┴───────────┴───────────┴───────┼───────────┼─────────────┤
+│                 imm[31:12]                  │    rd     │   opcode    │ U-type
+├─────────────────────────┬───────────────────┼───────────┼─────────────┤
+│     imm[20|10:1|11]     │    imm[19:12]     │    rd     │   opcode    │ J-type
+└─────────────────────────┴───────────────────┴───────────┴─────────────┘
+```
 
-![](assets/3.3.1.png)
+==**Regular field positions**==: `opcode[6:0]`, `rd[11:7]`, `funct3[14:12]`, `rs1[19:15]`, `rs2[24:20]` stay fixed whenever the field exists, so the decoder can fetch regs before decode finishes.
 
-==Regular field positions==: `opcode[6:0]`, `rd[11:7]`, `funct3[14:12]`, `rs1[19:15]`, `rs2[24:20]` stay fixed whenever the field exists.
+> [!NOTE]
+> B and J immediates are scrambled so sign and middle bits reuse wires across formats. The implicit low `0` means branch/jump targets are 2-byte aligned, which works with C-extension 16b instrs.
 
 ### 3.1 R-Type: Register-to-Register ALU
-
-![](assets/3.3.1.1.png)
 
 | Bits | Width | Field | Meaning |
 |---|---:|---|---|
@@ -150,8 +155,6 @@ Key decode:
 - `funct3=101`, `funct7=0100000` -> `SRA`
 
 ### 3.2 I-Type: Immediate ALU, Loads, JALR
-
-![](assets/3.3.2.png)
 
 | Bits | Width | Field | Meaning |
 |---|---:|---|---|
@@ -195,8 +198,6 @@ For RV32 shifts, only `imm[4:0]` is the shift amount; `inst[30]` distinguishes `
 
 #### 3.2.3 Load I-Type
 
-![](assets/3.3.2.2.png)
-
 Meaning: `rd = mem[rs1 + signext(imm12)]`; offset is **bytes**, not elements.
 
 | Load | `funct3` | Meaning |
@@ -212,11 +213,7 @@ Meaning: `rd = mem[rs1 + signext(imm12)]`; offset is **bytes**, not elements.
 > [!IMPORTANT]
 > No `LWU` in RV32I: loading an unsigned 32b word into a 32b GPR is the same bit pattern as `LW`; `LWU` matters in RV64 because it zero-extends to 64b.
 
-![](assets/3.3.2.3.png)
-
 ### 3.3 S-Type: Stores
-
-![](assets/3.3.3.png)
 
 | Bits | Width | Field | Meaning |
 |---|---:|---|---|
@@ -317,8 +314,6 @@ jal x0, label     # unconditional jump, pseudo: j label
 
 ### 3.7 JALR: I-Type Indirect Jump
 
-![](assets/3.3.6.png)
-
 Meaning:
 
 ```asm
@@ -338,11 +333,7 @@ jalr x0, x1, 0        # return, pseudo: ret
 
 ### 3.8 Immediate Encoding Differences
 
-![](assets/3.8.png)
-
 #### 3.8.1 S-Type vs B-Type
-
-![](assets/3.8.1.png)
 
 | Type | Inst bits | Immediate value |
 |---|---|---|
@@ -353,15 +344,13 @@ B-type reuses S-type bit positions so `rs1/rs2/funct3/opcode` remain fixed, but 
 
 #### 3.8.2 U-Type vs J-Type
 
-![](assets/3.8.2.png)
-
 | Type | Inst bits | Immediate value |
 |---|---|---|
 | U | `[31:12]` | `inst[31:12] << 12` |
 | J | `[31] [19:12] [20] [30:21]` | `signext({inst[31],inst[19:12],inst[20],inst[30:21],0})` |
 
 > [!IMPORTANT]
-> Do not write "20b imm x2" without the actual bit order. J-type has 20 encoded imm bits, an implicit low 0, and scrambled bit positions.
+> J-type target offset is `signext({inst[31], inst[19:12], inst[20], inst[30:21], 0})`; encoded imm bits are scrambled and bit 0 is implicit `0`.
 
 ## 4. Data Alignment and Memory Operands
 

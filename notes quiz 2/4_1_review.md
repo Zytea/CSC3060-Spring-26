@@ -129,8 +129,6 @@ Edge-triggered methodology:
 
 ## 6. Abstract RV32I Datapath
 
-![](assets/CA3060-4-1-ProcessorArchitecture_11.png)
-
 Core components:
 
 - PC.
@@ -185,8 +183,6 @@ Datapath must support:
 - data memory read/write.
 
 ### 7.3 Register File
-
-![](assets/CA3060-4-1-ProcessorArchitecture_19.png)
 
 | Port | Selection | Data |
 |---|---|---|

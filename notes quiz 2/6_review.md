@@ -2,350 +2,524 @@
 
 ## Exam Facts
 
-- ==**Memory wall**==: growing gap between CPU speed and DRAM speed; includes **latency wall** and **bandwidth wall**.
-- Latency fixes: caches/local memory, NUMA/PIM, multithreading/SMT/warp interleaving. Bandwidth fixes: **HBM**, banks/interleaving, wider bus, non-blocking caches.
-- Hierarchy management: registers/local memory by compiler/programmer; caches by **hardware**; VM memory-disk by **HW+OS**; files by programmer.
-- Cache line stores **data + tag + valid bit** (+ dirty bit if write-back). **Set number is not stored**.
-- Address split for A-bit addr, capacity C, block B, ways E:
+- ==**Memory hierarchy**== exploits locality: small/fast/expensive near CPU; large/slow/cheap far away.
+- Management: registers by compiler, caches by hardware, main memory/VM by OS+HW, files by OS/programmer.
+- SRAM: fast, expensive, no refresh, used for caches. DRAM: dense, cheap, needs refresh, used for main memory.
+- Cache line contains **valid bit, tag, data block**, and dirty bit for write-back caches.
+- Address split: `tag | set index | block offset`.
+- For cache size `C`, block size `B`, associativity `E`: sets `S=C/(B*E)`, offset bits `b=log2(B)`, index bits `s=log2(S)`.
+- Direct mapped: `E=1`. Fully associative: `S=1`. Set associative: `E>1`.
+- Modern L1D quiz answer: set-associative + write-back + write-allocate.
+- I-cache has no CPU stores, so no write-hit/write-miss policy.
+- AMAT:
+
 $$
-S=\frac{C}{B E};\quad b=\log_2B;\quad s=\log_2S;\quad t=A-s-b
+AMAT = HitTime + MissRate \times MissPenalty
 $$
-- Modern L1D likely: **4-way set-assoc, write-back, write-allocate**, hit latency about **3-4 cycles**.
-- L3 usually shared by cores; most chip area is caches; `L3 write-through` does not make sense.
-- Non-blocking cache uses **MSHR**; L3 MSHR count depends on memory latency and memory bus width.
-- 4C misses: **compulsory/cold, conflict/collision, capacity, coherence**. Coherence is hardest to remove.
-- High-end GPU global memory: **HBM**.
-- I-cache easier than D-cache because it takes no CPU stores.
-- Linked-list loop `while(A) A=A->next`: instruction temporal/spatial locality only; data locality poor; latency-bound.
-- High-locality sorts: **quicksort, insertion, bubble**. Poorer locality: heapsort, large radix.
 
-## 1. RAM and Memory Wall
+- Multi-level AMAT:
 
-| Tech | Cell | Refresh | Density/cost | Speed | Use |
-|---|---|---|---|---|---|
-| **SRAM** | 6-8 transistors | no | low density, expensive | fast | caches, regfile |
-| **DRAM** | 1T1C | yes | high density, cheap | slow | main memory |
-| **HBM** | stacked DRAM | yes | high BW | high bandwidth | GPUs/AI |
+$$
+AMAT = HT_{L1}+MR_{L1}(HT_{L2}+MR_{L2}(HT_{L3}+MR_{L3}MP_{mem}))
+$$
 
-==**Memory wall**==:
+- 4C misses: compulsory, capacity, conflict, coherence.
+- Non-blocking cache uses **MSHR** to track outstanding misses.
+- `BTB/BHT/TLB` are cache-like structures. TLB caches `VPN -> PPN` translations.
+- Larger pages reduce TLB misses/PTE count but increase internal fragmentation and page-fault transfer size.
 
-| Wall | Meaning | Mitigation |
+## 1. Memory Hierarchy
+
+| Level | Example | Managed by | Main idea |
+|---|---|---|---|
+| L0 | CPU registers | compiler | fastest, explicit allocation |
+| L1/L2/L3 | SRAM caches | hardware | cache lines from lower level |
+| L4 | DRAM main memory | OS + MMU | cache for disk/VM pages |
+| L5 | SSD/HDD | OS/filesystem | persistent local storage |
+| L6 | remote storage | distributed systems | largest and slowest |
+
+Locality:
+
+| Type | Meaning | Example |
 |---|---|---|
-| latency | single access takes too many CPU cycles | cache, local memory, NUMA, PIM, SMT/warp interleave |
-| bandwidth | not enough bytes/cycle for many cores/SIMD/GPU | HBM, multi-bank, interleaving, wider bus, non-blocking cache |
+| temporal | recently used item likely reused | loop variable, instruction loop |
+| spatial | nearby address likely used | array scan, sequential instr fetch |
 
-## 2. Memory Hierarchy
+## 2. RAM and Memory Wall
 
-Registers -> L1 -> L2 -> L3 -> DRAM -> SSD/HDD -> remote.
+### 2.1 SRAM vs DRAM
 
-Up: small/fast/expensive. Down: large/slow/cheap.
-
-> Memory hierarchy gives the illusion of memory that is **fast, large, and cheap**.
-
-### 2.1 Who Manages What
-
-| Boundary | Manager |
-|---|---|
-| registers <-> memory | compiler/programmer |
-| cache <-> memory | hardware |
-| local/scratchpad <-> memory | compiler/programmer |
-| memory <-> disk for VM | hardware + OS |
-| memory <-> disk files | programmer |
-
-### 2.2 Terms
-
-- ==**Block/line**==: unit moved between memory levels.
-- Hit: found in upper level. Miss: not found; fetch from lower level.
-- Hit time is much smaller than miss penalty.
-- Miss rate = misses/accesses; hit rate = 1 - miss rate.
-
-## 3. Cache Basics and Address Breakdown
-
-### 3.1 Cache Line Contents
-
-Cache line metadata:
-
-```text
-valid | tag | data bytes | dirty (only for write-back)
-```
-
-Set index is implied by where the line sits; it is **not stored**.
-
-### 3.2 Address Split
-
-For A-bit addresses:
-
-```text
-[ tag t bits | set index s bits | block offset b bits ]
-```
-
-$$
-b=\log_2B,\quad S=C/(B E),\quad s=\log_2S,\quad t=A-s-b
-$$
-
-> Index bits are middle bits. High bits are tag; low bits are byte offset. Using high bits as index would map adjacent blocks badly and destroy spatial locality.
-
-### 3.3 Quiz Examples
-
-| Cache | Calculation | Tag/index/offset |
+| | SRAM | DRAM |
 |---|---|---|
-| 64KB, 4-way, 32B line, 32b addr | `S=65536/(4*32)=512` | `18 / 9 / 5` |
-| 16KB, direct-mapped, 64B line, 32b addr | `S=16384/64=256` | `18 / 8 / 6` |
-| 4KB, 2-way, 32B line, 32b addr | `S=4096/(2*32)=64` | `21 / 6 / 5` |
+| Cell | 6T latch | 1T + capacitor |
+| Refresh | no | yes |
+| Speed | faster | slower |
+| Density | lower | higher |
+| Cost/bit | higher | lower |
+| Use | CPU caches | main memory |
 
-### 3.4 Cache Simulation
+DRAM read can be destructive: charge is sensed and restored. Rows are activated into a row buffer; columns select bytes/words.
+
+Enhanced DRAM: SDRAM/DDR/GDDR/HBM improve bandwidth through banks, burst transfers, wider interfaces, and stacking.
+
+### 2.2 CPU-Memory Gap
+
+CPU speed improved faster than DRAM latency. Memory wall means performance is often limited by data movement rather than computation.
+
+Mitigation:
+
+- cache hierarchy.
+- prefetching.
+- non-blocking caches.
+- memory-level parallelism.
+- wider memory buses / HBM.
+- locality-conscious software.
+
+## 3. Main Memory Transactions
+
+### 3.1 Read Transaction
+
+1. CPU sends address to memory controller/cache hierarchy.
+2. If cache miss reaches DRAM, memory activates row/reads data.
+3. Data returns on bus and fills cache line.
+4. CPU gets requested word.
+
+### 3.2 Write Transaction
+
+1. CPU sends address + data.
+2. Cache handles write hit/miss according to policy.
+3. Lower-level write may happen immediately (write-through) or on eviction (write-back).
+
+Bandwidth matters for streaming; latency matters for pointer chasing.
+
+## 4. Cache Basics
+
+### 4.1 Cache Line / Block
+
+==**Cache line**==: unit of transfer between cache levels.
+
+Line metadata:
+
+| Field | Purpose |
+|---|---|
+| valid | line contains meaningful data |
+| tag | high address bits identifying memory block |
+| data block | bytes from memory |
+| dirty | write-back line modified vs lower level |
+| coherence state | MESI-like state in multicore caches |
+
+### 4.2 Cache Sets
+
+Cache parameters:
+
+| Symbol | Meaning |
+|---|---|
+| `C` | data capacity in bytes |
+| `B` | block size in bytes |
+| `E` | associativity, lines per set |
+| `S` | number of sets = `C/(B*E)` |
+| `m` | address bits |
+| `b` | block offset bits = `log2(B)` |
+| `s` | set index bits = `log2(S)` |
+| `t` | tag bits = `m-s-b` |
+
+Address layout:
 
 ```text
-block_addr = addr / B
-set        = block_addr mod S
-tag        = block_addr / S
-hit iff some valid line in set has same tag
+[ tag: t bits ][ set index: s bits ][ block offset: b bits ]
 ```
 
-For powers of two, use bit fields: offset low `b`, index next `s`, tag rest.
+### 4.3 Cache Lookup
 
-Quiz4 conflict example: 4KB 2-way 32B line -> 64 sets. Addresses `0x01ABC000, 0x01ABB004, 0x01ABD000, 0x01ABA010` have same index with different tags -> conflict misses.
+1. Use set index bits to select a set.
+2. Compare tag against each valid line in the set.
+3. Hit if any valid tag matches.
+4. Offset chooses byte/word inside block.
+5. Miss: fetch block from lower level, choose victim if set full.
 
-## 4. Placement / Associativity
+### 4.4 Quiz Examples
 
-| Cache type | Sets | Ways | Pros | Cons |
-|---|---:|---:|---|---|
-| direct-mapped | many | 1 | lowest tag overhead, simplest replacement | conflict-prone |
-| N-way set-assoc | `C/(B*N)` | N | fewer conflicts | more comparators, slower |
-| fully associative | 1 | all lines | flexible placement | expensive/slow |
+Example 1: 32b address, `C=1024B`, `B=16B`, direct mapped.
 
-Quiz "always true" for same C/B:
+```text
+E=1
+S = 1024/(16*1)=64 sets
+b = log2(16)=4
+s = log2(64)=6
+t = 32-6-4=22
+```
 
-- Direct-mapped has **lowest tag overhead**.
-- Direct-mapped replacement is simplest.
-- Do not automatically choose "direct-mapped fastest" or "fully associative lowest miss rate"; replacement/pathological sequences can break simplistic claims.
+Example 2: 64 KiB cache, 4-way, 64B blocks.
 
-### 4.1 Reducing Conflict Misses
+```text
+C=65536, E=4, B=64
+S=65536/(4*64)=256
+b=6, s=8
+tag bits for 32b address = 18
+```
 
-- Increase cache size.
-- Increase associativity.
-- Add victim cache after direct-mapped L1.
-- Change data/code layout; pad arrays to avoid power-of-two stride conflicts.
-- Redesign algorithm/data structure.
+Example 3: 256B cache, 32B blocks, 2-way.
 
-## 5. Block Size Tradeoffs
+```text
+S=256/(32*2)=4
+b=5, s=2
+```
 
-Larger block:
+## 5. Placement / Associativity
 
-| Pros | Cons |
+| Organization | `E` / `S` | Placement | Pros/cons |
+|---|---|---|---|
+| direct mapped | `E=1` | one possible line | fastest/simple, many conflict misses |
+| set associative | `E>1` | any line in indexed set | balance hit time/miss rate |
+| fully associative | `S=1` | anywhere | few conflict misses, expensive search |
+
+Increasing associativity usually reduces conflict misses but increases hit time, tag comparators, power, and complexity.
+
+### 5.1 Conflict Miss Example
+
+Direct mapped cache can thrash if addresses map to the same set:
+
+```text
+access A, B, A, B ...
+set(A) == set(B), tag(A) != tag(B)
+```
+
+Fixes:
+
+- higher associativity.
+- victim cache.
+- padding/array layout changes.
+- loop blocking/tiling.
+- change stride to avoid power-of-two conflicts.
+
+## 6. Block Size Tradeoffs
+
+| Larger block helps | Larger block hurts |
 |---|---|
-| exploits spatial locality | higher miss penalty |
-| lower tag overhead | more bandwidth traffic |
-| fewer compulsory misses | fewer total lines -> more conflict/capacity pressure |
+| spatial locality | miss penalty/bandwidth |
+| fewer compulsory misses | fewer total lines |
+| amortizes tag overhead | more conflict/capacity misses |
+| sequential accesses | useless bytes for poor locality |
 
-Critical-word-first / early-restart reduces perceived miss penalty.
+Critical-word-first / early-restart lets CPU use requested word before entire block arrives.
 
-## 6. Write Policies
+## 7. Write Policies
 
-### 6.1 Write Hit
+### 7.1 Write Hit
 
 | Policy | Behavior | Notes |
 |---|---|---|
-| write-through | write cache and memory/L2 | simple, high bandwidth; use write buffer |
-| write-back | write cache only, mark dirty; write on eviction | needs dirty bit, common in L1D |
+| write-through | update cache and next level immediately | simple, more bandwidth, needs write buffer |
+| write-back | update cache only, set dirty bit | common in L1D, writes back on eviction |
 
-### 6.2 Write Miss
+### 7.2 Write Miss
 
 | Policy | Behavior | Best for |
 |---|---|---|
-| write-allocate | fetch line, then write | likely reuse: locals, struct fields |
-| no-write-allocate | write to lower level only | streaming writes: large `memcpy`, large `memset`, DB logs |
+| write-allocate | fetch line, then write into cache | likely reuse: locals, struct fields |
+| no-write-allocate | write around/bypass cache | streaming writes, large `memset`, logs |
 
 Search terms: **write allocate** = fetch-on-write-miss; **no write allocate** = bypass cache on write miss.
 
-Modern L1D quiz answer: **set-assoc + write-back + write-allocate**.
+Modern L1D quiz answer: **set-associative + write-back + write-allocate**.
 
-### 6.3 I-Cache
+### 7.3 I-Cache
 
-I-cache has no CPU stores, so no write-hit/write-miss policy.
+I-cache has no CPU stores, so no write-hit/write-miss policy. I-cache miss handling fetches instruction blocks from lower level.
 
-JIT/code patching stale instruction fixes:
+## 8. Cache Read, Non-Blocking Cache, MSHR
 
-- flush/invalidate I-cache lines containing old instrs.
-- or maintain I/D cache coherence for code writes.
+### 8.1 Cache Read
 
-## 7. Cache Performance
+On hit: data returned after tag check/data array access.
 
-### 7.1 Stall Cycles
+On miss:
 
-```text
-memory stall cycles = accesses * miss_rate * miss_penalty
-                    = IC * mem_refs_per_instr * miss_rate * miss_penalty
-```
+1. allocate miss tracking entry.
+2. send request to lower cache/memory.
+3. when line returns, fill cache.
+4. restart/wake waiting load.
 
-Quiz single-cycle example:
+### 8.2 Blocking vs Non-Blocking
 
-```text
-base CPI=1, D-cache miss=5%, load/store instr=40%, miss penalty=100
-CPI = 1 + 0.40*0.05*100 = 3.0
-```
-
-### 7.2 AMAT
-
-$$
-AMAT = hit\ time + miss\ rate \times miss\ penalty
-$$
-
-Multi-level:
-
-$$
-AMAT=T_{L1}+m_{L1}(T_{L2}+m_{L2}(T_{L3}+m_{L3}T_{mem}))
-$$
-
-> AMAT is less accurate on OoO/non-blocking/prefetching systems because miss latency can overlap with other work.
-
-## 8. Reduce Misses: 4C
-
-| Miss | Cause | Fix |
-|---|---|---|
-| compulsory/cold | first touch | prefetch, larger line |
-| conflict/collision | too many blocks map to same set | bigger cache, more associativity, victim cache, layout |
-| capacity | working set exceeds cache | larger cache, blocking/tiling, algorithm |
-| coherence | invalidation from other cores | hardest; reduce shared writable data |
-
-Quiz: hardest to remove = **coherence**.
-
-### 8.1 Bandwidth-Heavy Features
-
-Need more bus/memory bandwidth:
-
-- large cache lines.
-- prefetching.
-- non-blocking caches.
-- write-through caches.
-
-## 9. Replacement Policies
-
-| Policy | Key point |
+| Cache | Behavior |
 |---|---|
-| direct-mapped | no choice |
-| true LRU | stack of recency order; expensive |
-| approximate LRU | typical practical set-assoc replacement |
-| FIFO | evict oldest inserted |
-| random | cheap, often okay |
-| Belady optimal | evict line used farthest in future; not implementable; upper bound |
+| blocking | one miss stalls later accesses until resolved |
+| non-blocking | can continue serving hits and/or issue more misses |
 
-Quiz: true LRU data structure = **stack**. New replacement algorithm upper bound = **Belady**.
+==**MSHR**==: Miss Status Holding Register, tracks an outstanding miss: block address, waiting loads/stores, destination, state.
 
-## 10. Multi-Level Caches
+MSHR count depends on memory latency and memory bandwidth/bus width. More memory-level parallelism needs more MSHRs.
 
-| Level | Goal | Typical |
-|---|---|---|
-| L1 | fastest hit | split I/D, small, 3-4 cycle D-hit |
-| L2 | balance hit time/capacity | larger/slower, unified |
-| L3 | reduce memory traffic | usually shared by cores |
+## 9. Cache Performance
 
-### 10.1 Inclusive / Exclusive / NINE
+### 9.1 Stall Cycles
 
-| Organization | Meaning | Notes |
-|---|---|---|
-| inclusive | L1 contents also in L2/L3 | easier coherence, duplicate capacity |
-| exclusive | a line in L1 not also in next level | more effective capacity, harder |
-| NINE | non-inclusive, non-exclusive | project #4 answer |
+$$
+Memory\ Stall\ Cycles = IC \times MemAccesses/Instr \times MissRate \times MissPenalty
+$$
 
-Nonsense configurations from Quiz:
+$$
+CPI = CPI_{base} + Memory\ Stalls/Instr
+$$
 
-- L3 write-through.
-- L1I copy-back/write-back.
-- L1D 4-way with L2 direct-mapped.
-- L1/L2 exclusive + L2/L3 inclusive chain.
-
-## 11. Cache Coherence
-
-Private caches + shared writable data can hold stale copies.
-
-Solutions for bus-connected multiprocessors:
-
-- use a shared cache only.
-- or private caches with **snoopy protocol**.
-
-==**Snoopy cache**==: cache controllers monitor bus transactions and invalidate/share lines as needed; causes significant bus traffic.
-
-MESI states: Modified, Exclusive, Shared, Invalid.
-
-## 12. TLB / Virtual Memory
-
-==**TLB**== caches page-table translations `VPN -> PPN`.
-
-For page size `2^p`:
+If split I/D:
 
 ```text
-VA = [ VPN | VPO ], PA = [ PPN | PPO ], VPO = PPO = low p bits
+stalls/instr =
+I_miss_rate * I_miss_penalty
++ data_accesses_per_instr * D_miss_rate * D_miss_penalty
+```
+
+### 9.2 AMAT
+
+$$
+AMAT = HitTime + MissRate \times MissPenalty
+$$
+
+Example: hit time 1 cycle, miss rate 5%, miss penalty 100 cycles:
+
+```text
+AMAT = 1 + 0.05*100 = 6 cycles
+```
+
+### 9.3 Multi-Level AMAT
+
+For local miss rates:
+
+$$
+AMAT = HT_{L1}+MR_{L1}(HT_{L2}+MR_{L2}(HT_{L3}+MR_{L3}MP_{mem}))
+$$
+
+Example:
+
+```text
+L1 hit 1, L1 MR .05
+L2 hit 10, L2 local MR .20
+memory penalty 100
+AMAT = 1 + .05*(10 + .20*100) = 2.5
+```
+
+AMAT becomes incomplete for OoO/non-blocking CPUs because overlapped misses and MLP hide some latency.
+
+## 10. Reducing Misses: 4C
+
+| Miss type | Cause | Fix |
+|---|---|---|
+| compulsory | first access to block | larger block, prefetch |
+| capacity | working set exceeds cache | bigger cache, blocking/tiling |
+| conflict | mapping collisions | associativity, victim cache, padding |
+| coherence | invalidations by other cores | reduce sharing, align/pad, better synchronization |
+
+Some texts use 3C without coherence; multicore adds 4th C.
+
+### 10.1 Bandwidth-Heavy Features
+
+These can reduce misses/penalty but require bandwidth:
+
+- larger blocks.
+- prefetching.
+- write-through.
+- non-blocking caches.
+- many MSHRs.
+- wide issue/OoO cores generating many misses.
+
+## 11. Replacement Policies
+
+| Policy | Idea |
+|---|---|
+| random | cheap, sometimes effective |
+| FIFO | evict oldest inserted |
+| LRU | evict least recently used |
+| pseudo-LRU | approximate LRU with less metadata |
+| optimal/Belady | evict line used farthest in future; theoretical lower bound |
+
+LRU is expensive for high associativity. Direct mapped has no replacement choice.
+
+Belady anomaly examples can make direct mapped appear better than fully associative for a specific trace under a poor replacement policy, but fully associative with optimal replacement is the ideal comparison.
+
+## 12. Victim Cache
+
+==**Victim cache**==: small fully associative buffer holding recently evicted lines from a direct-mapped or low-assoc cache.
+
+Helps conflict misses, especially ping-pong between two blocks mapping to same set.
+
+DM + victim cache can sometimes beat 2-way set associative for conflict-heavy traces with low hit-latency cost.
+
+## 13. Multi-Level Caches
+
+Multi-level caches reduce miss penalty:
+
+- L1: smallest/fastest, split I/D common.
+- L2: larger/slower, unified or private.
+- L3: larger shared last-level cache.
+- DRAM beyond LLC.
+
+Considerations:
+
+- hit time.
+- local/global miss rate.
+- miss penalty.
+- inclusion policy.
+- coherence traffic.
+- bandwidth and MSHRs.
+
+### 13.1 Inclusive / Exclusive / NINE
+
+| Policy | Meaning | Pros/cons |
+|---|---|---|
+| inclusive | L1 contents also in L2/L3 | easier coherence/snoop filtering, duplicate capacity |
+| exclusive | line in L1 not also in next level | more effective capacity, more movement complexity |
+| NINE | non-inclusive, non-exclusive | flexible; neither guarantee |
+
+Quiz pattern:
+
+- L1/L2 inclusive + L2/L3 inclusive -> L1/L3 inclusive.
+- L1/L2 exclusive + L2/L3 exclusive does **not** imply L1/L3 inclusive.
+- L1/L2 exclusive + L2/L3 inclusive chain has mixed guarantees.
+
+## 14. Cache Coherence
+
+Coherence problem: multiple cores cache same address; writes by one core must become visible consistently.
+
+Snoopy coherence: caches watch bus/coherence messages and update/invalidate their lines.
+
+MESI states:
+
+| State | Meaning |
+|---|---|
+| M Modified | dirty, only this cache has latest copy |
+| E Exclusive | clean, only this cache has copy |
+| S Shared | clean, other caches may have copy |
+| I Invalid | not valid |
+
+False sharing: different variables on same cache line cause coherence traffic. Fix by padding/alignment or data partitioning.
+
+## 15. TLB / Virtual Memory
+
+==**TLB**==: Translation Lookaside Buffer, a cache for page-table translations `VPN -> PPN`.
+
+Virtual address split:
+
+```text
+[ VPN ][ page offset ]
+```
+
+Physical address:
+
+```text
+[ PPN ][ same page offset ]
+```
+
+TLB set/index/tag:
+
+```text
 TLBI = low bits of VPN used to index TLB set
 TLBT = remaining high VPN bits
 ```
 
+TLB hit: get PPN quickly, combine with page offset, then access cache/memory.
+
 TLB miss:
 
-1. hardware/OS walks page table in memory.
+1. hardware or OS page-table walk.
 2. if PTE valid -> fill TLB.
-3. if PTE invalid -> page fault; OS loads page from disk, updates PTE/TLB.
+3. if PTE invalid/not resident -> page fault; OS loads page and updates PTE/TLB.
 
-### 12.1 CMU-Style TLB Example
+### 15.1 CMU-Style TLB Example
 
-20-bit VA, 1024B pages:
-
-```text
-p=10, VPO=[9:0], VPN=[19:10]
-8-set TLB -> TLBI=3 low VPN bits, TLBT=remaining 7 VPN bits
-```
-
-VA `0x078E6`:
+Assume:
 
 ```text
-VPN = 0x01E
-VPO = 0x0E6
-TLBI = 0x6
-TLBT = 0x03
+virtual address = 0x03d4
+VA bits = 14
+page size = 16B -> page offset = 4 bits
+VPN bits = 10
+8-set TLB -> TLBI = 3 low VPN bits
+TLBT = remaining 7 VPN bits
 ```
 
-### 12.2 Page Table Size
+Compute:
 
-Single-level page table entries:
+```text
+VPN = 0x03d4 >> 4 = 0x03d
+VPO = 0x4
+TLBI = VPN & 0x7 = 0x5
+TLBT = VPN >> 3 = 0x07
+```
 
-$$
-\#PTE = \frac{\text{virtual address space size}}{\text{page size}}
-$$
+Always recompute from the exact address bits in the problem; do not memorize one answer blindly.
 
-Larger pages reduce PTE count and TLB misses but increase internal fragmentation and page-fault transfer size.
+### 15.2 Page Table Size
 
-## 13. Locality / Applications
+PTE count = virtual address space / page size.
 
-### 13.1 Linked List
+Example: 32b VA, 4 KiB pages:
+
+```text
+pages = 2^32 / 2^12 = 2^20 PTEs
+```
+
+Larger pages:
+
+- fewer PTEs.
+- fewer TLB misses / better TLB reach.
+- larger page-fault transfer.
+- more internal fragmentation.
+
+## 16. Locality / Applications
+
+### 16.1 Linked Lists and Pointer Chasing
 
 ```c
-while (A != NULL) A = A->next;
+while (p) p = p->next;
 ```
 
-Locality:
+Problems:
 
-- instruction temporal/spatial: yes (loop body).
-- data spatial: poor.
-- data temporal: poor unless revisiting nodes.
-- performance: latency-bound pointer chasing.
+- poor spatial locality if nodes scattered.
+- load-use dependency chain: next address unknown until current load completes.
+- little memory-level parallelism.
 
-### 13.2 C Row-Major Arrays
+Fixes:
 
-In C, `A[i][j]` row-major; increasing `j` is contiguous.
+- arrays/contiguous storage.
+- B/B+ trees instead of pointer-heavy binary trees.
+- open-addressing hash tables instead of linked collision chains.
+- prefetch if next pointers predictable enough.
 
-Transpose/matrix kernels: use blocking/tiling to turn repeated row/column accesses into cache-sized chunks.
+### 16.2 C Row-Major Arrays
 
-### 13.3 Sorting Locality
+C stores `int A[R][C]` row-major. Good traversal:
 
-High locality: quicksort, insertion sort, bubble sort.
+```c
+for (i=0; i<R; i++)
+  for (j=0; j<C; j++)
+    sum += A[i][j];
+```
 
-Low locality: heapsort; large radix sort can suffer cache misses despite O(n).
+Bad for locality: column traversal with large row stride.
 
-### 13.4 Hardware vs Software Cache
+### 16.3 Sorting Locality
 
-| | Hardware cache | Software cache |
-|---|---|---|
-| manager | hardware | OS/app |
-| lookup | associative search | hash/tree/data structure |
-| replacement | simple/fast | can be complex |
-| flexibility | fixed | flexible |
+| Algorithm | Locality idea |
+|---|---|
+| quicksort | partition scans arrays, decent cache locality but recursion/random pivots |
+| radix/counting sort | often streaming and cache-friendly if buckets fit |
+| linked-list sort | poor locality |
+
+### 16.4 Hardware vs Software Cache
+
+Hardware cache:
+
+- transparent to program.
+- exploits general locality.
+- fixed policies and limited semantic knowledge.
+
+Software locality optimization:
+
+- loop interchange.
+- blocking/tiling.
+- data layout changes: AoS vs SoA.
+- contiguous containers.
+- padding to avoid conflicts/false sharing.

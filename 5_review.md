@@ -2,170 +2,309 @@
 
 ## Exam Facts
 
-- First optimization step: **enable compiler optimization**.
-- Flags: `-O0` debug, `-O1/-O` basic, `-O2` safe default, `-O3` aggressive, **`-Os` size**, **`-O3 -flto` cross-module/LTO**.
-- Cross-module procedure inlining requires **`-O3 -flto`**.
-- `-Ofast = -O3 -ffast-math`; may break IEEE FP assumptions.
-- Quiz: optimization with **no primary locality goal** = **loop unrolling**. Locality transforms: interchange, fusion, tiling/blocking.
-- Quiz: possible **1000x speedup** = **cascading DCE**.
-- Class-discussed compiler optimization: **loop transformations for data locality**. Not CUDA/SIMT/multithreading.
-- Compiler limits: aliasing, FP non-associativity, volatile, side effects/calls, separate compilation, unknown runtime data.
-- If `*a` and `*b` are frequent and non-aliasing but compiler keeps them in memory: use **`restrict`** or manual local scalar copies.
-- CSE/reassociation for `(a+b+c+d)` and `(a+d+b+c)` is safe for integer types (`long long`, `char`), not `float/double`.
-- Good inlining candidates: **small procedures**, multiple constant args, called once in a loop. Bad: recursive, very large, many call sites.
-- Pointer chasing (linked list/tree) is latency-bound; matrix multiply/streaming arrays are bandwidth/throughput-bound.
+- Optimization must be measurement-driven: improve algorithm, data layout, compiler flags, locality, ILP, SIMD, and alias information.
+- Compiler flags: `-O2` is safe default; `-O3` adds aggressive loop/unroll/vector transforms; `-Ofast = -O3 -ffast-math`; `-flto` enables link-time optimization.
+- Compiler cannot change semantics: aliasing, FP non-associativity, volatile, calls/side effects, exceptions, separate compilation, unknown inputs.
+- Basic optimizations: constant folding, DCE, CSE, LICM, strength reduction, inlining, register allocation, scheduling.
+- If frequent non-aliasing `*a`, `*b` still stay in memory, use `restrict` or local scalar copies.
+- `strlen` inside a loop can accidentally make code quadratic if the string may be modified.
+- Loop unrolling reduces branch overhead and exposes ILP/SIMD but can increase code size and hurt I-cache.
+- CPE = cycles per element. `cycles = CPE*n + overhead`.
+- Reduction with one accumulator is latency-bound; multiple accumulators/SIMD lanes reduce dependency-chain CPE.
+- Pointer-heavy structures are latency-bound; contiguous arrays, B/B+ trees, open addressing improve locality/MLP.
 
 ## 1. Program Optimization
 
-Optimization goals:
+Program optimization shifts from correct code to efficient code.
 
-- reduce instruction count.
-- reduce cycles per instruction / stalls.
-- improve locality and memory behavior.
-- expose ILP/SIMD.
-- keep correctness under language rules.
+Main levers:
 
-> Algorithm/data-structure improvement beats compiler tricks. Compiler cannot turn O(n^2) into O(n log n) unless you change the algorithm.
+| Lever | Example |
+|---|---|
+| algorithm | `O(n^2)` -> `O(n log n)` or `O(n)` |
+| data structure/layout | linked list -> array; AoS -> SoA |
+| compiler | `-O2`, `-O3`, `-flto`, PGO |
+| microarchitecture | cache locality, branch predictability, ILP |
+| ISA | SIMD/vector/FMA |
+| programmer annotations | `restrict`, alignment, constness |
 
-## 2. Compiler Optimization Levels
+> Optimization is not guessing. Use profiling, inspect generated code, and understand bottlenecks.
+
+## 2. Compiler Optimization Flags
 
 | Flag | Meaning |
 |---|---|
-| `-O0` | no optimization; debugging |
-| `-O1` / `-O` | basic local/global opts |
-| `-O2` | safe default: most non-size-exploding opts |
-| `-O3` | aggressive loop opts, unrolling, vectorization; possible code bloat |
-| `-Os` | optimize for code size, embedded memory-limited builds |
-| `-O3 -flto` | link-time whole-program analysis; cross-module inlining |
-| `-Ofast` | `-O3` plus fast-math semantics |
-| `-march=native` | use local CPU ISA/features |
-| PGO | `-fprofile-generate` then `-fprofile-use` |
+| `-O0` | no optimization, best debugging, slow code |
+| `-O1` / `-O` | basic safe optimizations |
+| `-O2` | recommended default; broad safe optimizations without huge code growth |
+| `-O3` | aggressive loop unrolling/vectorization/inlining; may increase code size |
+| `-Ofast` | `-O3 -ffast-math`; may break strict FP semantics |
+| `-flto` | link-time optimization across translation units |
+| `-march=native` | generate instructions for current CPU |
+| `-mtune=native` | schedule/tune for current CPU while preserving ISA target |
+| PGO | `-fprofile-generate`, run workload, `-fprofile-use` |
+
+`-O3` can be slower than `-O2` if code bloat hurts I-cache or branch prediction.
 
 ## 3. Why Compiler Optimization Is Hard
 
-Compiler must preserve observable behavior:
+The compiler must preserve language-visible behavior.
 
-- pointer aliasing may make memory ops dependent.
-- FP operations are not associative.
-- calls may have side effects.
-- `volatile`/atomic accesses are ordered.
-- runtime values are unknown.
-- separate compilation hides other modules unless LTO is enabled.
-- optimal register allocation/scheduling/phase ordering is hard.
+Hard limits:
+
+- cannot generally change algorithmic complexity.
+- memory aliasing may force loads/stores in program order.
+- FP arithmetic is not associative.
+- function calls may have side effects.
+- `volatile` and atomics constrain reordering.
+- separate compilation hides whole-program facts unless LTO.
+- optimal register allocation/scheduling/phase ordering are hard combinatorial problems.
+- worst-case and malicious inputs may matter more than profiled common cases.
 
 ## 4. Basic Compiler Optimizations
 
-### 4.1 Constant Folding / Propagation
+### 4.1 Local vs Global
+
+| Scope | Meaning | Examples |
+|---|---|---|
+| local | inside one basic block | constant folding, local CSE, DCE |
+| global | across CFG of a function | LICM, global CSE, register allocation |
+| whole-program | across modules | LTO, interprocedural inlining |
+
+CFG models control paths; DFG/DDG models value/dependence flow.
+
+### 4.2 Constant Folding / Propagation
+
+Compute constant expressions at compile time:
 
 ```c
-int x = 3 * 8;        // x=24
-if (DEBUG == 0) ...   // branch may disappear
+long mask = 0xFF << 8;                  // 0xFF00
+size_t n = strlen("Harry Bovik");       // 11
 ```
 
-### 4.2 Dead Code Elimination (DCE)
+### 4.3 Dead Code Elimination (DCE)
+
+Remove unreachable code or useless overwritten assignments:
 
 ```c
-x = 1;
-x = 2;       // first store dead if x not read
-if (0) f();  // removed
+if (0) puts("never");
+x = 23;
+x = 42;     // first store dead if x not read between
 ```
 
-==**Cascading DCE**==: one removal exposes another removal; can create very large speedups when templates/debug/checking layers collapse.
+DCE often cleans up code created by other optimizations and conditional compilation.
 
-### 4.3 Common Subexpression Elimination (CSE)
+### 4.4 Common Subexpression Elimination (CSE)
+
+Reuse repeated calculations:
 
 ```c
-t = a*b;
-x = t + c;
-y = t + d;
+norm[i] = v[i].x*v[i].x + v[i].y*v[i].y;
 ```
 
-For integer expressions, compiler may reuse/reassociate when overflow/semantics allow. For FP, do not assume:
+Compiler can transform to:
 
 ```c
-(x+y)+z != x+(y+z)   // possible because rounding
+elt = &v[i];
+x = elt->x;
+y = elt->y;
+norm[i] = x*x + y*y;
 ```
 
-Quiz: `(a+b+c+d)` and `(a+d+b+c)` CSE -> **long long, char**; not `float/double`.
+Other CSE patterns:
 
-### 4.4 Loop-Invariant Code Motion (LICM)
+- `A=(A+B+C)*(A+B+D)-(A+D+B)` has integer common subexpressions like `A+B`.
+- `B[i][j][k] + C[i][j][k]` shares index arithmetic.
+- `A->b->c->e + A->b->c->d` shares pointer chain `A->b->c`.
+
+FP caveat: do not reassociate FP sums unless fast-math semantics allow it.
+
+### 4.5 Loop-Invariant Code Motion (LICM)
+
+Move loop-invariant work out of loop:
 
 ```c
-for (j=0; j<n; j++) a[n*i+j] = b[j];
+for (j=0; j<n; j++)
+    a[n*i+j] = b[j];
 ```
 
-Move `n*i` outside inner loop.
+becomes:
 
-### 4.5 Strength Reduction
+```c
+int ni = n*i;
+for (j=0; j<n; j++)
+    a[ni+j] = b[j];
+```
 
-- replace multiply by constant with shifts/adds.
-- replace division by power of 2 with shifts when semantics allow.
-- for signed division by `2^k`, add bias for negative values to round toward 0.
+Valid only if moved expression produces same result and no side effects/exceptions/aliasing changes behavior.
 
-### 4.6 Inlining
+### 4.6 Strength Reduction
 
-Inlining removes call/return overhead and exposes constants, CSE, DCE, register allocation, and scheduling.
+Replace expensive operations with cheaper ones:
 
-| Good | Bad |
+| Expensive | Cheaper |
 |---|---|
-| small function | recursive |
-| constant args | large body |
-| called once inside loop | many call sites causing code bloat |
+| `i * 4` | `i << 2` |
+| `i * n` in loop | increment pointer/index by `n` |
+| division by power of 2 unsigned | logical shift |
+
+Signed division by power of 2 needs bias for negative values.
+
+### 4.7 Inlining
+
+Inlining copies callee body into caller.
+
+Benefits:
+
+- removes call/return overhead.
+- exposes constants and CSE/DCE/LICM.
+- improves register allocation and scheduling.
+
+Costs:
+
+- code bloat.
+- worse I-cache.
+- longer compile time.
+- recursion/deep inline limits.
+
+Inlining is high value when small hot functions are called inside loops.
 
 ## 5. Memory Aliasing
 
-==**Aliasing**==: two references may name the same memory location.
-
-Example:
+### 5.1 Problem
 
 ```c
-void f(double *a, double *b) {
-    *a += *b;
-    *b += 1;
+void sum_rows1(double *a, double *b, long n) {
+    for (long i=0; i<n; i++) {
+        b[i] = 0;
+        for (long j=0; j<n; j++)
+            b[i] += a[i*n+j];
+    }
 }
 ```
 
-If `a==b`, transformations that keep `*a`/`*b` in separate registers can be wrong.
+Compiler may reload/store `b[i]` every iteration because `a[i*n+j]` might alias `b[i]`.
 
-### 5.1 Fixes for Alias-Limited Code
+Bad inner loop shape:
 
-```c
-void f(double *restrict a, double *restrict b, long n)
+```asm
+fld    fa5,0(a3)      # load b[i]
+fld    fa4,0(a4)      # load a[i*n+j]
+fadd.d fa5,fa5,fa4
+fsd    fa5,0(a3)      # store b[i]
 ```
 
-`restrict`: within this scope, object is accessed only through that pointer-derived path.
+If no alias, it can keep accumulator in a register.
 
-Manual scalar copy:
+### 5.2 Fixes for Alias-Limited Code
 
-```c
-double aa = *a, bb = *b;
-/* compute in registers */
-*a = aa; *b = bb;
-```
-
-Quiz answer for frequent non-aliasing `*a`, `*b`: **restricted pointers** and **local variables manually**.
-
-### 5.2 Function Calls in Loops
+Use local accumulator:
 
 ```c
-for (i=0; i<strlen(s); i++) ...
+void sum_rows2(double *a, double *b, long n) {
+    for (long i=0; i<n; i++) {
+        double val = 0;
+        for (long j=0; j<n; j++)
+            val += a[i*n+j];
+        b[i] = val;
+    }
+}
 ```
 
-May be O(n^2). Hoist `strlen` only if loop cannot modify `s`.
+Use `restrict`:
 
-## 6. Loop Optimizations
+```c
+void sum_rows(double *restrict a, double *restrict b, long n);
+```
 
-| Transform | Main purpose |
-|---|---|
-| loop unrolling | reduce branch/index overhead; expose ILP |
-| loop interchange | make inner loop access contiguous data |
-| loop fusion | combine loops over same data; improve reuse |
-| loop tiling/blocking | operate on cache-sized blocks |
-| loop unswitching | move invariant branch outside loop |
+Check compiler diagnostics:
 
-> Quiz: unrolling is not primarily for locality.
+```bash
+gcc -O3 -fopt-info-missed=missed_opts.txt file.c
+clang -O3 -Rpass-missed=.* -Rpass-analysis=.* file.c
+```
 
-## 7. CPE / Combine Benchmark
+Look for messages like "data dependence", "dependent memory operations", or "cannot vectorize due to aliasing".
+
+### 5.3 Function Calls in Loops
+
+```c
+for (i=0; i<strlen(s); i++)
+    ...
+```
+
+If loop body modifies `s`, compiler may need to recompute `strlen(s)` each iteration, making code quadratic.
+
+Fix:
+
+```c
+size_t n = strlen(s);
+for (i=0; i<n; i++)
+    ...
+```
+
+Only valid if loop does not change string length.
+
+## 6. Modern CPU Design and Scheduling
+
+Modern CPUs have:
+
+- instruction fetch + I-cache.
+- branch prediction.
+- decode/rename/dispatch.
+- multiple functional units: branch, integer ALU, load/store, FP/SIMD.
+- data cache.
+- retirement unit to preserve architectural order.
+
+OoO executes ready operations when operands and functional units are available. Compiler scheduling still helps, especially when hardware window is small or code is in-order/embedded.
+
+## 7. Loop Unrolling
+
+Unroll by 4:
+
+```c
+for (i=0; i+3<nelts; i+=4) {
+    A[i  ] = B[i  ]*k + C[i  ];
+    A[i+1] = B[i+1]*k + C[i+1];
+    A[i+2] = B[i+2]*k + C[i+2];
+    A[i+3] = B[i+3]*k + C[i+3];
+}
+for (; i<nelts; i++)
+    A[i] = B[i]*k + C[i];
+```
+
+Benefits:
+
+- less loop branch overhead.
+- more ILP.
+- exposes CSE and scheduling.
+- helps SIMD vectorization.
+
+Risks:
+
+- cleanup loop needed if length not multiple of unroll factor.
+- code size increases.
+- register pressure increases.
+- aliasing can make reordered loads/stores illegal.
+
+## 8. Instruction Scheduling
+
+Move independent loads early:
+
+```c
+B0=B[i]; B1=B[i+1]; B2=B[i+2]; B3=B[i+3];
+C0=C[i]; C1=C[i+1]; C2=C[i+2]; C3=C[i+3];
+A[i  ] = B0*k + C0;
+A[i+1] = B1*k + C1;
+A[i+2] = B2*k + C2;
+A[i+3] = B3*k + C3;
+```
+
+Invalid if `A` overlaps `B` or `C` and writes change later reads.
+
+Use `-march=native -mtune=native` so compiler knows available ISA and scheduling costs.
+
+## 9. CPE / Vector Combine Benchmark
 
 ==**CPE**==: cycles per element.
 
@@ -173,59 +312,112 @@ May be O(n^2). Hoist `strlen` only if loop cannot modify `s`.
 cycles = CPE*n + overhead
 ```
 
-Optimization steps in vector combine:
+`combine1`:
 
-1. avoid repeated `vec_length` calls.
-2. avoid bounds checks via raw data pointer.
-3. accumulate in local variable.
-4. unroll loop.
-5. use multiple accumulators to break dependency chains.
+```c
+void combine1(vec_ptr v, data_t *dest) {
+    *dest = IDENT;
+    for (i=0; i<vec_length(v); i++) {
+        data_t val;
+        get_vec_element(v,i,&val);
+        *dest = *dest OP val;
+    }
+}
+```
+
+Problems:
+
+- calls `vec_length` every iteration.
+- calls `get_vec_element` with bounds check.
+- loads/stores `*dest` every iteration due to aliasing.
+
+`combine4`:
+
+```c
+void combine4(vec_ptr v, data_t *dest) {
+    long length = vec_length(v);
+    data_t *d = get_vec_start(v);
+    data_t t = IDENT;
+    for (i=0; i<length; i++)
+        t = t OP d[i];
+    *dest = t;
+}
+```
+
+Performance pattern:
+
+| Version | Reason for improvement |
+|---|---|
+| `-O1/-O3` | compiler removes obvious overhead |
+| `combine4` | hoists length/start, uses local accumulator |
+| unrolled | reduces loop overhead, exposes ILP |
+| multiple accumulators | breaks serial dependency chain |
+| SIMD/vector reduction | parallel lanes |
+
+## 10. Reduction and SIMD
+
+Scalar reduction:
+
+```c
+sum = 0;
+for (i=0; i<n; i++)
+    sum += a[i];
+```
+
+One accumulator creates a RAW dependency chain:
+
+```text
+sum0 -> sum1 -> sum2 -> ...
+```
 
 Multiple accumulators:
 
 ```c
-x0 = IDENT; x1 = IDENT;
-for (i=0; i<limit; i+=2) {
-  x0 = x0 OP d[i];
-  x1 = x1 OP d[i+1];
+s0=s1=s2=s3=0;
+for (i=0; i+3<n; i+=4) {
+    s0 += a[i];
+    s1 += a[i+1];
+    s2 += a[i+2];
+    s3 += a[i+3];
 }
-*dest = x0 OP x1;
+sum = s0+s1+s2+s3;
 ```
 
-Why it works: one accumulator creates a latency chain; k accumulators reduce CPE until FU/load bandwidth becomes the bottleneck.
+Why it works: four independent chains can use multiple ALUs/FMA lanes and hide latency until throughput becomes bottleneck.
 
-## 8. Reduction and SIMD
+SIMD reduction accumulates across vector lanes, then horizontally combines.
 
-Reduction:
+## 11. Latency-Bound vs Bandwidth-Bound
 
-```c
-sum += a[i];
-```
+| Bottleneck | Symptom | Fix |
+|---|---|---|
+| latency-bound | dependency chain, pointer chasing | break chain, prefetch, better data structure |
+| bandwidth-bound | streaming large arrays, FU/cache bandwidth saturated | improve locality, reduce bytes, vectorize, compress |
+| branch-bound | unpredictable branches | branchless code, better layout, prediction-friendly data |
+| cache-bound | high miss rate | blocking, layout, contiguous data |
 
-One scalar accumulator is latency-bound. SIMD/multiple accumulators create independent partial reductions, then combine at the end.
+Pointer-heavy data structures:
 
-## 9. Latency-Bound vs Bandwidth-Bound
+- linked lists.
+- binary trees.
+- queues/stacks built from nodes.
+- hash tables with linked collision chains.
 
-| Pattern | Bound |
+Fixes:
+
+- arrays/contiguous storage.
+- B/B+ trees.
+- open addressing.
+- structure-of-arrays for vectorization.
+- pool allocator to improve locality.
+
+## 12. Safety Traps
+
+| Trap | Correct idea |
 |---|---|
-| one account-balance query | latency |
-| linked-list traversal | latency |
-| binary-tree search | latency + branch/data hazards |
-| large matrix multiply | bandwidth/throughput |
-| streaming array traversal | bandwidth |
-
-### 9.1 Data-Structure Fixes for Pointer Chasing
-
-- prefer contiguous arrays.
-- B/B+ tree over binary tree.
-- open addressing over collision chains.
-- batch multiple independent lookups.
-- allow multiple memory requests in flight.
-
-## 10. Safety Traps
-
-- FP reassociation needs fast-math permission.
-- `restrict` is a promise; wrong use gives wrong code.
-- unrolling needs cleanup for remainder.
-- overlapping arrays can break vectorization/unrolling assumptions.
-- code bloat can hurt I-cache.
+| "compiler will optimize everything" | no; semantics and unknowns constrain it |
+| "unroll always helps" | no; code size/register pressure/I-cache can hurt |
+| "FP can be reassociated" | only under fast-math-like assumptions |
+| "loads can move before stores" | only if no alias/trap concern |
+| "inline always helps" | no; may bloat code |
+| "CPE is total cycles" | no; CPE is slope per element |

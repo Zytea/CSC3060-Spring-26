@@ -290,8 +290,6 @@ $$
 g_i=A_iB_i;\quad p_i=A_i\oplus B_i;\quad C_{i+1}=g_i+p_iC_i
 $$
 
-![](assets/2.3.2.3.2.png)
-
 ALU control idea:
 
 | Operation | Control idea |
@@ -475,8 +473,6 @@ Example: `1.000_2 * 2^{-1} + (-1.110_2 * 2^{-2})`.
 
 ### 7.5 FP Units and FMA
 
-![](assets/2.4.5.png)
-
 | Unit | Latency idea | Notes |
 |---|---|---|
 | FADD | 3-4 cycles | align exponents, add, normalize, round |
@@ -486,17 +482,3 @@ Example: `1.000_2 * 2^{-1} + (-1.110_2 * 2^{-2})`.
 FMA is not `FMUL latency + FADD latency` because product reduction overlaps addend alignment/final addition and avoids intermediate normalization/rounding.
 
 Benefits: higher throughput, smaller code, better precision, lower energy for dot products and matrix multiply.
-
-## 8. Quiz Trap Cheat-Notes
-
-| Trap | Answer |
-|---|---|
-| `0` vs `'0'` | integer zero byte is `0x00`; ASCII `'0'` is `0x30` |
-| text vs binary | text more portable; binary depends on endian/ABI/format |
-| `x < 0` with unsigned | signed value converted to unsigned |
-| `x*x >= 0` for signed int | false; overflow can make negative |
-| `x > 0 || -x >= 0` | false for `TMin` |
-| `x & 7` | low 3 bits; `x % 8` only same for nonnegative or unsigned |
-| `x/8` signed | bias negative before arithmetic shift |
-| FP all-zero bits | `+0.0` in IEEE, but still interpretation-specific |
-| bfloat16 vs fp16 | bf16 has fp32-sized exponent, less precision than fp16 |
