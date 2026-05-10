@@ -95,7 +95,7 @@ $$
 > 
 ```
 
-Good example (Keep in mind that the notes will be printed in A4, so there is a limit on the length of latex lines, be cautious):
+Good example (Keep in mind that the notes will be printed in A4, be cautious):
 ```
 If $\alpha$ of old time is improved by factor $k$:
 

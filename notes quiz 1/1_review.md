@@ -74,7 +74,7 @@ Main components: **CPU, main memory, I/O devices, buses/interconnect, I/O bridge
 
 ### 1.4.2 Running `hello`
 
-Path: user types `./hello` -> shell makes **system call** -> OS creates process and loads executable -> CPU executes `main` -> bytes of `"hello, world\n"` move memory -> registers -> output device.
+Path: `./hello` -> shell system call -> OS creates process/loads exe -> CPU runs `main` -> bytes move memory -> registers -> output.
 
 ==**Shell**==: **user-level command-line interpreter**, not kernel.
 
@@ -187,4 +187,4 @@ If serial/unimproved fraction is $\beta$, max speedup $=1/\beta$.
 
 ## 1.10 Summary
 
-System performance/correctness depends on **bits+context, compilation/linking, CPU execution, locality/memory hierarchy, OS abstractions, and limited speedup (Amdahl)**.
+System performance/correctness depends on **bits+context, compilation/linking, execution, locality/hierarchy, OS abstractions, Amdahl limits**.

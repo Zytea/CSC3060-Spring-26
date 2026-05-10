@@ -64,6 +64,7 @@ Regularity:
 
 - ==**Natural alignment**==: object address is multiple of object size.
 - Struct rules: each field aligned to its own size; struct size padded to multiple of largest field alignment.
+- C address formulas: `A[i]=base+i*sizeof(T)`; row-major `A[i][j]=base+(i*cols+j)*sizeof(T)`; struct offset includes padding.
 - RISC-V Linux stack alignment: **16B** at function boundaries.
 - Loads/stores use base + signed 12b byte offset: `LW rd, imm(rs1)`.
 - Arrays/structs often stay in memory; more registers do not remove most memory ops.

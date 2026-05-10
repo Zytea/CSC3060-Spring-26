@@ -39,6 +39,7 @@ Placement:
 
 For A-bit address, cache size C bytes, block B bytes, E ways:
 - sets $S=C/(B\cdot E)$, offset bits $b=\log_2B$, index bits $s=\log_2S$, tag bits $t=A-s-b$.
+- Simulation: block# = `addr/B`; set = `block# mod S`; tag = `block#/S`; hit iff valid matching tag in set.
 - Example: 64KB, 4-way, 32B line, 32b addr: $S=65536/(4*32)=512$, $b=5$, $s=9$, $t=18$.
 
 > [!IMPORTANT]
@@ -50,8 +51,9 @@ For A-bit address, cache size C bytes, block B bytes, E ways:
 - ==**Write-back**==: write cache only; write dirty line back on eviction; needs dirty bit.
 - ==**Write-allocate**==: on write miss, fetch block then write; common with write-back.
 - ==**Write-no-allocate / no-write-allocate**==: on write miss, bypass cache; good for streaming writes like large `memset`, `memcpy`, database logs.
+- Write buffer lets CPU continue after a store; stalls only when full; can coalesce writes.
 
-I-cache easier than D-cache because it normally has no processor stores; JIT/patching stale-code fixes: **flush I-cache**, invalidate affected lines, or maintain I/D coherence.
+I-cache easier: no normal processor stores. JIT/patching stale-code fixes: **flush I-cache**, invalidate lines, or maintain I/D coherence.
 
 ## Miss Handling and Performance
 
@@ -62,6 +64,7 @@ I-cache easier than D-cache because it normally has no processor stores; JIT/pat
 - Single-cycle cache miss quiz: base CPI 1 + `0.4*0.05*100 = 3.0`.
 - Line holds `block size / element size` elements; in a cold cache, first access to a line is a compulsory miss.
 - Bandwidth-heavy features: **large lines, prefetching, non-blocking caches, write-through**.
+- Miss-penalty reduction: **critical-word-first/early restart, non-blocking cache, prefetch, write buffer**.
 
 ## Reducing Misses
 
@@ -105,10 +108,14 @@ Large line:
 - TLB caches **VPN -> PPN** translations; page offset is unchanged.
 - TLB index/tag come from VPN like cache index/tag.
 - VM works well because programs show temporal/spatial locality at **page** granularity.
+- VA = **VPN | VPO**, PA = **PPN | PPO**, and **VPO=PPO**.
+- For page size $2^p$: offset has `p` bits; TLB sets = entries/ways; **TLBI = low bits of VPN**, **TLBT = remaining VPN bits**.
+- TLB miss -> page table lookup; PTE valid=0 -> **page fault**, else use PPN and fill TLB.
 
 ## Locality / Applications
 
-- Linked-list traversal `while(A) A=A->next`: poor data spatial locality and pointer-chasing latency; loop instructions still have instruction temporal/spatial locality.
+- Linked list `while(A) A=A->next`: poor data spatial locality + pointer latency; loop instructions still have I-cache locality.
+- C row-major arrays: `A[i][j]` with increasing `j` is contiguous; transpose often reads rows but writes columns, so blocking helps.
 - Good locality sorting: quicksort, insertion sort, bubble sort (vs heapsort poorer locality).
 - Hardware cache: managed by hardware, associative search, simple fast replacement.
 - Software cache: managed by OS/app, uses data structures like hash tables, can use complex policies.

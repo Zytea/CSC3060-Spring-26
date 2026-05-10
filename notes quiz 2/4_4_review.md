@@ -47,7 +47,7 @@ Quiz pattern:
 - If branch resolved in MEM, penalty can be 3 flushed inst; if EX, often 2.
 - Penalty estimate: loss CPI $\approx f_{branch}\cdot f_{mispredict/taken}\cdot penalty$; slowdown = loss/base CPI.
 - A57-like no prediction with 20% branches and late 15-cycle penalty gives large penalty (~75% in quiz).
-- Computing `PC+imm` in ID helps predicted-taken branches only if target is not already predicted; modern BTB+BHT predicts both **where** and **whether**, so extra ID adder may not pay off.
+- ID `PC+imm` helps predicted-taken branches only if target is not already predicted; BTB+BHT predicts **where + whether**, so extra ID adder may not pay off.
 
 Prediction:
 - static: backward branches taken; forward fall-through/not taken.

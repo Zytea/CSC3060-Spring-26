@@ -60,4 +60,4 @@ Exam example:
 
 ## Summary
 
-Correct answer pattern: ask **who needs the value after the call?** If caller needs a caller-saved reg after call, caller saves it. If callee modifies an `s` reg, callee saves/restores it.
+Pattern: if caller needs a caller-saved reg after call, caller saves it; if callee modifies an `s` reg, callee restores it.
