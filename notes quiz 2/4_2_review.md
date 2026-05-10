@@ -2,81 +2,182 @@
 
 ## Exam Facts
 
-- ==**Control**==: combinational logic that maps instruction bits + datapath status to control signals.
-- ==**Most difficult control signal: ALU control / `ALUSel`**== because it depends on opcode class + `funct3` + `funct7[5]`.
-- Regular RV fields (`rd`, `rs1`, `rs2`) simplify decode/control.
-- `RegWEn=0` for **stores and branches**.
-- `LW` usually sets the single-cycle clock period because it uses IF, reg read, ALU, data memory, WB.
-- Single-cycle control is simpler than pipeline/OoO, but slow.
+- Control sets datapath muxes/write-enables from opcode, funct3/funct7, branch result, and instruction class.
+- Main signals: `PCSrc`, `RegWr`, `MemRd`, `MemWr`, `ALUSrc`, `WBSel`, `ALUCtrl`.
+- `RegWr=0` for **branch and store**.
+- `MemRd=1` only for load. `MemWr=1` only for store.
+- `ALUSrc=0` for R-type; `ALUSrc=1` for I-type/load/store/address/immediate ops.
+- `WBSel`: load -> memory, ALU/R/I/U -> ALU/imm result, JAL/JALR -> `PC+4`.
+- ALU control depends on `ALUOp` plus `funct3` and `funct7[5]`.
+- `funct7[5]` distinguishes `ADD/SUB` and `SRL/SRA`.
+- Single-cycle clock is dominated by load path.
 
 ## 1. High-Level Control Signals
 
-| Signal | Function | Typical values |
-|---|---|---|
-| `PCSel/PCSrc` | next PC source | 0=`PC+4`, 1=branch/JAL target; JALR uses `rs1+imm` path |
-| `ImmSel` | immediate format | I/S/B/U/J |
-| `RegWEn` | write GPR? | 0 for store/branch; 1 for ALU/load/U/J |
-| `BrUn` | unsigned branch compare? | 1 for `bltu/bgeu`, 0 for signed |
-| `BrEq` | comparator output | `rs1 == rs2` |
-| `BrLT` | comparator output | `rs1 < rs2` |
-| `ASel` | ALU A input | 0=`rs1`, 1=`PC` |
-| `BSel` | ALU B input | 0=`rs2`, 1=`imm` |
-| `MemRW` | data memory | read/write |
-| `WBSel` | writeback source | ALU / memory / `PC+4` |
+![](assets/CA3060-4-2-Control_0.png)
 
-### 1.1 Next-PC Sources
+| Signal | Expression idea | Meaning |
+|---|---|---|
+| `PCSrc` | branch taken or `JAL/JALR` | select non-`PC+4` next PC |
+| `RegWr` | not branch/store | write destination register |
+| `MemRd` | load | read data memory |
+| `MemWr` | store | write data memory |
+| `ALUSrc` | not R-type for operand B | choose immediate vs `rs2` |
+| `WBSel` | load/R-type/JAL | choose memory/ALU/`PC+4` |
+
+High-level table:
+
+| Instr class | `RegWr` | `MemRd` | `MemWr` | `ALUSrc` | `WBSel` | Next PC |
+|---|---:|---:|---:|---:|---|---|
+| R ALU | 1 | 0 | 0 | 0 | ALU | `PC+4` |
+| I ALU | 1 | 0 | 0 | 1 | ALU | `PC+4` |
+| load | 1 | 1 | 0 | 1 | memory | `PC+4` |
+| store | 0 | 0 | 1 | 1 | none | `PC+4` |
+| branch | 0 | 0 | 0 | 0 | none | `PC+imm` if taken else `PC+4` |
+| JAL | 1 | 0 | 0 | x | `PC+4` | `PC+imm` |
+| JALR | 1 | 0 | 0 | 1 | `PC+4` | `(rs1+imm)&~1` |
+| LUI/AUIPC | 1 | 0 | 0 | 1 | ALU/imm path | `PC+4` |
+
+> HDL such as Verilog/SystemVerilog/VHDL describes these control functions and synthesizes to gates/netlists.
+
+## 2. Next-PC Sources
 
 | Source | Used by |
 |---|---|
-| `PC+4` | normal sequential path, not-taken branch |
-| `PC + branch/jump imm` | taken branch, `jal` |
-| `rs1 + imm` | `jalr` |
+| `PC+4` | normal fall-through |
+| `PC + branch_imm` | taken conditional branch |
+| `PC + J_imm` | `JAL` |
+| `(rs1 + I_imm) & ~1` | `JALR` |
 
-> [!IMPORTANT]
-> RV32I has no memory-indirect next PC option like "load PC from memory". Quiz answer excludes `(rs1+imm)` as memory indirection.
+`PCSrc` sometimes means a simple 2-way branch/JAL mux in a teaching datapath; complete RV32I needs enough choices for JALR and exceptions.
 
-## 2. ALU Control
+## 3. ALU Control
 
-Two-level idea:
+ALU control input levels:
 
-1. Main control classifies instruction: load/store -> ADD, branch -> compare/sub, R/I -> decode function.
-2. ALU control uses `ALUOp + funct3 + funct7[5]`.
+1. main decoder uses opcode to produce `ALUOp`.
+2. ALU decoder combines `ALUOp`, `funct3`, and `funct7[5]`.
 
-### 2.1 `funct7[5]` Pairs
+Common `ALUOp`:
+
+| `ALUOp` | Use | ALU action |
+|---|---|---|
+| `00` | load/store address | ADD |
+| `01` | branch compare | SUB / compare |
+| `10` | R/I ALU | decode funct fields |
+
+### 3.1 funct Table
 
 | `funct3` | `funct7[5]=0` | `funct7[5]=1` |
 |---|---|---|
-| `000` | `ADD` | `SUB` |
-| `101` | `SRL` | `SRA` |
+| `000` | `ADD` / `ADDI` | `SUB` for R-type |
+| `001` | `SLL` / `SLLI` | invalid/reserved in base |
+| `010` | `SLT` / `SLTI` | invalid/reserved |
+| `011` | `SLTU` / `SLTIU` | invalid/reserved |
+| `100` | `XOR` / `XORI` | invalid/reserved |
+| `101` | `SRL` / `SRLI` | `SRA` / `SRAI` |
+| `110` | `OR` / `ORI` | invalid/reserved |
+| `111` | `AND` / `ANDI` | invalid/reserved |
 
-> Other signals are often simple booleans; `ALUSel` is a multi-way decode, so it is the hardest control signal in Quiz.
+Pseudo-Verilog shape:
 
-## 3. Single-Cycle Datapath Examples
-
-| Instr | Important control |
-|---|---|
-| `add rd,rs1,rs2` | `RegWEn=1`, `ASel=rs1`, `BSel=rs2`, `ALUSel=ADD`, `WBSel=ALU` |
-| `lw rd,off(rs1)` | `RegWEn=1`, `BSel=imm`, `ALUSel=ADD`, `MemRW=Read`, `WBSel=Mem` |
-| `sw rs2,off(rs1)` | `RegWEn=0`, `BSel=imm`, `ALUSel=ADD`, `MemRW=Write` |
-| `beq rs1,rs2,L` | `RegWEn=0`, compare `BrEq`; if true `PCSel=target` |
-| `jal rd,L` | `RegWEn=1`, `WBSel=PC+4`, `PCSel=PC+imm` |
-| `jalr rd,rs1,imm` | `RegWEn=1`, `WBSel=PC+4`, `PCSel=rs1+imm` |
-
-## 4. Single-Cycle Drawback
-
-Clock period must cover the worst full instruction path.
-
-`LW` critical path:
-
-```text
-PC -> instr memory -> register read -> ALU addr calc -> data memory -> WB mux -> register setup
+```verilog
+case (alu_op)
+  2'b00: alu_control = ALU_ADD;  // load/store
+  2'b01: alu_control = ALU_SUB;  // branch compare
+  2'b10: case (funct3)
+    3'b000: alu_control = funct7_bit5 ? ALU_SUB : ALU_ADD;
+    3'b001: alu_control = ALU_SLL;
+    3'b010: alu_control = ALU_SLT;
+    3'b011: alu_control = ALU_SLTU;
+    3'b100: alu_control = ALU_XOR;
+    3'b101: alu_control = funct7_bit5 ? ALU_SRA : ALU_SRL;
+    3'b110: alu_control = ALU_OR;
+    3'b111: alu_control = ALU_AND;
+  endcase
+endcase
 ```
 
-> [!IMPORTANT]
-> Quiz: among `JALR`, `LW`, `SLL`, `LUI`, the single-cycle clock is dominated by ==**LW**==.
+## 4. Complete Single-Cycle Datapath
 
-## 5. Summary of Single-Cycle RV
+![](assets/CA3060-4-2-Control_2.png)
 
-- Advantage: simple control; CPI=1.
-- Disadvantage: long clock, low throughput, duplicated resources.
-- RV helps control: fixed fields, few formats, load/store discipline, simple operations.
+Required flows:
+
+- fetch instr with PC.
+- read `rs1/rs2`.
+- generate immediate.
+- ALU computes result/address/compare.
+- data memory for loads/stores.
+- writeback to `rd`.
+- next PC mux selects `PC+4` or target.
+
+## 5. Example: `sw x2, offset(x1)`
+
+![](assets/CA3060-4-2-Control_5.png)
+
+Data movement:
+
+1. read `rs1=x1` as base.
+2. read `rs2=x2` as store data.
+3. sign-extend S-imm.
+4. ALU computes `x1 + imm`.
+5. memory writes `x2` value at computed address.
+
+Control:
+
+| Signal | Value |
+|---|---|
+| `RegWr` | 0 |
+| `MemWr` | 1 |
+| `MemRd` | 0 |
+| `ALUSrc` | 1 |
+| `ALUCtrl` | ADD |
+| `WBSel` | don't care |
+| `PCSrc` | `PC+4` |
+
+## 6. Example: `beq x1,x2,imm`
+
+![](assets/CA3060-4-2-Control_6.png)
+
+Data movement:
+
+1. read `x1` and `x2`.
+2. compare equality.
+3. compute `PC + branch_imm`.
+4. next PC = target if equal, else `PC+4`.
+
+Control:
+
+| Signal | Value |
+|---|---|
+| `RegWr` | 0 |
+| `MemWr` | 0 |
+| `MemRd` | 0 |
+| `ALUSrc` | 0 |
+| `ALUCtrl` | SUB/compare |
+| `WBSel` | don't care |
+| `PCSrc` | branch condition result |
+
+## 7. Drawback of Single-Cycle Design
+
+Clock period must cover the slowest instruction. For `lw`:
+
+```text
+PC clk-to-Q
+-> instruction memory access
+-> register file read
+-> ALU address calculation
+-> data memory access
+-> writeback mux
+-> register file setup
+-> clock skew
+```
+
+All other instrs are forced to use this long period even if they do not need data memory.
+
+## 8. Summary of Single-Cycle RV
+
+- CPI = 1, but cycle time is long.
+- RISC-V regularity simplifies control: fixed field positions, mostly fixed 32b instrs, limited formats, register/immediate ALU ops.
+- Single-cycle is good for teaching but inefficient for real high-performance CPUs.

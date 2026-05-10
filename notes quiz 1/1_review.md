@@ -2,149 +2,255 @@
 
 ## Exam Facts
 
-- ==**Computer architecture**==: the **software/hardware interface** visible to programmers and compilers.
-- ==**Computer system**==: **hardware + system software** cooperating to run application programs.
-- ==**System programs**==: OS, compiler, assembler, linker, loader, shell. ChatGPT/browser/user apps are **not** system programs.
-- ==**Bits + context**==: the same bit pattern may mean integer, FP, instruction, address, char data, etc.
-- 128 all-0 bits may be two 64b integer 0s, four fp32 +0.0, one quad +0.0; **not** a string of ASCII `'0'` chars (`0x30`).
-- `gcc` build phases: **preprocess -> compile -> assemble -> link**. **Loading is not part of gcc compilation**.
-- Memory hierarchy illusion: **fast + large + cheap** memory.
-- OS abstractions: ==**processes, virtual memory, files**==.
-- Interrupt/resume must save **architectural state** (PC/registers/CSRs), not caches/files/all memory.
-- Amdahl: optimize the common/high-time part; serial fraction limits parallel speedup.
+- ==**Computer system**==: **hardware + system software** that work together to run application programs.
+- ==**Computer architecture**==: how ISA/microarchitecture/system design use transistors to deliver performance: multiplier/divider, pipeline, superscalar, OoO, multicore, caches, SIMD/vector.
+- ==**Bits + context**==: the same bits may be an integer, FP value, instruction, address, character bytes, or media data.
+- 128 all-zero bits may be two 64b integer zeros, four fp32 `+0.0`, one fp128 `+0.0`, or something else by context; it is **not** ASCII `"0000"`.
+- ASCII character `'0'` = `0x30`; C string `"0000"` bytes = `30 30 30 30 00`.
+- Compilation pipeline: **preprocess -> compile -> assemble -> link**.
+- A relocatable `.o` is **not executable**: external symbols/addresses may need relocation.
+- Linker jobs: **symbol resolution + relocation + library handling**.
+- Common link errors: undefined reference, multiple definition, wrong static-library order.
+- OS abstractions: **processes, virtual memory, files**.
+- ==**Amdahl's Law**== limits speedup by the unimproved fraction.
 
 ## 1. Information is Bits + Context
 
-==**Context**== decides how a byte sequence is interpreted.
+Memory is usually byte-addressed: 1 byte = 8 bits. A pointer value is the virtual address of the first byte of an object; its type tells the compiler how to interpret the bytes.
 
-- `0x00000000`: `int 0`, fp32 `+0.0`, address 0, part of an instruction, etc.
-- C string `"0000"` bytes: `0x30 0x30 0x30 0x30 0x00`, **not** zero bytes.
-- Machine code is just bytes; ABI/ISA tells the processor how to decode them.
+| Bit pattern | Possible interpretation |
+|---|---|
+| all 0 bits | integer 0, FP `+0.0`, NUL byte, invalid/legal instr depending on ISA |
+| `0x30` | ASCII `'0'`, not numeric zero |
+| `0x00000013` in RISC-V | `addi x0,x0,0` (`nop`) |
+| same 4 bytes | `int`, `float`, instr, pointer fragment, struct field |
 
 > [!IMPORTANT]
-> Do not answer from bit pattern alone. Ask: **type? ISA? data size? endian? encoding?**
+> Never identify a bit pattern without interpretation context. Quiz traps often ask whether all-zero bits are a string of ASCII zeros or a valid value in every FP format.
 
 ## 2. Program Compilation: 4 Phases
 
-| Phase | Tool-ish | Input -> output | Main work |
+![](assets/1.2.png)
+
+| Phase | Tool | Input -> output | Main job |
 |---|---|---|---|
-| **Preprocess** | `cpp`, `gcc -E` | `.c -> .i` | `#include`, `#define`, `#ifdef`, remove comments |
-| **Compile** | `cc1`, `gcc -S` | `.i -> .s` | parse, semantic check, optimize, emit asm |
-| **Assemble** | `as`, `gcc -c` | `.s -> .o` | encode machine instrs, build symbol/relocation info |
-| **Link** | `ld`, `gcc` driver | `.o + libs -> executable` | symbol resolution + relocation + library handling |
+| Preprocess | `cpp`, `gcc -E` | `.c -> .i` | expand `#include`, macros, conditional compilation, remove comments |
+| Compile | `cc1`, `gcc -S` | `.i -> .s` | parse, type/semantic check, optimize, generate assembly |
+| Assemble | `as`, `gcc -c` | `.s -> .o` | encode instrs, build `.symtab`, emit relocation records |
+| Link | `ld`, `gcc` driver | `.o + libs -> executable` | resolve symbols, relocate addresses, merge sections, add runtime startup/libs |
 
-> [!IMPORTANT]
-> A relocatable `.o` is **not executable**: external labels/calls/data references may still need relocation.
+Common commands:
 
-### 2.1 Linking Errors
+```bash
+gcc -E hello.c -o hello.i
+gcc -S hello.i -o hello.s
+gcc -c hello.s -o hello.o
+gcc hello.o -o hello
+gcc hello.c -o hello
+```
 
-| Error | Cause | Fix |
+### 2.1 Assembly and Relocation Example
+
+Source:
+
+```c
+int add(int a, int b) { return a + b; }
+int main() { return add(3,4); }
+```
+
+Possible RISC-V assembly:
+
+```asm
+add:
+    add a0,a0,a1
+    ret
+
+main:
+    li  a0,3
+    li  a1,4
+    jal ra,add
+    ret
+```
+
+Assembler encodes known instrs directly:
+
+```asm
+add a0,a0,a1
+0000000 01011 01010 000 01010 0110011
+0x00b50533
+```
+
+But `jal ra,add` may not know final address yet. The `.o` contains:
+
+| Section / record | Purpose |
+|---|---|
+| `.text` | machine code with placeholders if needed |
+| `.symtab` | symbols such as `add`, `main` |
+| `.rel.text` / `.rela.text` | relocation records saying where linker must patch code |
+| ELF header | object-file metadata |
+
+> A `.o` file is not a runnable program: start address, final symbol addresses, library code, and some relocation patches are unresolved.
+
+### 2.2 Linker Errors
+
+| Symptom | Typical cause | Fix |
 |---|---|---|
-| `undefined reference` | declared/called but no definition linked | add `.o`/library; implement function |
-| `multiple definition` | same strong symbol defined in multiple files | one definition; others `extern` |
-| library order error | static lib scanned too early | put library **after** users: `gcc main.o -lm` |
+| `undefined reference to f` | declared/called `f`, no definition found | compile/link file that defines `f`; add correct library |
+| `multiple definition of x` | global `x` defined in more than one `.o` | one definition; use `extern` declarations in headers |
+| math function unresolved | forgot math library | `gcc main.o -lm` |
+| static library unresolved | library appears before object needing it | put library after objects: `gcc main.o -lfoo` |
 
-### 2.2 Static vs Dynamic Libraries
+### 2.3 Static vs Dynamic Libraries
 
-| | Static `.a` | Dynamic `.so` |
+| | Static library `.a` | Shared library `.so` / `.dll` |
 |---|---|---|
-| When | copied at link time | loaded at load/runtime |
-| Executable | larger, self-contained | smaller, needs runtime library |
-| Update | relink/rebuild executable | replace shared lib |
-| Typical benefit | no runtime dependency | memory sharing + security updates |
+| When linked | copied into executable at link time | loaded at load time or run time |
+| Executable size | larger | smaller |
+| Runtime dependency | less | needs compatible shared lib |
+| Update library | relink executable | can update library separately if ABI compatible |
+| Linker issue | left-to-right archive scan order matters | dynamic loader resolves/imports symbols |
 
 ## 3. Why Compilation Knowledge Matters
 
-- `switch` is not always faster: dense cases -> jump table; sparse/few cases -> branch chain.
-- Function call overhead: pass args, save/restore regs, stack frame, jump/return. Small hot functions may be inlined.
-- `(a+b)+(c+d)` may expose ILP vs left-chain `(((a+b)+c)+d)`.
-- `restrict` tells compiler no alias -> more register allocation/vectorization/reordering.
-- `-O0` can be **2x-20x** slower; `-O1/-O2/-O3` add increasingly aggressive optimization.
-- Stack layout matters for security: local buffers near saved regs/return address -> overflow can hijack control flow.
+Understanding compilation lets you answer performance and correctness questions from generated code, not source syntax.
 
-## 4. Processors Interpret Instructions in Memory
+| Source-level question | Real deciding factor |
+|---|---|
+| Is `switch` always faster than `if`? | no; dense cases may become jump table, sparse cases become compare/branch chain |
+| What is call overhead? | args, `jal/jalr`, saving `ra`, saving live regs, stack frame, return |
+| Why `(a+b)+(c+d)` may be faster than `(((a+b)+c)+d)`? | exposes parallel independent adds / shorter dependence chain |
+| Why `restrict` helps `memcpy`-like code? | compiler can assume no aliasing, enabling vectorization/reordering/register allocation |
+| Why `-O0` is slow? | disables many optimizations: inlining, constant folding, DCE, CSE, LICM, scheduling |
+
+Security reason: stack stores local data, saved regs, old frame pointer, and return address. Buffer overflow or bad pointer writes can corrupt control flow.
+
+## 4. Processors Interpret Instructions Stored in Memory
+
+The shell is a command-line interpreter:
+
+```bash
+./hello
+hello, world
+```
+
+The processor executes machine instructions in `hello`: bytes are loaded from disk to memory, instructions update registers/memory/I/O, and output bytes reach the display/terminal.
 
 ### 4.1 Hardware Organization
 
 | Component | Role |
 |---|---|
-| **Bus** | moves address/data/control info |
-| **I/O bridge** | connects CPU/mem bus to I/O bus |
-| **Main memory** | stores program instructions + data |
-| **CPU** | PC + register file + ALU + control |
-| **PC** | address of next instruction |
+| CPU | executes instructions; contains PC, register file, ALU, control, bus interface |
+| PC | register holding address of next instruction |
+| Register file | small named storage in CPU |
+| ALU | arithmetic/logic operations |
+| Main memory | stores data and instructions |
+| Bus | moves address/data/control signals |
+| I/O bridge | translates between CPU/memory bus and I/O bus |
+| I/O devices | keyboard, display, disk, network |
 
-Instruction cycle: ==**fetch -> decode -> execute -> update PC**==.
+Basic instruction cycle:
+
+1. Fetch instr from memory at `PC`.
+2. Decode opcode/fields.
+3. Execute: load, store, ALU op, branch/jump.
+4. Write back result if needed.
+5. Update `PC`.
 
 ### 4.2 Running `hello`
 
-1. Shell reads command.
-2. OS loads executable bytes from disk to memory.
-3. CPU PC points to program entry; fetch/decode/execute instructions.
-4. Data moves among memory, registers, I/O device.
+![](assets/1.4.2.png)
 
-> Computers spend much time **copying data**. This is why caches and locality dominate performance.
+High-level flow:
+
+1. Shell reads command from keyboard.
+2. OS loads executable from disk to memory.
+3. CPU starts executing at program entry.
+4. Program copies string bytes through memory/registers.
+5. OS/device driver sends output to display/terminal.
 
 ## 5. Caches Matter
 
-- ==**Temporal locality**==: recently used item likely reused soon (loop instructions).
-- ==**Spatial locality**==: nearby addresses likely used soon (array traversal).
+Computers spend much time moving bytes. Caches exploit locality:
+
+| Locality | Meaning | Example |
+|---|---|---|
+| Temporal | recently used item likely reused soon | loop instrs, repeated variable access |
+| Spatial | nearby addresses likely used soon | array scan, sequential instr fetch |
+
+Cache hierarchy is critical because CPU is much faster than DRAM/disk.
 
 ## 6. Storage Devices Form a Hierarchy
 
-==Registers -> L1/L2/L3 SRAM -> DRAM -> SSD/HDD -> remote storage==.
+| Level | Storage | Key property |
+|---|---|---|
+| L0 | registers | smallest, fastest, most expensive |
+| L1 | L1 cache SRAM | cache lines from L2 |
+| L2 | L2 cache SRAM | cache lines from L3 |
+| L3 | L3 cache SRAM | cache lines from memory |
+| L4 | main memory DRAM | disk blocks cached in RAM |
+| L5 | local disk/SSD | persistent local files |
+| L6 | remote storage | largest, slowest, cheapest |
 
-| Direction | Trend |
-|---|---|
-| Up | smaller, faster, more expensive/byte |
-| Down | larger, slower, cheaper/byte |
-
-> [!IMPORTANT]
-> Memory hierarchy gives the **illusion** of a memory that is **fast, large, and inexpensive**.
+Trend downward: larger capacity, slower access, lower cost per byte.
 
 ## 7. OS Manages Hardware
 
-OS roles: resource allocator, hardware controller, protection/security layer, service provider via **system calls**.
+OS roles:
+
+- resource manager: CPU time, memory, I/O devices, network.
+- controller/protection: privilege, isolation, scheduling, security.
+- abstraction provider: processes, virtual memory, files.
+
+Applications request OS service through **system calls**, which perform controlled privilege transitions.
 
 ### 7.1 Three OS Abstractions
 
-| Abstraction | What it virtualizes | Exam wording |
+| Abstraction | What it virtualizes | Illusion |
 |---|---|---|
-| **Process** | CPU + running program state | each program seems to own CPU |
-| **Virtual memory** | memory address space | each process seems to own memory |
-| **File** | I/O devices | all I/O as byte streams |
+| Process | CPU + address space | program seems to have its own CPU/memory |
+| Virtual memory | physical memory/disk | each process has private contiguous address space |
+| File | I/O devices | every I/O object is a byte stream |
 
 ### 7.2 Processes
 
 ==**Process**==: OS abstraction for a running program.
 
-- **Context**: state needed to resume a process (PC, registers, OS bookkeeping).
-- **Context switch**: save current process context, restore another process.
+- Context: state needed to stop/resume process, e.g., PC, regs, flags, address-space info.
+- Context switch: OS saves one process context and restores another.
+- On single core, context switches create concurrency, not true parallel execution.
 
 ### 7.3 Threads
 
-==**Thread**==: execution unit inside a process.
+==**Thread**==: execution unit inside a process. Threads in the same process share code/global data/address space but have separate execution state such as PC/registers/stack.
 
-- Threads in same process share code/global data/address space.
-- Lower overhead than processes, but weaker isolation.
+| Processes | Threads |
+|---|---|
+| stronger isolation | lower overhead |
+| slower communication | fast shared-memory communication |
+| separate address spaces | share address space |
 
 ### 7.4 Virtual Memory
 
-==**Virtual memory**==: each process sees a private virtual address space.
+==**Virtual memory**==: abstraction giving each process the illusion of exclusive main memory.
 
-- Address 0 page is usually unmapped -> catches NULL dereference.
-- Main memory acts as a **cache** for disk-backed virtual pages.
-- Enables protection, sharing (shared libraries), and multiprogramming.
+Key facts:
+
+- each process has its own virtual address space.
+- kernel occupies protected high address region.
+- page 0 is usually unmapped to catch NULL dereference.
+- RAM is a cache for pages whose backing store may be disk.
+- different virtual pages can map to the same physical page, e.g., shared libraries.
+- VM supports protection, sharing, relocation, and multiprogramming.
 
 ### 7.5 Files
 
-==**File**==: sequence of bytes; Unix models I/O devices as files.
+==**File**==: sequence of bytes modeling I/O devices and persistent data.
 
-Common Unix I/O: `open`, `close`, `read`, `write`, `lseek`.
+Unix I/O uses a small interface: `open`, `close`, `read`, `write`, `lseek`.
 
-## 8. Systems Communicate with Networks
+## 8. Networks
 
-Network I/O is another file-like I/O path; a remote server can act like a storage/device source.
+Networks let computer systems communicate. From a program view, remote data can often be treated like I/O through files/sockets, with much larger latency and failure modes.
 
 ## 9. Important Themes
 
@@ -153,23 +259,26 @@ Network I/O is another file-like I/O path; a remote server can act like a storag
 If fraction $\alpha$ of old time is improved by factor $k$:
 
 $$
-T_{new}=(1-\alpha)T_{old}+\frac{\alpha T_{old}}{k};\quad
-\text{Speedup}=\frac{1}{(1-\alpha)+\alpha/k}\le \frac{1}{1-\alpha}
+T_{new} = (1-\alpha)T_{old} + \frac{\alpha T_{old}}{k}; \quad
+\text{Speedup}=\frac{1}{(1-\alpha)+\frac{\alpha}{k}} \le \frac{1}{1-\alpha}
 $$
 
-> If serial/unimproved fraction is $\beta$, max speedup is $1/\beta$.
+> Example: 90% improvable, target speedup `4x`: `4 = 1/(0.1+0.9/k)` -> `k=6`.
 
-### 9.2 Concurrency vs Parallelism
+### 9.2 Concurrency and Parallelism
 
 | Term | Meaning |
 |---|---|
-| ==**Concurrency**== | multiple activities logically in progress |
-| ==**Parallelism**== | multiple activities physically run at same time to improve speed |
+| Concurrency | multiple activities in progress; may be time-sliced |
+| Parallelism | multiple activities physically execute at same time to improve speed |
 
-Parallelism implies concurrency; concurrency does **not** imply parallelism.
+Parallelism implies concurrency; concurrency does not imply parallelism.
 
 ### 9.3 ILP, DLP, SIMD
 
-- ==**ILP**==: multiple instructions from one thread overlapped/executed together (pipeline, superscalar, OoO).
-- ==**DLP**==: same operation over many data elements.
-- ==**SIMD/vector**==: one instruction operates on multiple data lanes.
+| Term | Meaning |
+|---|---|
+| ILP | instruction-level parallelism: overlap/multiple instrs from one thread, e.g., pipeline, superscalar, OoO |
+| DLP | data-level parallelism: same operation across many data items |
+| SIMD | single instruction, multiple data; vector/SIMD units exploit DLP |
+| GPU | many-lane throughput machine exploiting massive DLP |

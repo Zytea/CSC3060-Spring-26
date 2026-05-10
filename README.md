@@ -23,13 +23,46 @@ for example,
 > ...
 ```
 
-2. latex formulas, tables, diagrams, pics (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary), bullet points, etc. whenever appropriate
+2. use unicode art, latex formulas, tables, diagrams, pics (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary), bullet points, etc. whenever appropriate
 
 $$
 \text{formula}
 $$
 
 is different from $\text{formula}$, the former is for important formulas that you want to be easily found during the exam, while the latter is for inline formulas that are not as important but still necessary to be included in the notes.
+
+Bad example:
+```
+| Type | Use | Fields |
+|---|---|---|
+| **R** | reg-reg ALU | `funct7\|rs2\|rs1\|funct3\|rd\|opcode` |
+| **I** | imm ALU, loads, JALR | `imm[11:0]\|rs1\|funct3\|rd\|opcode` (12b signed) |
+| **S** | stores | imm split, no rd |
+| **B** | branches | imm split, **PC-rel × 2B**, no rd |
+| **U** | `lui auipc` | 20b upper imm |
+| **J** | `jal` | 20b imm × 2 |
+```
+
+
+Good example:
+```
+31           25 24       20 19       15 14   12 11        7 6           0
+┌─────────────┬───────────┬───────────┬───────┬───────────┬─────────────┐
+│   funct7    │    rs2    │    rs1    │funct3 │    rd     │   opcode    │ R-type
+├─────────────┴───────────┼───────────┼───────┼───────────┼─────────────┤
+│        imm[11:0]        │    rs1    │funct3 │    rd     │   opcode    │ I-type
+├─────────────┬───────────┼───────────┼───────┼───────────┼─────────────┤
+│  imm[11:5]  │    rs2    │    rs1    │funct3 │ imm[4:0]  │   opcode    │ S-type
+├─────────────┼───────────┼───────────┼───────┼───────────┼─────────────┤
+│imm[12|10:5] │    rs2    │    rs1    │funct3 │imm[4:1|11]│   opcode    │ B-type
+├─────────────┴───────────┴───────────┴───────┼───────────┼─────────────┤
+│                 imm[31:12]                  │    rd     │   opcode    │ U-type
+├─────────────────────────┬───────────────────┼───────────┼─────────────┤
+│     imm[20|10:1|11]     │    imm[19:12]     │    rd     │   opcode    │ J-type
+└─────────────────────────┴───────────────────┴───────────┴─────────────┘
+
+```
+
 
 3. be concise, no bullshit
 

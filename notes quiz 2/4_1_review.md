@@ -2,109 +2,275 @@
 
 ## Exam Facts
 
-- ==**Architecture/ISA**==: SW-visible interface. ==**Microarchitecture**==: one HW implementation of an ISA.
-- Microarchitectures: **single-cycle, multi-cycle, pipelined, superscalar, OoO, caches, predictors**.
-- ==**CPU time = Instruction count x CPI x clock cycle time**==.
-- Single-cycle: **CPI=1**, simple control, but clock = slowest instr path, usually `LW`.
-- Multi-cycle: shorter clock, variable CPI, reuses HW across cycles.
-- Pipelined: overlaps instrs, throughput near 1 instr/cyc.
-- Superscalar + pipelined: can issue >1 instr/cyc, so ==**CPI < 1**==; highest throughput among choices.
-- Quiz order: ==**superscalar+pipeline > pipeline > multi-cycle > single-cycle**==.
-- RV32I GPR file needs **2R/1W**. 2-issue integer about **4R/2W**; 2-issue FMA FP file **6R/2W**.
-- Single-cycle cannot reuse a resource in the same cycle -> duplicate memories/adders.
-- Branch compare by ALU subtraction can be wrong on signed overflow -> use a dedicated comparison unit.
+- ==**Microarchitecture**==: implementation of an ISA: single-cycle, multi-cycle, pipeline, superscalar, OoO, speculation, caches, branch predictors.
+- ==**Datapath**== moves/computes data: ALU, regfile, memory interface, buses.
+- ==**Control**== generates signals and selects paths: PC update, mux selects, register/memory write enables.
+- Instruction execution cycle: **fetch -> decode/read regs -> execute -> memory -> writeback -> PC update**.
+- CPU time = **instruction count x CPI x clock cycle time**.
+- RISC vs CISC tradeoff: RISC may use more instrs, but lower CPI and shorter cycle time.
+- Single-cycle: CPI=1, but clock is as slow as slowest instr, usually `lw`.
+- Multi-cycle: shorter clock and reused resources, but CPI varies.
+- Pipeline: overlapped instrs, throughput close to 1 instr/cycle after fill, hazards may add stalls.
+- Superscalar + pipeline may issue >1 instr/cycle, so ==**CPI < 1**==.
+- Quiz order: **superscalar+pipelined > pipelined > multi-cycle > single-cycle** for throughput.
+- RV32I scalar regfile needs **2 read ports + 1 write port**.
+- Branch compare via subtraction can be wrong if overflow affects sign; true comparator or flags avoid this.
 
 ## 1. Processors and Logic Designs
 
-==**Computer organization**== explains how datapath, control, memory, I/O, and interconnect implement an ISA.
+Computer architecture levels:
 
-| Term | Meaning |
+| Level | Examples |
 |---|---|
-| Datapath | values move/compute: PC, regfile, ALU, memories, muxes |
-| Control | selects what datapath does: `PCSel`, `RegWEn`, `ALUSel`, `WBSel`, etc. |
-| Combinational logic | output depends only on current inputs |
-| Sequential logic | stores state; updates on clock edge |
+| ISA family | x86, IBM 360, ARM, RISC-V |
+| microarchitecture | single-cycle, multi-cycle, pipelined, superscalar, OoO, SMT, SIMD, caches, predictors |
+| logic/circuit | gates, muxes, adders, regfiles, memories |
 
-Critical path = longest delay path in a clocked design -> sets minimum clock period.
+Different microarchitectures can implement the same ISA with different cost/performance.
+
+| x86 history idea | Microarchitecture feature |
+|---|---|
+| 8086/286/386 | multi-cycle |
+| 486 | pipelined |
+| Pentium P5 | superscalar |
+| Pentium Pro / Core | OoO |
+| Nehalem | SMT / Hyper-threading |
+| Sandy Bridge+ | wider SIMD/AVX |
+| Alder/Raptor Lake | heterogeneous P/E cores |
 
 ## 2. Computer Organization
 
-Instruction execution cycle:
-
-1. **Fetch** instr at `PC`.
-2. **Decode** instr bits; read registers; generate control.
-3. **Execute** ALU / address / branch compare.
-4. **Memory** access for load/store.
-5. **Write back** result and update PC.
-
-> [!IMPORTANT]
-> These are logical steps. A single-cycle CPU does all in one long cycle; a multi-cycle CPU spreads them over cycles; a pipeline overlaps them across instrs.
-
-## 3. RV32I Datapath and Control
-
-Subset often used in datapath questions: `lw, sw, add, sub, and, or, beq, jal`.
-
-Datapath requirements:
-
-- PC register, instruction memory, data memory.
-- Register file: 32 regs, **2 read ports + 1 write port**.
-- Immediate generator for I/S/B/U/J formats.
-- ALU for arithmetic/address/compare support.
-- Adders for `PC+4` and branch/jump target.
-- MUXes for next PC, ALU input, write-back source.
-
-### 3.1 Main MUX Choices
-
-| MUX | Choices | Typical use |
+| Part | Role | Mnemonic |
 |---|---|---|
-| `PCSel/PCSrc` | `PC+4`, `PC+imm`, `rs1+imm` | sequential, branch/JAL, JALR |
-| `ASel` | `rs1`, `PC` | ALU op vs AUIPC/JAL target |
-| `BSel` | `rs2`, immediate | R-type vs I/load/store |
-| `WBSel` | ALU, memory, `PC+4` | ALU/U, load, JAL/JALR link |
+| Datapath | arithmetic, load/store, data movement | brawn |
+| Control | instruction flow, PC choice, control signals | brain |
 
-Quiz next-PC choices in RV32I: ==**`PC+4`, `PC+imm`, `rs1+imm`**==. Not memory indirection.
+Datapath elements include ALU, regfile, PC, memories/cache ports, immediate generator, adders, and muxes.
 
-## 4. Single-Cycle vs Multi-Cycle vs Pipeline
+Control decides `RegWr`, `MemRd`, `MemWr`, `ALUSrc`, `PCSrc`, `WBSel`, ALU function, and branch/jump behavior.
 
-For instr costs in short cycles `4,2,3,4`:
+## 3. RV32I Subset and Execution Cycle
 
-| Impl | Clock | CPI | Time for 4 instrs |
-|---|---|---|---|
-| Single-cycle | longest = 4 | 1 | `4*4=16` |
-| Multi-cycle | short = 1 | variable | `4+2+3+4=13` |
-| Pipeline | short = 1 | about 1 | fill/drain -> `4+5-1=8` for 5-stage, class example may use 7 if 4 stages |
+Subset used for datapath design:
 
-> Single-cycle CPI=1 is not "fast"; the clock is long.
+| Class | Instrs |
+|---|---|
+| memory | `lw`, `sw` |
+| ALU | `add`, `sub`, `and`, `or` |
+| control | `beq`, `jal` |
+
+Logical instruction cycle:
+
+1. Fetch instr at `PC`.
+2. Decode instr fields and read `rs1/rs2`.
+3. Execute ALU op, address calc, branch compare, or target calc.
+4. Access data memory for load/store.
+5. Write result to `rd` if needed.
+6. Set next `PC` to `PC+4`, branch/JAL target, or JALR target.
+
+> These are logical steps. A single-cycle CPU performs all combinational work in one long cycle; a multi-cycle CPU spreads them over cycles; a pipeline overlaps steps from multiple instrs.
+
+## 4. Performance Model
+
+$$
+CPU\ Time = Instruction\ Count \times CPI \times Clock\ Cycle\ Time
+$$
+
+Example with 4 instrs whose required steps are `w=4`, `x=2`, `y=3`, `z=4` short cycles:
+
+| Implementation | CPI idea | Clock | Total short cycles |
+|---|---|---|---:|
+| single-cycle | 1 | 1 long = 4 short | `4*4=16` |
+| multi-cycle | variable | 1 short | `4+2+3+4=13` |
+| pipelined | about 1 after fill | 1 short | about `5+4-1=8`, examples may count 7 depending stage model |
+
+RISC vs CISC:
+
+| | Instruction count | CPI | cycle time |
+|---|---:|---:|---:|
+| CISC | lower | higher | longer |
+| RISC | higher | lower | shorter |
+
+Modern x86 decodes x86 instrs into internal micro-ops, which are closer to RISC-like operations.
 
 ## 5. Logic Design Basics
 
-| Element | Examples | Exam role |
+| Element | Stores state? | Output depends on | Examples |
+|---|---|---|---|
+| combinational | no | current inputs only | gates, ALU, adder, mux, decoder |
+| sequential/state | yes | stored state + inputs | PC, regs, regfile, memory, pipeline regs |
+
+Binary signals: low voltage = 0, high voltage = 1. A bus uses one wire per bit.
+
+HDLs: Verilog, SystemVerilog, VHDL, Chisel. HDL describes hardware structure/behavior and can be synthesized to a netlist.
+
+### 5.1 Combinational Delay
+
+Combinational logic is always active: output changes after propagation delay when inputs change.
+
+==**Critical path**==: longest delay path from any input to any output. Clock period must cover state-element clk-to-Q + critical path + setup + skew.
+
+### 5.2 Sequential Elements and Clocking
+
+Registers update on a clock edge if write enable is asserted.
+
+| Operation | Behavior |
+|---|---|
+| read regfile | combinational: selected register appears on read port |
+| write regfile | sequential: value written on clock edge if `RegWr=1` |
+| branch/store | no destination GPR write -> `RegWr=0` |
+
+Edge-triggered methodology:
+
+1. state outputs become stable after clock edge.
+2. combinational logic computes during cycle.
+3. result reaches next state element before next edge.
+4. next edge updates state.
+
+## 6. Abstract RV32I Datapath
+
+![](assets/CA3060-4-1-ProcessorArchitecture_11.png)
+
+Core components:
+
+- PC.
+- instruction memory / I-cache.
+- register file.
+- immediate generator.
+- ALU.
+- data memory / D-cache.
+- adders for `PC+4` and branch/JAL target.
+- muxes for ALU operand, writeback data, next PC.
+
+Main mux choices:
+
+| Mux | Choices | Used by |
 |---|---|---|
-| Combinational | gates, mux, decoder, ALU, comparator | no stored state |
-| Sequential | PC, regfile, pipeline regs, memory, FF | stores state |
-| Clocked write | regfile write, PC update | state changes on edge |
+| `PCSrc` | `PC+4`, `PC+imm`, `rs1+imm` | sequential, branch/JAL, JALR |
+| `ALUSrc` | `reg[rs2]`, immediate | R-type vs I/load/store |
+| `WBSel` | ALU result, memory data, `PC+4` | ALU/U, load, JAL/JALR link |
 
-HDL flow: HDL -> Boolean/FSM -> synthesis -> netlist -> silicon.
+## 7. Processor Design Procedure
 
-## 6. Branch via Subtraction Trap
+1. Analyze instruction set and required register transfers.
+2. Choose datapath components and clocking methodology.
+3. Assemble datapath to support each transfer.
+4. Determine control settings for each instruction.
+5. Build control logic.
 
-If branch condition `rs1 < rs2` is computed by `rs1-rs2` sign bit, signed overflow can flip the sign.
+### 7.1 Regularity in RISC-V Format
 
-> [!IMPORTANT]
-> Dedicated branch comparator avoids wrong taken/not-taken caused by subtraction overflow. This is the Quiz answer; not structural hazard, not "comparison does not trap".
+RISC-V simplifies datapath/control:
 
-## 7. Single-Cycle Limitations
+| Field | Position |
+|---|---|
+| opcode | bits `[6:0]` |
+| `rd` | bits `[11:7]` when present |
+| `rs1` | bits `[19:15]` when present |
+| `rs2` | bits `[24:20]` when present |
+| immediate | high bits, with store/branch using split pieces |
 
-1. Cannot reuse HW in one cycle -> separate I/D memory, multiple adders.
-2. Clock must cover slowest instruction: `PC -> I-Mem -> RegFile -> ALU -> D-Mem -> WB`.
-3. Iterative `mul/div` would need huge combinational hardware or make clock impossible.
-4. Low throughput despite CPI=1.
+Fixed field positions allow decoding and regfile access in parallel with immediate extraction.
 
-## 8. Performance Ordering Summary
+### 7.2 Datapath Requirements
 
-| Impl | Throughput | Clock | Control | Key trap |
-|---|---|---|---|---|
-| Single-cycle | lowest | longest | simplest | CPI=1 but slow clock |
-| Multi-cycle | medium | shorter | FSM | variable CPI |
-| Pipeline | high | short | medium | hazards add CPI |
-| Superscalar+pipe | highest | short | hardest | CPI can be <1 |
+Datapath must support:
+
+- memory for instrs and data.
+- 32 x 32b regfile with `rs1`, `rs2`, `rd`.
+- PC storage.
+- sign/zero extension.
+- ALU add/sub/logic/compare/address calculation.
+- add `4` or immediate to PC.
+- data memory read/write.
+
+### 7.3 Register File
+
+![](assets/CA3060-4-1-ProcessorArchitecture_19.png)
+
+| Port | Selection | Data |
+|---|---|---|
+| read A | `rs1` | `R[rs1]` |
+| read B | `rs2` | `R[rs2]` |
+| write W | `rd` + write enable | writeback data |
+
+Quiz port counts:
+
+- scalar RV32I: **2R/1W**.
+- 2-wide integer superscalar: **4R/2W**.
+- FMA has 3 FP source operands; 2-wide FMA needs **6R/2W** FP regfile.
+
+## 8. Branch Datapath and Subtraction Trap
+
+`beq rs1,rs2,imm`: compare `R[rs1]` and `R[rs2]`; if true, next PC = `PC + branch_imm`; else `PC+4`.
+
+Why often two adders:
+
+- one adder computes `PC+4`.
+- another computes `PC+imm`.
+- ALU may compare or perform other work.
+
+### 8.1 Branch via Subtraction Trap
+
+For equality, `rs1-rs2 == 0` is safe for equality. For signed less-than/greater-than, using only sign of subtraction can be wrong when subtraction overflows.
+
+Correct signed less-than from subtraction:
+
+```text
+lt = sign(sum) ^ overflow
+```
+
+Many implementations use a true comparator or internal flags. RISC-V architectural state does not expose condition codes, and integer overflow itself does not trap.
+
+## 9. Single-Cycle RISC-V Processor
+
+Single-cycle rule: one instruction finishes every clock tick. All state elements update together at next rising edge.
+
+Consequences:
+
+- CPI = 1.
+- clock period must cover slowest instr path.
+- resources cannot be reused within same cycle.
+- separate instruction and data memories/caches avoid IF/MEM conflict.
+- regfile must read two regs and write one reg in same cycle.
+
+Worst common path is `lw`:
+
+```text
+PC clk-to-Q
+-> instruction memory
+-> register file read
+-> ALU address calc
+-> data memory read
+-> writeback mux
+-> register file setup
+```
+
+Quiz: among `JALR`, `LW`, `SLL`, `LUI`, the single-cycle clock is dominated by **LW**.
+
+## 10. Single-Cycle vs Multi-Cycle vs Pipeline
+
+| Design | Strength | Weakness |
+|---|---|---|
+| single-cycle | simple CPI=1 | long clock, duplicated resources, slowest instr dominates |
+| multi-cycle | shorter clock, resource reuse | CPI > 1 and variable |
+| pipeline | high throughput | hazards, pipeline regs, control complexity |
+| superscalar pipeline | CPI can be <1 | port pressure, issue/rename/scheduling complexity |
+
+Multiply/divide are poor fits for single-cycle because they are iterative or need many replicated adders. Multi-cycle or separate pipelined/iterative units are cheaper.
+
+## 11. Control Points Preview
+
+Key control signals:
+
+| Signal | Meaning |
+|---|---|
+| `RegWr` | write `rd` |
+| `MemRd` | read data memory |
+| `MemWr` | write data memory |
+| `ALUSrc` | choose reg or imm as ALU operand B |
+| `ALUCtrl` | ALU operation |
+| `WBSel` | choose writeback source |
+| `PCSrc` | choose next PC |
+
+Example `add rd,rs1,rs2`: `RegWr=1`, `ALUSrc=0`, `WBSel=ALU`, `MemRd=0`, `MemWr=0`, `PCSrc=PC+4`.
