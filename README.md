@@ -25,6 +25,12 @@ for example,
 
 2. latex formulas, tables, diagrams, pics (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary), bullet points, etc. whenever appropriate
 
+$$
+\text{formula}
+$$
+
+is different from $\text{formula}$, the former is for important formulas that you want to be easily found during the exam, while the latter is for inline formulas that are not as important but still necessary to be included in the notes.
+
 3. be concise, no bullshit
 
 4. follow the organization structure, if you are unsure, use the one for my notes like those in `1.md`, ..., `4.md`, `CA3060-4-1-ProcessorArchitecture.md`, etc.
@@ -152,7 +158,26 @@ Good example (efficient!):
 ```
 
 
-6. If you have gone though the quizz and exams files. If you see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; otherwise, include it or use [!NOTE] or [!IMPORTANT] whenever appropriate; **this is the major criterion for whether to include an example or not!!!**
+6. You should always check the quizz and exams files when editing your *_review.md files. If you see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; otherwise, include it or use [!NOTE] or [!IMPORTANT] whenever appropriate; **this is the major criterion for whether to include an example or not!!!**
+
+7. Be systematic like what I originally did in `1.md`, ..., `4.md`, `CA3060-4-1-ProcessorArchitecture.md`, etc.. ==!!!Clarity, precision and organization are way more important than saving some tiny characters.!!!==
+
+A extremely bad example:
+```
+## 3. Instruction Formats
+
+| Type | Use | Fields |
+|---|---|---|
+| **R** | reg-reg ALU | `funct7\|rs2\|rs1\|funct3\|rd\|opcode` |
+| **I** | imm ALU, loads, JALR | `imm[11:0]\|rs1\|funct3\|rd\|opcode` (12b signed) |
+| **S** | stores | imm split, no rd |
+| **B** | branches | imm split, **PC-rel × 2B**, no rd |
+| **U** | `lui auipc` | 20b upper imm |
+| **J** | `jal` | 20b imm × 2 |
+```
+Who the fucking know what is so-called ` 20b imm × 2 `? If you have read `notes quiz 1\3.md`, you should know how I handle this. Fuck Occam's Razor if you dare write this piece of shit!
+
+
 
 # Harness
 你需要生成的是1_review.md,2_review.md,3_review.md, 4_review.md

@@ -2,222 +2,183 @@
 
 ## Exam Facts
 
-- **Three hazards**: ==**Structural, Data, Control**==. ("Forward hazard" is **NOT** a real hazard type — quiz trap.)
-- $\text{CPI}_{actual} = \text{CPI}_{ideal} + \text{Stall cycles per instruction}$.
-- Branch-penalty CPI ≈ $f_{\text{branch}} \times f_{\text{mispredict/taken}} \times \text{penalty}$.
-- ==**Branch prediction performed at IF**== (earliest possible). If IF is unavailable, choose earliest stage with PC.
-- ==Hardware data-hazard reduction: **forwarding/bypassing**==.
-- ==Software data-hazard reduction: **compiler scheduling/reordering**==.
-- ==Control-hazard reduction: **BTB + BHT + static/dynamic prediction**==.
-- BHT often **untagged** because it is **simple, fast, low power, cost-effective**. (High-performance cores may use tagged BHT.)
-- Correlated/2-level predictor index uses ==**current PC ⊕ Global History Register**==.
-- 1-bit predictor: mispredicts **twice per inner loop** (last iteration + first iteration of next outer iter).
+- **Three hazards**: ==**Structural, Data, Control**==. ("Forward hazard" is **NOT** a real type — quiz trap.)
+- $\text{CPI}_{actual} = \text{CPI}_{ideal} + \text{Stall cycles per instr}$.
+- Branch-penalty CPI ≈ $f_{br} \times f_{mispredict/taken} \times \text{penalty}$.
+- ==**Branch prediction at IF**== (earliest stage with PC).
+- HW data-hazard reduction: ==**forwarding/bypassing + OoO**==. SW: ==**compiler scheduling**==.
+- Control-hazard reduction: ==**BTB + BHT + static/dynamic prediction**==. (NOT data forwarding.)
+- BHT often **untagged** because **simple, fast, low energy, cost-effective**.
+- Correlated/2-level predictor index: ==**current PC ⊕ Global History Register**==.
+- 1-bit predictor mispredicts **twice per inner loop**.
 - 2-bit saturating counter: changes prediction only after **2 consecutive mispredicts**.
-- BTB predicts ==**where**==; BHT predicts ==**whether**==.
-- Hard-to-predict: ==**indirect branches (JALR for switch / virtual / function pointer) and returns**==.
-- Static prediction examples: ==**backward branches taken; forward branches fall-through**==. (e.g., `beq rs1, x0, +X` predict not-taken; loop back-edge predict taken).
+- ==**BTB predicts where; BHT predicts whether**==.
+- Hardest to predict: ==**indirect branch (JALR for switch / vtable)**==. (Returns use **RAS** so easier.)
+- Static prediction: ==**backward branches taken; forward not-taken**== (e.g., `beq rs1,x0,+X` predict not-taken).
 - Modern high-perf cores (Apple M4) use **dynamic + BTB + tournament/TAGE**, NOT static-only.
-- WB-stage control signals propagated through pipeline regs: ==**`rd`, `RegWr` (WRen), `WBsel`**==.
-- Split L1I/L1D ⇒ removes IF↔MEM structural hazard + increases bandwidth.
-- Branch-bubble discrepancy: textbook resolves at EXE but resteers fetch at MEM ⇒ **3 bubbles**; modern designs **resteer at EXE ⇒ 2 bubbles**.
+- WB-stage signals propagated through pipeline regs: ==**`rd`, `RegWr` (WRen), `WBsel`**==.
+- Split L1I/L1D ⇒ avoid IF↔MEM struct hazard + double bandwidth.
+- Branch-bubble discrepancy: textbook resolves at EXE, **resteers fetch at MEM ⇒ 3 bubbles**; modern designs **resteer at EXE ⇒ 2 bubbles**.
 
-## 1.1 Pipeline Hazards Overview
+## 1. Structural Hazards
 
-==**Hazards**== prevent the next instruction from overlapping with previous ones — typically stalled at **ID** stage.
+==**Structural hazard**==: two stages need the **same HW resource** in same cycle.
 
-Three types: structural, data, control. (No "forward" hazard.)
+### 1.1 Causes
 
-## 2 Structural Hazards
+- ==**Von-Neumann bottleneck**==: shared instr/data memory → IF vs MEM conflict (= structural hazard).
+- **Non-pipelined functional unit**: e.g., divide (~32 cyc) → back-to-back divides stall.
+- **Bad design (early WB)**: R-type WB at cyc 4 conflicts with Load WB at cyc 5 → regfile write-port fight.
 
-==**Structural hazard**== = two pipeline stages need the **same hardware resource** in the same cycle.
+### 1.2 Solutions
 
-### Causes
+- **Pipeline stall** (bubble at ID).
+- More HW: ==**split I/D cache (Harvard)**==, more regfile ports, pipelined functional units.
+- **Instruction reordering** (compiler / HW dynamic).
+- ISA design: avoid auto-increment / mem operands needing many ports.
 
-- **Von-Neumann architecture (shared instr/data memory)**: IF (fetch) of new instr conflicts with MEM (load/store) of older. **Quiz: Von-Neumann bottleneck = a structural hazard**.
-- **Non-pipelined functional unit**: e.g., divide takes ~32 cycles; back-to-back divides stall.
-- **Bad pipeline design (early WB)**: if R-type writes back at cycle 4, conflicts with Load writing at cycle 5 → both fight for regfile write port.
+> [!IMPORTANT] Why split L1I+L1D: **(1) avoid IF↔MEM struct hazard**, **(2) double cache bandwidth**. NOT for higher hit rate or reliability.
 
-### Solutions
+## 2. Data Hazards
 
-- **Pipeline stall** (insert bubble at ID).
-- **More HW resources**: split I/D cache (Harvard); add regfile ports; pipeline / duplicate functional units.
-- **Instruction reordering** (compiler-static or HW-dynamic).
-- **ISA design**: avoid auto-increment instructions / mem operands that need too many ports.
+==**Data hazard**==: needed value not yet produced/written.
 
-> [!IMPORTANT] **Why split L1I + L1D**:
-> 1. Avoid IF↔MEM structural hazard.
-> 2. **Double the cache bandwidth** (parallel I-fetch + D-access).
-> *(Not for higher hit rate or reliability.)*
-
-## 3 Data Hazards
-
-==**Data hazard**== = a needed value hasn't been produced/written yet.
-
-| Type | Meaning | Always real in 5-stage in-order? |
+| Type | Meaning | Real in 5-stage in-order? |
 |---|---|---|
-| **RAW** | Read-After-Write (true) | **YES**, must preserve |
-| **WAR** | Write-After-Read (anti) | usually NO in 5-stage in-order; matters in OoO/scheduling |
-| **WAW** | Write-After-Write (output) | matters with OoO / multiple writers |
-| RAR | Read-After-Read | **not** a hazard |
+| **RAW** | true (read-after-write) | **YES** |
+| **WAR** | anti (write-after-read) | usually NO; matters in OoO/scheduling |
+| **WAW** | output (write-after-write) | matters with OoO/multi-writer |
+| RAR | read-after-read | NOT a hazard |
 
-### Without forwarding (worst case)
+### 2.1 Without Forwarding (worst case)
 
 ```
-ADD x9, x0, x1     // produces x9 at end of EX (cyc 3), writes back in WB (cyc 5)
-SUB x10, x9, x3    // wants x9 at ID (cyc 4)
+ADD x9, x0, x1    # produces x9 at end of EX (cyc 3), WB at cyc 5
+SUB x10, x9, x3   # wants x9 at ID (cyc 4)
 ```
 
-Reader needs to wait until producer **writes back** ⇒ adjacent ALU-ALU dependency ⇒ **2 bubbles** (between cycles where reg is read vs written).
+Reader waits until producer's WB ⇒ adjacent ALU-ALU ⇒ **2 bubbles**.
 
-### Solution 1: Pipeline stall at ID
-
-> Insert bubbles until producer reaches WB.
-
-### Solution 2: Forwarding / Bypassing (HARDWARE)
-
-Pass result directly from later pipeline stage to earlier without going through regfile.
-
-#### Forwarding conditions
+### 2.2 Solution: Forwarding / Bypassing (HARDWARE)
 
 | Source | Condition |
 |---|---|
-| **EX hazard** (forward from EX/MEM) | `EX/MEM.RegWr && EX/MEM.Rd != 0 && EX/MEM.Rd == ID/EX.Rs1 (or Rs2)` |
-| **MEM hazard** (forward from MEM/WB) | `MEM/WB.RegWr && MEM/WB.Rd != 0 && MEM/WB.Rd == ID/EX.Rs1 (or Rs2)` |
+| EX hazard (forward EX/MEM) | `EX/MEM.RegWr && EX/MEM.Rd != 0 && EX/MEM.Rd == ID/EX.Rs1 (or Rs2)` |
+| MEM hazard (forward MEM/WB) | `MEM/WB.RegWr && MEM/WB.Rd != 0 && MEM/WB.Rd == ID/EX.Rs1 (or Rs2)` |
 
-> [!IMPORTANT] Corner cases:
-> - **Don't forward from instructions that don't write a register** (Stores, Branches → check `RegWr`).
-> - **Don't forward to/from `x0`** (always 0; check `Rd != 0`).
+> [!IMPORTANT] Corner: don't forward from instrs that don't write (stores/branches → check `RegWr`). Don't forward to/from `x0`.
 
-#### Load-use hazard
+#### 2.2.1 Load-Use Hazard
 
 ```
 LW   x1, 0(x2)
-ADD  x3, x1, x4    // wants x1 immediately after LW
+ADD  x3, x1, x4
 ```
 
-Even with forwarding, **1 bubble remains** because LW result available only at end of MEM; ADD needs it at start of EX. The MEM/WB → EX/MEM forwarding can cover only after 1 stall.
+Even with forwarding, **1 bubble remains**: LW result available only at end of MEM; ADD needs it at start of EX.
 
-### Solution 3: Compiler Scheduling (SOFTWARE)
+### 2.3 Solution: Compiler Scheduling (SOFTWARE)
 
-> Reorder independent instructions to fill the bubble gap.
+> Reorder independent instrs to fill bubble.
 
-#### MIPS = "Microprocessor without Interlocked Pipeline Stages"
+==**MIPS**== (Microprocessor without Interlocked Pipe Stages): no HW interlocks; compiler must insert NOPs if no useful instr. **Failed mainly due to compatibility/scalability**, not perf.
 
-> Compiler must insert NOPs for hazards if no useful instruction is available; HW does NOT interlock. **Failed mainly due to compatibility/scalability**, not perf.
+> Compiler limits: memory aliasing; unknown/non-deterministic memory latency; branches/calls limit basic-block scope.
 
-#### Compiler limitations
+## 3. Control Hazards
 
-- **Memory aliasing**: can't safely move loads/stores past each other if addresses might alias.
-- **Unknown / non-deterministic memory latency**: hard to schedule loads precisely.
-- **Branches/calls** limit scheduling scope (basic blocks).
+==**Control hazard**==: next-PC unknown until branch resolved.
 
-> [!IMPORTANT] HW reduce data hazard: **forwarding + bypassing + OoO**. SW: **compiler scheduling**.
+- Branches occur **15-30%** of instrs (~1 per 4-5).
+- Late resolution → must flush wrong-path instrs.
 
-## 4 Control Hazards
+### 3.1 Branch Resolution Stage → Flush Count
 
-==**Control hazard**== = next-PC unknown until branch is resolved.
-
-- Branches occur **15–30%** of instructions (~ 1 per 4–5).
-- Late resolution → must flush wrong-path instructions.
-
-### Branch resolution stage → flush count
-
-| Branch resolved at | Flushed (penalty) |
+| Resolved at | Flushed (penalty) |
 |---|---|
 | ID | 1 |
 | **EXE (modern)** | **2** |
-| **MEM (textbook fig)** | **3** |
+| **MEM (textbook)** | **3** |
 | WB | 4 |
 
-> Textbook says 3 bubbles (resteer at MEM); modern designs resteer at EXE → 2 bubbles. **Quiz answer for the discrepancy: where the resteer happens.**
+> Textbook: 3 bubbles (resteer at MEM); modern: 2 bubbles (resteer at EXE). Quiz answer for the discrepancy.
 
-### Branch penalty CPI calculation
+### 3.2 Branch Penalty CPI
 
-$$\text{Penalty CPI} = f_{branch} \times f_{taken/mispredict} \times \text{flushed inst count}$$
-
-#### Worked examples
+$$\text{Penalty CPI} = f_{br} \times f_{taken/mispredict} \times \text{flushed}$$
 
 | Setting | Calc | Penalty |
 |---|---|---|
-| 20% br, 50% taken, 3-flush, no pred | $0.2 \times 0.5 \times 3 = 0.3$ | **30%** (or 60% if all-taken) |
-| 20% br, 50% taken, 2-flush, no pred | $0.2 \times 0.5 \times 2 = 0.2$ | **20%** (or 40% all-taken) |
-| **A57: 16-stage, 20% br, no pred, ~15-cyc penalty** | $0.2 \times 1 \times 15 = 3.0$ | **75%** |
-| **Pentium 4: 31-stage, 20% br, 2% mispred, penalty=30** | $0.2 \times 0.02 \times 30 = 0.12$ | **12%** |
+| 20%br, 50%taken, 3-flush, no pred | $0.2\times 0.5\times 3=0.3$ | 30% |
+| ==**A57: 16-stage, 20%br, no pred, ~15-cyc penalty**== | $0.2\times 1\times 15=3.0$ | **75%** |
+| ==**Pentium 4: 31-stage, 20%br, 2%mispred, penalty=30**== | $0.2\times 0.02\times 30=0.12$ | **12%** |
 
-### Branch Prediction Schemes
+### 3.3 Branch Prediction Schemes
 
 | Scheme | Accuracy |
 |---|---|
-| Always predict not-taken | 30–40% |
-| Static (compiler) | 65–90% |
-| 1-bit dynamic BHT | 70–80% |
-| **2-bit FSM (saturating counter)** | **85–95%** |
-| 2-level correlated (global) | 94–96% |
-| Tournament | 96–97% |
-| **TAGE** (modern Intel/AMD/ARM/Apple) | **97–99%** |
+| Always not-taken | 30-40% |
+| Static (compiler) | 65-90% |
+| 1-bit dynamic BHT | 70-80% |
+| **2-bit FSM (saturating)** | 85-95% |
+| 2-level correlated (global) | 94-96% |
+| Tournament | 96-97% |
+| ==**TAGE** (modern Intel/AMD/ARM/Apple)== | **97-99%** |
 
-#### Static prediction rules
+#### 3.3.1 Static Rules
 
-- ==**Backward branches → predict TAKEN**== (loop back-edges).
-- ==**Forward branches → predict NOT TAKEN**== (then-clause of `if`).
+- ==**Backward → predict TAKEN**== (loop back-edges).
+- ==**Forward → predict NOT TAKEN**== (then-clause of `if`).
 - E.g., `beq rs1, x0, +X` (forward) → predict not-taken.
 
-#### Dynamic prediction (BHT)
+#### 3.3.2 Dynamic Prediction (BHT)
 
 ==**Branch History Table**==: indexed by **lower bits of PC**; entry is recent outcome (1 or 2 bits).
 
-> Why **untagged BHT**: tag would cost 30–46 bits per entry vs 1–2 bits of history → too expensive. Aliasing causes some mispredicts, but speed/cost win. **Simple, fast, low power, cost-effective**. (High-perf cores may use tagged BHT or TAGE.)
+> Why **untagged**: tag would be 30-46b vs 1-2b history → too expensive. Aliasing causes some mispredicts, but speed/cost win. **Simple, fast, low power, cost-effective**. (High-perf cores may add tags / TAGE.)
 
-#### 1-bit predictor pitfall
+#### 3.3.3 1-bit Pitfall
 
 Inner loop: 2 mispredicts per outer iteration:
-- Last iteration of inner loop (predict taken, actual fall-through).
-- First iteration next time (predict not-taken, actually taken).
+- Last iter of inner (predict taken, actual fall-through).
+- First iter next time (predict not-taken, actually taken).
 
-#### 2-bit saturating counter (FSM)
+#### 3.3.4 2-bit Saturating Counter
 
-States: `00 strong-NT, 01 weak-NT, 10 weak-T, 11 strong-T`. Only flip prediction after **2 consecutive mispredictions** ⇒ tolerates one-off anomalies.
+States: `00 strong-NT, 01 weak-NT, 10 weak-T, 11 strong-T`. Flip prediction only after **2 consecutive mispredicts**.
 
-#### Correlated / 2-level prediction
+#### 3.3.5 Correlated / 2-Level
 
-==**Global History Register (GHR)**==: shift register of recent branch outcomes.
-
+==**Global History Register (GHR)**==: shift register of recent outcomes.
 ==**Pattern History Table (PHT)**==: 2-bit counters.
+==**Index = current PC ⊕ GHR**==.
 
-==**Index = current PC ⊕ GHR**==. (Quiz answer.)
-
-### "Whether" vs "Where"
+### 3.4 "Whether" vs "Where"
 
 - ==**BHT predicts WHETHER**== (taken/not-taken).
 - ==**BTB predicts WHERE**== (cache of `(PC → target)`).
-- Combined BHT + BTB enables fetch from target in the **next cycle after** a predicted-taken branch.
+- BHT + BTB ⇒ fetch from target the **next cycle** after a predicted-taken branch.
 
-#### Hard cases for BTB
+#### 3.4.1 Hard Cases for BTB
 
 - ==**Indirect branch (JALR)**== for `switch`, virtual calls, function pointers — target varies.
-- **Returns** — target depends on caller; use a **Return Address Stack (RAS)** instead.
+- **Returns** — handled by ==**Return Address Stack (RAS)**==.
 
-> [!IMPORTANT]
-> Modern improvement focuses on **indirect branches** + **returns** (call/return-address stack), since predictable conditional branches already at 99%.
+> Modern improvement focus: indirect branches + returns; conditional already 99%.
 
-### Computing branch target at ID stage?
+### 3.5 Branch Target at ID Stage?
 
-- IF compute `PC+imm` at ID, fetch from target one cycle earlier on **predicted-taken** branches.
-- BUT modern BTB+BHT already supplies target at IF ⇒ extra ID adder doesn't pay off.
-- **Quiz: usually a bad design choice in modern processors.**
+- IF compute `PC+imm` at ID, fetch from target one cyc earlier on predicted-taken branches.
+- BUT modern BTB+BHT already supplies target at IF ⇒ ==extra ID adder doesn't pay off==.
 
-## Control Signals in Pipeline
+## 4. Control Signals in Pipeline
 
-Generated in ID, propagated through pipeline registers:
+Generated in ID, propagated through pipeline regs:
 
-| Stage signals used | Cycles delayed |
+| Stage signals | Cycles delayed |
 |---|---|
 | EX (`ALUctl, ALUSrc`) | +1 |
 | MEM (`MemRW, Branch`) | +2 |
-| **WB (`rd, RegWr, WBsel`)** | **+3** |
+| ==**WB (`rd, RegWr, WBsel`)**== | **+3** |
 
-> [!IMPORTANT] **WB-stage signals (must reach WB through pipeline regs)**:
-> - **`rd`** (which register to write)
-> - **`RegWr` / WRen** (write enable)
-> - **`WBsel`** (ALU vs Mem vs PC+4)
-> NOT `ALUctl` (used in EX, not propagated to WB).
+> [!IMPORTANT] WB-stage signals through pipeline regs: ==**`rd, RegWr (WRen), WBsel`**==. NOT `ALUctl` (used at EX).

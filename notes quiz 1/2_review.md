@@ -2,322 +2,199 @@
 
 ## Exam Facts
 
-- ==**Word size**==: nominal pointer/register size. RV32 = **32b** GPR/addr (max 4GB); RV64 = **64b** (max 16EB).
-- ==**Byte ordering**==: address of multi-byte object = **smallest** byte address.
-  - **Little-endian** (Intel/AMD/ARM/RISC-V default): LSB at lowest addr; **Big-endian** (IBM, MIPS, SPARC): MSB at lowest addr.
-- ==**ABI**== = **ISA + OS syscalls + calling convention** → binary portability.
-- C int promotion: **if any operand is unsigned, signed operand is converted to unsigned** (silent trap).
-- ==**Two's complement**==: range $[-2^{w-1},\,2^{w-1}-1]$. **`-INT_MIN == INT_MIN`** (no positive counterpart).
-- RV core does **NOT trap** integer overflow; checking is compiler/software responsibility (RV omits trap variants for OoO/perf reasons).
-- IEEE FP: sign | biased exp | fraction. **Normal has hidden 1**, **denormal has no hidden 1**.
-- For $k$-bit exponent, **bias = $2^{k-1}-1$** unless explicitly redefined.
-- FP `+`,`*` are **commutative** but **NOT associative** — compiler can't reassoc without `-ffast-math`.
-- FP→int rounds **toward 0** (C standard); int→float can round but cannot overflow; int→double exact for 32b.
-- ==**FMA**==: `a*b+c` with **ONE final rounding**, **5–6 cycles** (NOT 9), uses parallel reduction overlapping FADD's exponent alignment.
-- ==**bfloat16**==: 1+**8**+7 = 16b; same exponent range as fp32, less precision than fp16; AI-friendly.
-- Number systems with **+0/-0**: signed-magnitude, 1's complement, **IEEE FP**. **2's complement has only ONE 0**.
-- Decimal $d$ exact in binary FP iff $d=p/q$ with $q$ a power of 2. Examples: 1.625 ✓, 1.5 ✓, 0.1 ✗, 1.405 ✗.
-- `A == (int)(double)A` true for 32b int (double has 53b precision); not true for 64b `long`.
+- ==**Word size**==: nominal pointer/reg size; RV32 = 32b (max 4GB), RV64 = 64b (max 16EB).
+- ==**Byte ordering**==: addr of multi-byte object = **smallest** byte addr. LE (Intel/AMD/ARM/RV) vs BE (IBM/MIPS/SPARC, network).
+- C int promotion: any unsigned ⇒ signed converted to unsigned.
+- ==**2's comp**== range $[-2^{w-1},2^{w-1}-1]$; ==**`-INT_MIN == INT_MIN`**==.
+- RV ==does NOT trap integer overflow==; SW/compiler must check; FP only sets a flag (poll).
+- IEEE FP: sign | biased exp | frac. ==Normal hidden 1==, ==denormal NO hidden 1==.
+- $k$-bit exp: ==**bias = $2^{k-1}-1$**==.
+- FP `+`,`*` commutative but ==**NOT associative**==; compiler can't reassoc without `-ffast-math`.
+- FP→int rounds **toward 0**; int→float may round but can't overflow; int(32b)→double exact.
+- ==**FMA**==: `a*b+c`, ==**1 final rounding, 5-6 cyc**== (NOT 9; reduction overlaps FADD's exp align).
+- ==**bfloat16**==: 1+**8**+7; same exp range as fp32; AI-friendly.
+- **+0/-0 systems**: sign-magnitude, 1's comp, IEEE FP. **2's comp has only 1 zero**.
+- Decimal $d$ exact in binary FP iff $d=p/q$ with $q$ power of 2 (1.625 ✓; 1.405/1.35/1.245/1.11 ✗).
 
-## 2.1 Information Storage
+## 1. Information Storage
 
-### 2.1.2 Word size + Data sizes
+### 1.1 Word size + Data sizes (LP64 won)
 
-| C type | 32b | 64b LP64 |
+| Type | 32b | LP64 |
 |---|---|---|
-| `char` | 1 | 1 |
-| `short` | 2 | 2 |
-| `int` | 4 | 4 |
+| `char/short/int` | 1/2/4 | 1/2/4 |
 | `long` | **4** | **8** |
-| `long long` | 8 | 8 |
-| `float` | 4 | 4 |
-| `double` | 8 | 8 |
-| `pointer` (`char *`) | **4** | **8** |
-| `int32_t/uint32_t` | 4 | 4 |
-| `int64_t/uint64_t` | 8 | 8 |
+| `long long`, `int64_t` | 8 | 8 |
+| `float/double` | 4/8 | 4/8 |
+| `pointer` | **4** | **8** |
 
-Constants: $\text{INT\_MAX}=2^{31}-1=$`0x7FFFFFFF`, $\text{INT\_MIN}=-2^{31}=$`0x80000000`.
+> `INT_MAX=0x7FFFFFFF=2^31-1`; `INT_MIN=0x80000000=-2^31`.
 
-> [!IMPORTANT] **LP64 vs ILP64**: LP64 (Linux/macOS) won — `int=4`, `long=ptr=8`. ILP64 doubles `int` storage and breaks data-file portability.
+`gcc -m32` 32b code; `gcc -m64` requires 64b host.
 
-`gcc -m32` builds 32b code; `gcc -m64` requires 64b host.
+### 1.2 Byte Ordering
 
-### 2.1.3 Byte Ordering
+- ==**Little-endian**== (Intel/AMD/ARM/RV): LSB at lowest addr.
+- ==**Big-endian**== (IBM/MIPS/SPARC, network): MSB at lowest addr.
 
-> ==Multi-byte object's address = address of its **lowest** byte.==
+> Endian matters only when storing+reading with **different types/orders** (cross-machine, type-cast bytes, bit fields, asm reading).
+> `int x=0x12345678` LE bytes `78 56 34 12`; raw to BE machine reads as `0x78563412`.
 
-- ==**Little-endian**==: LSB at lowest addr (Intel, AMD, ARM, RISC-V).
-- ==**Big-endian**==: MSB at lowest addr (legacy: IBM, MIPS, SPARC, Motorola, network byte order).
+### 1.3 Strings
 
-> Example: `int x=0x12345678` stored on LE → bytes `78 56 34 12`. If sent raw to BE machine, read as `0x78563412`.
+C string = char array + `'\0'`. ASCII `'0'=0x30`. `"12345"` = `31 32 33 34 35 00`. Text portable; binary not (different ABI).
 
-**Endian matters when**:
-- network/file portability,
-- type casting / pointer aliasing (read int as bytes),
-- assembly reading,
-- bit fields.
+### 1.4 Bitwise / Logical / Shift
 
-**Endian does NOT matter** if you store and read with the **same type on the same machine**.
+- Bitwise `& | ^ ~` per-bit; logical `&& || !` truth-value, **short-circuit** (`if(p && p->next)` safe).
+> [!IMPORTANT] `A && B` ≠ `A & B`. With A=2, B=1: `&&`→true, `&`→0.
+- ==Logical `>>`== fills 0 (unsigned); ==arithmetic `>>`== replicates sign (signed).
+- C unsigned `>>` logical; signed `>>` impl-defined (typically arithmetic on x86/RV).
+- `x << k`: low-k bits 0; high overflow discarded.
 
-### 2.1.4 Strings
+## 2. Integer Representation
 
-- C string = char array terminated by **`'\0'`**. ASCII `'0' = 0x30`, so `"12345"` = `31 32 33 34 35 00`.
-- Text data is **platform-independent**; binary code is not (different ABI).
+==Unsigned==: $B2U_w(\vec{x})=\sum x_i 2^i$, range $[0,2^w-1]$.
+==**2's comp**==: $B2T_w(\vec{x})=-x_{w-1}2^{w-1}+\sum_{i<w-1}x_i 2^i$.
 
-### 2.1.6 Boolean Algebra
+> Why 2's comp: 1 zero, no end-around carry, same HW for signed/unsigned add.
 
-| Op | C | Example (4b) |
-|---|---|---|
-| AND | `&` | `0110 & 1100 = 0100` |
-| OR | `\|` | `0110 \| 1100 = 1110` |
-| XOR | `^` | `0110 ^ 1100 = 1010` |
-| NOT | `~` | `~1100 = 0011` |
+### 2.1 Signed↔Unsigned Conversion
 
-### 2.1.7–2.1.8 Bitwise vs Logical
+$$U=S\bmod 2^w,\quad U=\begin{cases}S, & S\ge 0\\ S+2^w, & S<0\end{cases}$$
 
-- Bitwise `& | ^ ~` operate per bit on integral types.
-- Logical `&& || !` treat any nonzero as true; **short-circuit** (if first decides answer, second not evaluated).
-  - Safe: `if(p && p->next)` won't NULL-deref; `A && n/A` won't div-by-0.
+> [!IMPORTANT] If any operand is unsigned, the other converts to unsigned. So `-1 < 0u` is **false**.
 
-> [!IMPORTANT] **Trap**: `A && B` ≠ `A & B`. With A=2 (`10`), B=1 (`01`): `&&`→true, but `&`→0 (false).
+> ==**`-INT_MIN == INT_MIN`**== (no positive twin); signed overflow is UB in C ⇒ compiler may optimize assuming impossible; unsigned wrap is well-defined.
 
-### 2.1.9 Shifts
+### 2.2 Sign Extend / Truncate
 
-- ==**Logical right shift**== fills 0 (used for unsigned `>>`).
-- ==**Arithmetic right shift**== replicates sign bit (used for signed `>>`).
-- C unsigned `>>` is logical; signed `>>` is implementation-defined (usually arithmetic on x86/RISC-V).
-- `x << k`: low-k bits set to 0; bits shifted past MSB are discarded.
+- **Sign-extend**: replicate sign bit into new high bits.
+- **Truncate**: drop high bits, then reinterpret. Signed: $T_k(x)=U2T_k(x\bmod 2^k)$.
 
-| X | X >> 4 logical | X >> 4 arithmetic |
-|---|---|---|
-| `01100011` | `00000110` | `00000110` |
-| `10010101` | `00001001` | `11111001` |
+## 3. Integer Arithmetic
 
-## 2.2 Integer Representation
-
-### Unsigned
-
-$$B2U_w(\vec{x})=\sum_{i=0}^{w-1}x_i 2^i,\quad \text{range}=[0,\,2^w-1]$$
-
-### Signed encodings
-
-| Encoding | Formula | -2 (8b) |
-|---|---|---|
-| Sign-magnitude | $(1-2x_{w-1})\sum x_i 2^i$ | `1000 0010` |
-| 1's complement | $-x_{w-1}(2^{w-1}-1)+\sum x_i 2^i$ | `1111 1101` |
-| **2's complement** | $-x_{w-1}2^{w-1}+\sum_{i<w-1}x_i 2^i$ | `1111 1110` |
-
-> Why 2's comp wins: **only one 0**, no end-around carry, same hardware for signed/unsigned add.
-
-> [!IMPORTANT] **`-INT_MIN == INT_MIN`** (TMin has no positive twin). UB in C; never assume `-x > 0` if `x < 0`.
-
-### Signed↔Unsigned
-
-$$U=\begin{cases}S, & S\ge 0\\ S+2^w, & S<0\end{cases}=S\bmod 2^w$$
-
-> [!IMPORTANT] **🚨 If one operand is unsigned, the other is converted to unsigned.**
-> So `-1 < 0u` is **false** (`-1` becomes $2^w-1$).
-
-### Sign extension / Truncation
-
-- **Sign-extend** (smaller→larger): replicate sign bit into new high bits.
-- **Truncate** (larger→smaller): drop high bits, then reinterpret. For signed: $T_k(x)=U2T_k(x\bmod 2^k)$.
-
-## 2.3 Integer Arithmetic
-
-### Addition
-
-- **Unsigned**: wraps mod $2^w$. Overflow iff `sum < x` (or `< y`).
-- **Signed (2's comp)**: same hardware; overflow iff **operands same sign, result different sign**:
-  | A sign | B sign | Result sign indicating ovf |
-  |---|---|---|
-  | ≥0 | ≥0 | <0 |
-  | <0 | <0 | ≥0 |
-- Subtraction: `x - y = x + (~y + 1)`.
-- Iterative add (no `+`): `sum = a^b`, `carry = (a&b) << 1`; loop until `carry == 0`.
-  - Quiz: `(a & b) << 1` = **carry bits to add next iteration**.
-  - Quiz: subtract via `add(a, add(~b, 1))` (2's comp logic).
-
-### Why RV doesn't HW-trap overflow
-
-- Performance: traps are expensive, overflows rare.
-- Pipeline complexity: precise traps cost OoO logic.
-- Flexibility: unsigned wrap is intentional (hashing, crypto).
-- ⇒ **Compiler/software inserts checks if needed**; FP only sets a flag (poll explicitly).
-- MIPS/ARM/Power keep trapping versions; RV puts those in extensions.
-
-==**Precise exception**==: stops at well-defined state; clean state, restartable, "as if exception never happened". Easier with **in-order architectural state updates**.
-
-### Overflow detection patterns
+- Unsigned add wraps mod $2^w$; overflow iff `sum < x`.
+- Signed add: same HW; overflow iff **same-sign operands → opposite-sign result**.
+- `x - y = x + (~y + 1)`.
+- Carry-add (no `+`): `sum=a^b`, `carry=(a&b)<<1`; loop until carry=0.
+> Quiz: `(a&b)<<1` = carry-bits-next-iter; `sub(a,b)=add(a, add(~b,1))`.
 
 ```c
-x && (x*y)/x != y          // multiply overflow
-y != 0 && (x/y)*y != x     // divide overflow (e.g., INT_MIN/-1)
+x && (x*y)/x != y          // mul ovf
+y != 0 && (x/y)*y != x     // div ovf (e.g., INT_MIN/-1)
 ```
 
-### ALU mini-facts
+> [!NOTE] Why RV omits HW overflow trap: traps expensive, overflow rare, OoO complexity, unsigned wrap intentional. ==**Precise exception**==: cleanly stoppable+restartable; easier when arch state updates **in-order**.
 
-- 1-bit full adder: $S=A\oplus B\oplus C_{in}$, $C_{out}=AB+C_{in}(A\oplus B)$.
-- **RCA** (Ripple-Carry): O(n) delay.
-- **CLA** (Carry-Lookahead): generate $g_i=A_iB_i$, propagate $p_i=A_i\oplus B_i$ → carries computed in O(log n).
-- ALU ops `AND/OR/ADD/SLT` controlled by `Ainvert/Bnegate` + carry-in.
-- SLT: subtract A−B, only LSB outputs the sign-of-difference; MSB uses `Set = Sum_{31} ⊕ Overflow`.
-- **Faster multiplier**: tree of adders, O(log n).
-- Quick power-of-2 division (signed): bias before shift.
-  $$x/2^k=\begin{cases}x\gg k, & x\ge 0\\ (x+(1\ll k)-1)\gg k, & x<0\end{cases}$$
+### 3.1 ALU mini-facts
 
-## 2.4 Floating-Point Representation
+- 1-bit full adder: $S=A\oplus B\oplus C_{in}$.
+- ==**RCA**==: O(n) carry chain; ==**CLA**==: $g_i=A_iB_i$, $p_i=A_i\oplus B_i$ → O(log n).
+- ALU `AND/OR/ADD/SLT` via `Ainvert/Bnegate/CarryIn`. SLT MSB: `Sum_{31}⊕Overflow`.
+- Faster multiplier = **adder tree, O(log n)**.
+- Power-of-2 div (signed): bias before shift: $x/2^k = (x<0\,?\,x+(1\ll k)-1:x) \gg k$.
 
-### IEEE 754 layout
+## 4. Floating-Point Representation
 
 $$x=(-1)^s\cdot M\cdot 2^E$$
 
-| Format | Sign | Exp | Frac | Bias | Notes |
-|---|---|---|---|---|---|
-| **Quad** | 1 | 15 | 112 | 16383 | IEEE-754 |
-| **Double** (fp64) | 1 | 11 | 52 | 1023 | |
-| **Single** (fp32) | 1 | 8 | 23 | 127 | |
-| **Half** (fp16) | 1 | 5 | 10 | 15 | Tesla P100, 2016 |
-| **bfloat16** | 1 | **8** | 7 | 127 | Google Brain, fp32-range |
-| fp8 (mini) | 1 | 4 | 3 | 7 | H100 |
-| fp4 | 1 | 2 | 1 | 1 | B100/B200 |
-
-For **k-bit exponent**: ==**bias = $2^{k-1}-1$**==.
-
-### Class table (single-precision example)
-
-| Exp `e` | Frac `f` | Class | Value |
-|---|---|---|---|
-| `0` | `0` | ±0 | $\pm 0$ |
-| `0` | nonzero | **Denormal** (no hidden 1) | $(-1)^s \cdot (0.f) \cdot 2^{1-bias}$ |
-| `1..2^k-2` | any | **Normal** (hidden 1) | $(-1)^s \cdot (1.f) \cdot 2^{e-bias}$ |
-| all-1 | `0` | ±∞ | $\pm\infty$ |
-| all-1 | nonzero | NaN | NaN |
-
-> [!IMPORTANT]
-> - **Normal**: $M=1.f$, $E=e-\text{bias}$.
-> - **Denormal**: $M=0.f$, $E=1-\text{bias}$ (NOT $-\text{bias}$).
-> - Denormal fills the gap near 0; smaller, less precision.
-> - More exp bits → larger range; fewer frac bits → less precision.
-
-### Single-precision range/extremes (fp32, bias=127)
-
-| | Bits | Value |
-|---|---|---|
-| Largest normal | `0 11111110 1...1` (`0x7F7FFFFF`) | $\approx 3.4\times 10^{38}$ |
-| Smallest normal | `0 00000001 0...0` | $2^{-126}$ |
-| Largest denormal | `0 00000000 1...1` | $(1-2^{-23})\cdot 2^{-126}$ |
-| Smallest denormal | `0 00000000 0...01` | $2^{-149}$ |
-| `+0.0` | `0x00000000` | 0 |
-| `+1.0` | `0x3F800000` | exp=127, M=1.0 |
-| `+2.0` | `0x40000000` | exp=128, M=1.0 |
-| `+4.0` | `0x40800000` | exp=129, M=1.0 |
-| `+∞` | `0x7F800000` | |
-
-### Quick decode example (Quiz 1 #4)
-
-`F1=0x40800000`: `0|10000001|0..0` → E=129−127=2, M=1.0 → **+4.0**.
-`F2=0x3F800000`: `0|01111111|0..0` → E=0, M=1.0 → **+1.0**.
-`F3=0xC0800000`: sign 1 → **−4.0**.
-Then `F1+F3=0` ✓, `F3<F2<F1` ✓, `F2 = F1/F3 = -1.0 ≠ 1.0` ✗, `F3=-(F1*F2)` ✓.
-
-### 2.4.3 Custom 8-bit FP example (4 exp + 3 frac, bias=7)
-
-| Description | Bits | E | M | Value |
+| Format | s | exp | frac | bias |
 |---|---|---|---|---|
-| Zero | `0 0000 000` | — | 0 | 0 |
-| Smallest +denorm | `0 0000 001` | 1−7=−6 | 1/8 | $2^{-9}=1/512$ |
-| Largest denorm | `0 0000 111` | −6 | 7/8 | $7/512$ |
-| Smallest normal | `0 0001 000` | −6 | 1 | $1/64$ |
-| One | `0 0111 000` | 0 | 1 | 1.0 |
-| Largest normal | `0 1110 111` | 7 | 15/8 | 240 |
-| ±∞ | `0 1111 000` | — | — | ∞ |
+| Quad | 1 | 15 | 112 | 16383 |
+| Double (fp64) | 1 | 11 | 52 | 1023 |
+| Single (fp32) | 1 | 8 | 23 | 127 |
+| fp16 (Half) | 1 | 5 | 10 | 15 |
+| ==**bfloat16**== | 1 | **8** | 7 | 127 |
+| fp8 / fp4 | 1 | 4/2 | 3/1 | 7/1 |
 
-### Why float covers a huge range but loses integer precision
+==**bias = $2^{k-1}-1$**==.
 
-Floats are exact for integers in $[0, 2^{24}]$. Beyond that, **ULP = $2^{e-(p-1)}=2^{E-23}$** for normals.
+### 4.1 Class table (fp32)
 
-| Value | Stored as |
+| exp `e` | frac `f` | Class | Value |
+|---|---|---|---|
+| 0 | 0 | ±0 | 0 |
+| 0 | nz | ==**denorm**== (no hidden 1) | $(-1)^s(0.f)2^{1-bias}$ |
+| 1..2^k-2 | any | ==**normal**== (hidden 1) | $(-1)^s(1.f)2^{e-bias}$ |
+| all-1 | 0 | ±∞ | |
+| all-1 | nz | NaN | |
+
+> Denorm $E=1-\text{bias}$ (NOT $-\text{bias}$). More exp → larger range; fewer frac → less precision.
+
+### 4.2 fp32 hex decode
+
+> Quiz1 #4: `F1=0x40800000` → `0|10000001|0…` E=2,M=1.0 → **+4.0**; `F2=0x3F800000`=+1.0; `F3=0xC0800000`=−4.0. `F1+F3=0`✓; `F3<F2<F1`✓; `F2=F1/F3=-1≠1`✗; `F3=-(F1*F2)=-4`✓ → **A,B,D**.
+
+### 4.3 Custom 8b FP (4exp+3frac, bias=7)
+
+| | bits | E | M | value |
+|---|---|---|---|---|
+| smallest +denorm | `0 0000 001` | -6 | 1/8 | $1/512$ |
+| largest denorm | `0 0000 111` | -6 | 7/8 | $7/512$ |
+| smallest normal | `0 0001 000` | -6 | 1 | $1/64$ |
+| one | `0 0111 000` | 0 | 1 | 1.0 |
+| largest normal | `0 1110 111` | 7 | 15/8 | 240 |
+
+> ULP for normals = $2^{E-(p-1)}$. fp32 exact integers in $[0, 2^{24}]$; beyond loses precision (`123456789` → `123456792`).
+
+### 4.4 Rounding
+
+4 IEEE modes: ==**round-to-even (default), toward 0, down, up**==. Tie → pick value with **LSB=0**.
+
+> 12.5 → 12; 13.5 → 14; 1.875 in 2-frac → 10.00 (=2.0).
+
+### 4.5 FP Operations
+
+- `1/+0=+∞`, `1/-0=-∞`, `sqrt(-1)=NaN`.
+- Commutative ✓; **NOT associative**: `(3.14+1e10)-1e10=0`; `3.14+(1e10-1e10)=3.14`.
+> [!IMPORTANT] CSE on `(a+b+c+d)` and `(a+d+b+c)` legal for ==**integer (`long long`, `char`, `int`)**==, NOT float/double.
+
+### 4.6 Type Casts
+
+- int→float: may round, can't overflow.
+- int(32b)→double: exact.
+- float→double: exact.
+- double→float: round / overflow→±∞.
+- float/double→int: ==**rounds toward 0**==; overflow result not portable (Intel: `0x80000000`).
+
+### 4.7 FP Add Steps
+
+1. **Align** exp (shift smaller mantissa right).
+2. **Add** significands.
+3. **Normalize**.
+4. **Round** (round-to-even).
+
+## 5. FP Units
+
+| Op | Latency (cyc) |
 |---|---|
-| 123456784 | exact (multiple of 16) |
-| 123456789 | rounded to 123456792 |
-| 123456790 | rounded to 123456792 |
-| 123456791 | rounded to 123456800 |
+| FADD | 3-4 |
+| FMUL | 4-5 |
+| ==**FMA**== | **5-6** |
+| FP→int | 3-5 |
+| int mul | 3-5 |
+| int div | ~32 (hard to pipeline) |
 
-### 2.4.4 FP Rounding
+==**FMA (R4-type)**== `a*b+c`: 1 instr, ==**1 final rounding**==.
 
-4 IEEE modes: ==**round-to-even (default), toward 0, down, up**==.
+> Why FMA 5-6 not 9: FMUL's reduction stage runs **in parallel with FADD's exp align**; product needs no normalize/round before final add. Saves ~3 cyc.
 
-==**Round-to-even (banker's rounding)**==: if exactly halfway, choose value with **LSB = 0**.
+> R4 = 3src+1dst. 3-operand alt `rd=rs1*rs2+rd` works for dot-product but rd is both src+dst → ==breaks regularity== (extra read port for rd).
 
-| Value | Halfway between | Rounded |
-|---|---|---|
-| 12.5 | 12 / 13 | 12 |
-| 13.5 | 13 / 14 | 14 |
-| 1.875 (5 bits) → 1.11_1 | 1.11 / 10.00 | 10.00 (LSB=0) |
+### 5.1 Why GPUs use bf16 / fp16
 
-### 2.4.5 FP Operations
+- Higher BW + throughput (1 double-load = 4 bf16; AVX-512 = 32 bf16/cyc).
+- AI is approximate ⇒ precision loss tolerable.
+- ==**bf16 > fp16**== because 8-bit exp = fp32 range; fp16 only 5-bit exp → narrow range, easy overflow; bf16 also more compatible with fp32.
 
-- ==`1/+0=+∞`, `1/-0=-∞`, `sqrt(-1)=NaN`==
-- Commutative: `a op b == b op a`.
-- **NOT associative**: `(3.14+1e10)-1e10 = 0.0`; `3.14+(1e10-1e10) = 3.14`.
+## 6. Quiz Trap Cheat-Notes
 
-> [!IMPORTANT] Compiler may NOT do CSE/reassociation on FP without `-ffast-math`:
-> - `(a+b+c+d)` ≠ `((a+b)+(c+d))` ✗ for float/double
-> - Same expression with **integer (`long long`, `char`)**: CSE allowed ✓.
-
-### FP/Int casting
-
-| Conversion | Behavior |
-|---|---|
-| int → float | may **round**, cannot overflow |
-| int → double | **exact** for 32b int |
-| float → double | **exact** |
-| double → float | may round / overflow to ±∞ |
-| float/double → int | **rounds toward 0**; overflow result **not portable** |
-
-> Intel: float→int overflow returns `0x80000000` ("integer indefinite").
-
-### FP addition (manual)
-
-1. **Align** exponents (shift smaller mantissa right).
-2. **Add** significands (with sign).
-3. **Normalize** (shift to put leading 1 back).
-4. **Round** (default round-to-even).
-
-Example: $1.000_2\cdot 2^{-1}+(-1.110_2\cdot 2^{-2})$ → align to $\cdot 2^{-1}$: $1.000-0.111=0.001\cdot 2^{-1}$ → normalize: $1.000\cdot 2^{-4}=0.0625$.
-
-### 2.5 FP Units (latencies)
-
-| Op | Latency | Pipelining |
-|---|---|---|
-| FADD | **3–4 cyc** | yes |
-| FMUL | **4–5 cyc** | yes |
-| FMA | **5–6 cyc** | yes |
-| FP→Int | **3–5 cyc** | yes |
-| Int multiply | 3–5 cyc | yes |
-| Int divide | **~32 cyc** | hard to pipeline |
-
-==**FMA (R4-type)**== `a*b+c`: 1 instr, **1 final rounding** (more accurate than separate mul+add).
-
-> Why FMA is 5/6 not 9: FMUL has 5 cycles where most work is **partial-product reduction**. While reduction runs, FADD can do its **exponent alignment in parallel**. The product **doesn't need normalize/round** before the final add. Saves the 2 (norm+round) + 1 (alignment overlap) ≈ 3 cycles. Net: ~6 cycles.
-
-> Why FMA in R4 (3 src + 1 dst): preserves dot products / matrix mul. 3-operand alternative `rd = rs1*rs2 + rd` works for dot-product but **breaks regularity** (rd is both src+dst → needs 2 read ports for rd).
-
-### 2.6 Why GPUs use bfloat16/fp16
-
-- **Higher memory bandwidth + computation throughput**: 1 double load = 4 bf16; 1 AVX-512 instr = 32 bf16 ops/cycle.
-- AI is **approximate**; precision loss is acceptable.
-- ==**bfloat16 wins over fp16**== because bf16 has **8 exp bits** (same as fp32) → much larger range; easier conversion to/from fp32. fp16 only has 5 exp bits → narrow range, easy to overflow.
-
-## 2.6 Quiz Traps Cheat Sheet
-
-- 128 all-0 bits: **could be 4× SP +0.0**, two long zeros, padding. **Cannot** be assumed to be a quad-precision value unless format is given.
-- "Char string `0000`" is `0x30 0x30 0x30 0x30`, NOT all-zero bytes.
-- Unsigned wrap is well-defined; signed overflow is **UB** (compiler may optimize assuming it can't happen).
-- Number systems with both ±0: signed-magnitude, 1's-complement, IEEE FP.
-- Exact decimal in FP iff denominator (reduced) is power of 2: 1.625 ✓, 1.5 ✓, others usually ✗.
-- `(X+Y)+Z == X+(Y+Z)` is **not always true** for FP.
-- `if (A<0) -A>0` is **false** when A=INT_MIN (since `-INT_MIN==INT_MIN<0`).
-- `(x*x) >= 0`: **false** in 2's comp (e.g., `0xFFFF * 0xFFFF` overflows to negative as `int`).
-- `x+y == ux+uy` (where ux=(unsigned)x, uy=(unsigned)y): **true** — same bit-level behavior.
+- 128 all-0 bits: 4× fp32 +0.0, 2× DP zeros — **NOT necessarily 1 quad-FP** without format.
+- `"0000"` = `0x30 0x30 0x30 0x30`, NOT all-zero.
+- Exact decimal in FP ↔ denominator (reduced) is power of 2.
+- `(X+Y)+Z == X+(Y+Z)` not always true for FP.
+- `(A<0) ⇒ -A>0` **false** when A=`INT_MIN`.
+- `(x*x) >= 0` **false** if overflow (e.g., `0xFFFF * 0xFFFF` as int).
+- `x+y == ux+uy` **true** (same bit-level behavior).
+- `A == (int)(double)A` true for 32b int (53b precision); not for 64b long.

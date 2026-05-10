@@ -2,13 +2,14 @@
 
 ## Exam Facts
 
-- Control = combinational logic that **generates datapath signals from instruction bits**.
-- ==Most difficult signal: **ALU control**==, because it depends on **opcode/ALUOp + funct3 + funct7**.
-- RISC-V's regularity (fixed source/dest positions) makes control simpler than CISC.
-- Single-cycle drawback: clock period must accommodate the **slowest full-instruction path**.
-- HDLs (Verilog, VHDL) describe control logic → synthesized to a **netlist**.
+- Control = combinational logic generating datapath signals from instr bits.
+- ==**Most difficult signal: ALU control**== (depends on opcode/ALUOp + funct3 + funct7).
+- RV regularity makes control simple: rs1/rs2/rd in fixed positions.
+- Single-cycle drawback: clock period must cover slowest full-instr path (usually `LW`).
+- ==**LW has greatest impact on single-cycle clock rate**==.
+- HDLs (Verilog/VHDL) describe control → synthesized to **netlist**.
 
-## High-Level Control Signals
+## 1. High-Level Control Signals
 
 | Signal | Logic |
 |---|---|
@@ -16,79 +17,59 @@
 | `RegWr` | `(Branch \| Store) ? 0 : 1` |
 | `MemRd` | `Load ? 1 : 0` |
 | `MemWr` | `Store ? 1 : 0` |
-| `ALUSrc` | `R-type ? 0 : 1` (1 = use immediate) |
+| `ALUSrc` | `R-type ? 0 : 1` (1 = use imm) |
 | `WBsel` | `Load → MemData; R-type → ALU; JAL → PC+4` |
 
-> Quiz: `RegWr = 0` for **branches and stores**. Loads, ALU ops, jumps (write `PC+4` to `rd`) all set `RegWr = 1`.
+> ==`RegWr=0` for **branches and stores**==.
 
-### Next-PC sources
+### 1.1 Next-PC Sources
 
 | Source | When |
 |---|---|
-| `PC + 4` | sequential / not-taken branch |
-| `PC + imm` | branch taken, JAL |
-| `rs1 + imm` | JALR |
-| memory indirection | **NOT** in RV (no `LW pc, ...`) |
+| `PC+4` | sequential / not-taken branch |
+| `PC+imm` | branch taken, JAL |
+| `rs1+imm` | JALR |
+| memory indirection | ==NOT in RV== (no `LW pc, ...`) |
 
-> Quiz: legitimate next-PC sources are `PC+4`, `PC+imm`, `rs1+imm`. NOT `(rs1+imm)→memory→PC` (no memory-indirect jumps in RV32I).
+> Quiz: legitimate next-PC = PC+4 / PC+imm / rs1+imm. NOT memory-indirect.
 
-## ALU Control
+## 2. ALU Control
 
 ALU control derives from:
-- **ALUOp** (per instruction class: load/store=ADD, branch=SUB, R/I-type=decode further),
-- **`funct3`** (3 bits in I/R encoding),
-- **`funct7[5]`** distinguishes pairs.
+- **ALUOp** (per class: load/store=ADD, branch=SUB, R/I-type=decode)
+- **`funct3`** (3 bits)
+- **`funct7[5]`** (distinguishes pairs)
 
-### Common mappings
-
-| Class | ALU op |
-|---|---|
-| Load / Store | `ADD` (compute address) |
-| Branch (sub-style) | `SUB` (or use compare unit) |
-| R-type / I-type | decode `funct3` + `funct7[5]` |
-
-### funct7[5] distinguishes pairs
+### 2.1 funct7[5] Pairs
 
 | Same `funct3` | `funct7=0000000` | `funct7=0100000` |
 |---|---|---|
 | `000` (ADD/SUB) | ADD | **SUB** |
 | `101` (SRL/SRA) | SRL | **SRA** |
 
-> [!IMPORTANT] Why ALU control is hardest:
-> - Most other signals are 1-bit class booleans.
-> - ALU control is a **multi-bit lookup** depending on opcode + funct3 + funct7 + immediate vs register variant.
+> Why ALU control is hardest: most other signals are 1-bit class booleans; ALU control is a multi-bit lookup over opcode + funct3 + funct7 + imm-vs-reg variant.
 
-## Single-Cycle Datapath Examples
+## 3. Single-Cycle Datapath Examples
 
-### `SW x2, offset(x1)`
+| Instr | Active signals |
+|---|---|
+| `ADD rd,rs1,rs2` | `RegWr=1, ALUSrc=0, ALU=ADD, WBsel=ALU` |
+| `SW x2, off(x1)` | `RegWr=0, MemWr=1, ALUSrc=1, ALU=ADD` |
+| `BEQ x1,x2, imm` | `RegWr=0, MemWr=0, ALU=SUB, PCSrc = (Zero? 1:0)` |
 
-- `RegWr=0` (no rd written), `MemWr=1`, `ALUSrc=1` (use imm), ALU = `ADD` (compute addr), `PCSrc=0`.
-
-### `BEQ x1, x2, imm`
-
-- `RegWr=0`, `MemWr=0`, ALU = `SUB` (or compare), `PCSrc = 1 if Zero==1 else 0`.
-
-### `ADD rd, rs1, rs2`
-
-- `RegWr=1`, `ALUSrc=0` (use reg), ALU = `ADD`, `WBsel=ALU`.
-
-## Single-Cycle Drawbacks
+## 4. Single-Cycle Drawback
 
 Clock cycle must include the entire `LW` chain:
 
-> PC clk-to-Q + IMem access + RegFile read + ALU (addr calc) + DMem access + WB-mux + RegFile setup + clock skew
+> PC clk-to-Q + IMem + RegFile read + ALU + DMem + WB-mux + RegFile setup + skew
 
-⇒ all instructions pay the worst-case time even if they don't need DMem (e.g., `ADD`).
+⇒ all instrs pay worst-case time.
 
-> [!IMPORTANT] Quiz: the RV32I instruction with **greatest impact on single-cycle clock rate** is **`LW`** (longest path).
+> [!IMPORTANT] Quiz: instr with **greatest impact on single-cycle clock rate** = ==**`LW`**==.
 
-## Summary of Single-Cycle RV
+## 5. Summary of Single-Cycle RV
 
-- CPI = 1 ⇒ simple control + lower CPI than multi-cycle.
+- CPI=1 ⇒ simple control + lower CPI than multi.
 - Clock long ⇒ low throughput.
-- RV simplifies control:
-  - Fixed 32b instr length (or 16b w/ C-ext).
-  - **Regular format**: rs1/rs2/rd in fixed positions.
-  - Immediates same width (12b imm, 20b upper imm).
-  - Operations only on regs/imms (load-store).
+- RV simplifies control: fixed 32b instr (16b w/ C), regular format, fixed-width imm (12b/20b), regs/imm-only ops.
 - ⇒ lower design + verification cost.

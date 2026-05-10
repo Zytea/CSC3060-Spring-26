@@ -2,164 +2,121 @@
 
 ## Exam Facts
 
-- ==**Microarchitecture**==: implementation of an ISA. Variants:
-  - **Single-cycle** → CPI = 1, but clock = slowest instr.
-  - **Multi-cycle** → variable CPI, shorter clock, reuses HW.
-  - **Pipelined** → throughput ≈ 1 inst/cyc, latency may not improve.
-  - **Superscalar** → can issue >1 per cycle, **CPI < 1**.
-  - + OoO, speculative exec, cache hierarchies, predictors.
-- ==**CPU time = Instr count × CPI × Clock cycle time**==.
-- **CISC**: low IC, high CPI, long cycle. **RISC**: high IC, low CPI, short cycle.
-  - Modern x86: complex CISC instrs decoded **into RISC-like µ-ops** internally, then executed.
-- **Performance ranking**: ==Superscalar+pipelined > Pipelined > Multi-cycle > Single-cycle==.
-- Single-cycle CPI = 1 but **clock long** because all stages cascade in 1 cycle. The slowest instr (usually `LW`: PC → IMem → RegFile → ALU → DMem → WB) sets clock period.
-- RV32I scalar regfile: **2 read + 1 write** ports.
-- 2-issue superscalar (int): ~**4R / 2W**.
-- FMA needs **3 read** ports per issue.
-- `RegWr = 0` for **branches and stores** (no register written).
-- Single-cycle limitations: cannot reuse same combinational/state element twice/cycle ⇒ need **separate I-mem and D-mem**, multiple adders (PC+4, branch target, ALU).
-- Compare-and-branch using ALU subtraction has overflow trap: **better use a true comparison unit** to avoid wrong taken/not-taken.
+- ==**Microarch**==: ISA implementation. **Single-cycle / Multi-cycle / Pipelined / Superscalar / OoO / cache / predictors**.
+- ==**CPU time = IC × CPI × cycle**==.
+- **Single-cycle**: CPI=1, but clock = slowest instr (usually `LW`).
+- **Multi-cycle**: variable CPI, shorter clock, reuses HW.
+- **Pipelined**: throughput ≈ 1 inst/cyc.
+- **Superscalar+pipelined**: ==**CPI<1**==, **highest throughput**.
+- ==Performance order: **Superscalar+pipe > Pipe > Multi > Single**==.
+- RV32I scalar regfile: ==**2R / 1W**==. 2-issue superscalar (int) ~**4R / 2W**. FMA: 3 reads/issue.
+- `RegWr=0` for ==**branches and stores**==.
+- Single-cycle: cannot reuse HW in 1 cyc → split I/D mem, multiple adders (PC+4, branch target, ALU).
+- Compare-and-branch via ALU sub: subtraction overflow can give wrong sign → ==use **dedicated comparison unit**==.
 
-## 1. Processors and Microarchitectures
+## 1. Microarchitectures
 
-Different µ-arch implementations of the **same** ISA: single-cycle / multi-cycle / pipelined / superscalar / OoO / speculative / cache hierarchies / predictors.
+Different µ-arch implementations of the **same ISA** support different perf/cost tradeoffs.
 
-| Era (x86 example) | Microarchitecture |
+| Era (x86 example) | Microarch |
 |---|---|
 | 8086/286/386 | multi-cycle |
 | 80486 | pipelined |
 | Pentium P5 | superscalar |
-| Pentium Pro / II / Core2 | OoO + speculative |
+| Pentium Pro/II/Core2 | OoO + speculative |
 | Nehalem | + SMT/Hyperthreading |
 | Sandy Bridge / Rocket Lake | + AVX/SIMD |
-| Alder/Raptor Lake | heterogeneous (P-core + E-core) |
+| Alder/Raptor Lake | heterogeneous (P+E core) |
 
-## 2. Computer Organization: Datapath vs Control
+## 2. Datapath vs Control
 
 | | Datapath | Control |
 |---|---|---|
-| Job | data flow | instruction flow / signals |
-| Components | ALU, regs, mem interface, buses, muxes | decode, `PCSrc`, `RegWr`, ALU control, MemRd/Wr, `WBsel` |
-| Role | "**Brawn**" | "**Brain**" |
+| Job | data flow | instr flow / signals |
+| Components | ALU, regs, mem, buses, muxes | decode, `PCSrc`, `RegWr`, ALU ctrl, `WBsel` |
+| Role | "Brawn" | "Brain" |
 
-## 3. Instruction Execution Cycle
+Instr cycle: ==**Fetch → Decode → Execute → Update PC**==. Execute paths: **Ld/St / Branch / ALU**.
 
-==**Fetch → Decode → Execute → Update PC**==
+## 3. CPU Time and Three Implementation Styles
 
-In Execute:
-- ALU computes arithmetic OR address (LW/SW) OR branch comparison + target.
-- Data memory accessed for load/store.
-- PC ← `PC+4` or branch target.
-
-## 4. CPU Time and Three Implementation Styles
-
-For 4 instructions w (4 cyc), x (2), y (3), z (4):
+For 4 instrs `w(4) x(2) y(3) z(4)` (1 long cyc = 4 short):
 
 | Implementation | CPI | Clock | Total |
 |---|---|---|---|
-| Single-cycle | 1 | 1 long cycle (= 4 short) | **16 short cycles** |
-| Multi-cycle | variable | 1 short | 4+2+3+4 = **13 short** |
-| Pipelined | ~1 | 1 short | overlapped → **7 short** |
+| Single-cycle | 1 | 1 long (=4 short) | **16 short** |
+| Multi-cycle | variable | 1 short | 4+2+3+4 = **13** |
+| Pipelined | ~1 | 1 short | overlapped → **7** |
 
-> Note: Single-cycle CPI=1 is misleading — clock is long because it must accommodate the slowest instruction.
+> Single-cycle CPI=1 is misleading: clock is long because all stages cascade in 1 cycle.
 
-## 5. Logic Design Basics
+## 4. Logic Design Basics
 
-### Three component types
+| Type | Behavior |
+|---|---|
+| **Combinational** | output = f(inputs); stateless (gates, ALU, MUX) |
+| **Sequential / state** | output = f(input + stored state) (regs, memory, FF) |
+| **Clock** | edge-triggered; state updates on rising edge |
 
-| Type | Behavior | Example |
-|---|---|---|
-| **Combinational** | output = f(inputs only); stateless | gates, ALU, MUX, decoder |
-| **Sequential / state** | output = f(input + stored state) | register, memory, FF |
-| **Clock** | regulates state updates | edge-triggered FF |
+- **Critical path** (longest gate chain) sets minimum clock period.
+- HDLs: Verilog, SystemVerilog, VHDL, Chisel (SiFive RV).
 
-- **Critical path** delay = longest gate-chain → sets minimum clock period.
-- Clock methodology: **edge-triggered**, state updates on rising edge; combinational logic runs between edges.
+> SW: C → compiler → asm. HW: HDL → Boolean+FSM → synthesizer → netlist → silicon.
 
-### HDL languages: Verilog, SystemVerilog, VHDL, Chisel (used by SiFive for RV).
-
-> SW: C → compiler → asm.
-> HW: Verilog/Chisel → Boolean eqs + FSM → logic synthesizer → netlist → silicon.
-
-## 6. Single-Cycle RISC-V Subset
+## 5. Single-Cycle RISC-V Subset
 
 Subset: `lw, sw, add, sub, and, or, beq, jal`.
 
-### Three key MUX decisions
+### 5.1 Three Key MUX Decisions
 
 | MUX | Source choices |
 |---|---|
-| **`PCSrc`** | branch/JAL → `PC + imm`; else → `PC + 4` |
-| **`WBsel`** | load → DMem out; ALU op → ALU out |
-| **`ALUSrc`** | R-type → `reg[rs2]`; I/Load/Store → imm |
+| ==`PCSrc`== | branch/JAL → `PC+imm`; else `PC+4` |
+| ==`WBsel`== | load → DMem; ALU op → ALU |
+| ==`ALUSrc`== | R-type → `reg[rs2]`; I/Load/Store → imm |
 
-### Datapath requirements
+### 5.2 Datapath Requirements
 
-- **Memory**: instruction memory + data memory (separated to avoid structural hazard).
-- **Register file**: 32 × 32b, **2R + 1W** ports.
-- **PC** (32b).
-- **Sign/zero extender** for immediates.
-- **ALU** for ADD/SUB/AND/OR/SLT.
-- **Adders** for PC+4 and PC+imm (branch target).
+- Memory: **separate I-mem + D-mem** (avoid struct hazard).
+- Regfile: 32×32b, **2R + 1W** ports.
+- PC, sign/zero extender, ALU, adders for PC+4 + PC+imm.
 
-### Why two adders?
+> Why two adders in EX: simultaneously need branch target (PC+imm) AND ALU result.
 
-> EX stage simultaneously needs **branch target (PC+imm)** and **ALU result** (e.g., for the live data). Sharing one adder would cause a structural hazard.
+### 5.3 Branch via Subtraction Trap
 
-### Branch via subtraction trap
+- ALU sub → sign decides taken; but **sub can overflow** → wrong sign.
+- RV doesn't trap overflow → would need explicit check on every branch.
+- ⇒ many RV designs use a ==**dedicated comparison unit**== or `V/C` flags.
 
-- Using ALU subtract → sign bit decides taken/not-taken.
-- But **subtraction can overflow** → wrong sign → wrong outcome.
-- RV does NOT trap on overflow → would need explicit check on every compare-and-branch.
-- ⇒ many RV processors use a **dedicated comparison unit** (or carry/overflow flags in a status register) to avoid mis-branching.
+## 6. Storage Elements
 
-> [!IMPORTANT] Quiz answer: "Why use a comparison unit instead of ALU sub?" → **Avoid wrong taken/not-taken due to subtraction overflow.**
+### 6.1 Register File
 
-## 7. RV32I Format Regularity (helps datapath simplicity)
+- 2 read ports (busA/busB) selected by rs1/rs2; 1 write port (busW) by rd, gated by `RegWrite`.
+- CLK matters only on writes; reads behave combinationally.
 
-- Opcode always **bits 0–6**.
-- `rd` (when present) always **bits 7–11**.
-- `rs1` always **bits 15–19**.
-- `rs2` always **bits 20–24**.
-- Immediate placed in high bits (B/S split using rd field).
-- Fixed length 32b (or 16b w/ C-ext).
+> 2-wide superscalar GPR: **4R / 2W**. FMA FP regfile: **3 reads/issue** (6R/2W for 2-issue).
 
-⇒ Decoder is small + fast; reg-read can begin **before decode finishes**.
+### 6.2 Memory
 
-## 8. Storage Elements
+Address selects word; `WriteEnable=1` → write via DataIn.
 
-### Register file
-
-- 2 read ports (busA, busB) selected by rs1, rs2.
-- 1 write port (busW) selected by rd, gated by `RegWrite`.
-- CLK matters only for **writes**; reads behave combinationally.
-
-> Quiz: For 2-wide superscalar, GPRs need **4 read + 2 write** ports.
-> For FMA (3-source instr), FP regfile needs **3 reads per FMA**.
-
-### Memory
-
-- Address selects word.
-- `WriteEnable=1` → address selects word written via DataIn bus.
-
-## 9. Single-Cycle Limitations
+## 7. Single-Cycle Limitations
 
 > [!IMPORTANT]
-> 1. **Resources cannot be reused** in same cycle → must duplicate adders, separate I/D mem.
-> 2. Cannot pass through the same combinational/state element twice/cycle → multi-cycle iterative ops (mul/div) would have to be **fully unrolled in HW** (very expensive).
-> 3. Clock = slowest instruction → typically `LW` path: PC → IMem → RegFile → ALU → DMem → WB.
-> 4. ⇒ leads to **multi-cycle / pipelined** implementations.
+> 1. Resources cannot be reused in same cycle → duplicate adders, separate I/D mem.
+> 2. Iterative ops (mul/div) must be fully unrolled in HW (expensive).
+> 3. Clock = slowest instr (`LW`: PC → IMem → RegFile → ALU → DMem → WB).
+> 4. ⇒ leads to multi-cycle / pipelined.
 
-## 10. Performance Ordering Summary
+## 8. Performance Ordering Summary
 
-> [!IMPORTANT] Throughput: ==**Superscalar+Pipelined > Pipelined > Multi-cycle > Single-cycle**==.
-
-| | Single-cycle | Multi-cycle | Pipelined | Superscalar+Pipe |
+| | Single | Multi | Pipe | Superscalar+Pipe |
 |---|---|---|---|---|
 | CPI | 1 | variable | ≈1 | **<1** |
 | Clock | long | short | short | short |
 | Control | **simple** | complex FSM | medium | hardest |
 | Throughput | low | medium | high | highest |
-| Resource sharing | none | yes | yes (across instrs) | yes |
 
-> Single-cycle "advantages" vs pipelined: **Simple control + lower CPI (=1)**. Drawback: long clock, low throughput.
+> Single-cycle "advantages" vs pipe: **simple control + low CPI**. Drawback: long clock, low throughput.
