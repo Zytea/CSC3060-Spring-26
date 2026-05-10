@@ -122,6 +122,14 @@ $$
 
 No-prediction taken-branch case uses taken fraction instead of mispredict rate.
 
+Correctness vs performance:
+
+| Mechanism | Role |
+|---|---|
+| stall/flush | handles wrong/unknown control flow but pays penalty |
+| BHT/BTB/static layout | reduces control-hazard penalty by predicting earlier |
+| data forwarding/bypassing | data hazard fix, not control hazard fix |
+
 ### 4.1 Resolution Stage -> Flush Count
 
 | Branch resolved at | Penalty idea |
@@ -188,6 +196,8 @@ Cost: aliasing between branches.
 
 High-performance predictors may add tags or richer metadata; simple class BHTs are often untagged.
 
+Simple BHT indexing often uses lower PC bits; correlated/2-level predictors combine PC with history.
+
 ### 5.4 Correlated / 2-Level
 
 Uses recent branch history:
@@ -213,6 +223,7 @@ Hard branch/jump targets:
 - indirect `JALR` for switch jump table.
 - virtual calls/function pointers.
 - returns if RAS mismatch.
+- binary-tree/linked-list traversal often causes **data hazards** (pointer load-use chain) plus **control hazards** (branch direction depends on data).
 
 Switch vs if-chain:
 

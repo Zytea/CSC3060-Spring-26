@@ -13,6 +13,8 @@
 - **Long-latency ops**: stall or use separate pipelined/iterative FUs.
 - **In-order retirement**: preserves precise architectural state.
 - **Pipeline regs carry**: **control, data, addresses/PC, immediates, register designators**.
+- **WB-stage propagated info**: `rd + RegWr/WRen + WBSel`; not `ALUCtrl`.
+- **Quiz anchor**: among IF/ID, ID/EX, EX/MEM, MEM/WB, class answer for least stored info is **MEM/WB**.
 - **Pipeline design principles**: multi-stage partitioning, overlapped execution, increased throughput, better resource utilization; **not** lowered instr latency.
 
 ## 1. Pipeline Timing Formulas

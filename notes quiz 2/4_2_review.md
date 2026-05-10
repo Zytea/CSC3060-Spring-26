@@ -8,7 +8,7 @@
 - **Memory control**: `MemRd=1` only load; `MemWr=1` only store.
 - **`ALUSrc`**: `0` for R-type/branches; `1` for I/load/store/JALR address.
 - **`WBSel`**: load -> memory; ALU/I/U -> ALU/imm; JAL/JALR -> `PC+4`.
-- **`ALUCtrl`**: depends on `ALUOp + funct3 + funct7[5]`.
+- **`ALUCtrl`**: depends on `ALUOp + funct3 + funct7[5]`; quiz: **hardest control signal to generate**.
 - **`funct7[5]`**: distinguishes `ADD/SUB` and `SRL/SRA`.
 - **HDL control**: synthesizable Verilog/VHDL logic can map opcode/funct bits to a netlist of control signals.
 
@@ -23,7 +23,7 @@ PCSrc = BranchTaken || JAL/JALR
 RegWr = !(Branch || Store)
 MemRd = Load
 MemWr = Store
-ALUSrc = !Rtype || Load || Store || JALR
+ALUSrcB = I_ALU || Load || Store || JALR || LUI/AUIPC
 ```
 
 | Instr | `RegWr` | `MemRd` | `MemWr` | `ALUSrc` | `WBSel` | Next PC |

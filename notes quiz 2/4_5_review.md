@@ -35,6 +35,14 @@ add t1,t0,t2
 
 Any legal schedule must place every predecessor before successor.
 
+Quiz option checklist:
+
+| Check | Meaning |
+|---|---|
+| every DAG edge respected | predecessor appears before successor |
+| memory alias edges preserved | do not move possible aliasing loads/stores across each other |
+| stalls ignored for legality | a schedule can be legal but still have bubbles |
+
 Worst-case legal schedules can be huge:
 
 | Case | # schedules |

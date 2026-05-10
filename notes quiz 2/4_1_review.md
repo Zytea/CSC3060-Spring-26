@@ -179,6 +179,9 @@ signed_lt = sign(A-B) ^ overflow
 
 Equality via subtraction zero is safe.
 
+> [!IMPORTANT]
+> Class quiz reason for a separate branch comparison unit: **avoid wrong taken/not-taken from subtraction overflow**. It is not because comparison cannot trap.
+
 ## 9. Single-Cycle RISC-V Processor
 
 Single-cycle rule: all instrs finish in one long cycle; all state updates at clock edge.

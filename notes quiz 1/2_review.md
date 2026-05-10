@@ -273,6 +273,33 @@ carry = (a & b) << 1;
 sub(a,b) = add(a, add(~b,1));
 ```
 
+### 5.5 Integer Expression Quiz Traps
+
+Assume 32b two's-complement wrap where needed; C signed overflow is still undefined in real C.
+
+| Expr | Always? | Key counter/reason |
+|---|---|---|
+| `(x > 0) || ((x-1) < 0)` | no | `x=TMin`, `x-1 -> TMax` |
+| `(x & 7) != 7 || (x << 29 < 0)` | yes | if low 3 bits all 1, bit2 becomes sign bit |
+| `(x*x) >= 0` | no | overflow can make negative |
+| `x < 0 || -x <= 0` | yes | nonnegative `x` negates to <=0; `TMin` covered by first term |
+| `x > 0 || -x >= 0` | no | `x=TMin`, `-x=TMin` |
+| `x+y == uy+ux` | yes bitwise | same modulo bit pattern |
+| `x*~y + uy*ux == -x` | yes bitwise | `~y=-y-1` |
+| `(x<y) == (-x>-y)` | no | `x=TMin,y=0` |
+| `((x+y)<<4)+y-x == 15*x+17*y` | yes bitwise | modulo arithmetic distributes over `+`, `*`, `<<` |
+| `~x+~y+1 == ~(x+y)` | yes | `~a=-a-1` |
+| `((x>>1)<<1) <= x` | yes class model | arithmetic shift rounds down; then clears low bit |
+| `(double)x+(double)y == (double)(x+y)` | no | `x+y` may overflow before cast |
+| `x<0 => x*3<0` | no | `x=TMin` overflow |
+| `(x-y)>0 => -x < -y` | no | `x=-1,y=TMin` overflow |
+| `((y-x)<<3)+x-2*y == 6*y-7*x` | yes bitwise | distribute in modulo arithmetic |
+| `ux-x == 0` | yes bitwise | same bits: `ux + ~x + 1 == 0` |
+| `x>0 => !(x>>31 \| !x)` | yes | sign bit 0 and `x` nonzero |
+| `((ux>>1)<<1) == ux` | no | any odd `ux` loses low bit |
+| `dx/3.0 == x/3` | no | integer division truncates |
+| `x-(int)dx == 0` | yes | 32b int exactly representable in double |
+
 ## 6. Floating-Point Representation
 
 ### 6.1 Binary Fractions and Exactness
@@ -393,7 +420,14 @@ IEEE rounding modes: nearest-even, toward 0, toward $+\infty$, toward $-\infty$.
 | `double -> float` | may round/overflow/underflow |
 | `float/double -> int` | rounds toward 0; overflow undefined/implementation-specific |
 
-High-yield true statement: `A == (int)(double)A` for 32b `int A`.
+High-yield cast traps:
+
+| Expr | Always? | Reason |
+|---|---|---|
+| `A == (int)(double)A` for 32b `int A` | yes | double has 53-bit precision |
+| `(double)(float)x == (double)x` for 32b `int x` | no | float has only 24-bit precision |
+| `dx+dy+dz == dz+dy+dx` for int-derived doubles | yes | 32b ints and their sum fit exactly in double |
+| `dx*dy*dz == dz*dy*dx` | no | large products round differently |
 
 ### 7.4 FMA / bfloat16
 

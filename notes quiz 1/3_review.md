@@ -10,6 +10,7 @@
 - **Fixed length**: without `C`, RISC-V base instrs are 32b; `C` adds 16b compressed instrs.
 - **RV32I architectural state**: **32 GPRs + PC + CSRs**. **RV64IFV** adds FP + vector regs.
 - **Microarchitectural state**: pipeline regs, BHT, BTB, caches; regenerated, not saved on interrupt.
+- **All-zero 32b word as RV instr**: opcode `0000000` is not valid -> illegal instruction in class quizzes.
 - **Scalar RV32I regfile**: **2R/1W**.
 - **`JAL` vs `JALR`**: `JAL` PC-relative ~$\pm1$ MiB; `JALR` uses `rs1+imm12`, can reach full RV32 address space via register, clears bit 0.
 - **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
@@ -84,6 +85,15 @@ RV64 adds `LD`, `SD`, `LWU`, `ADDW`, `SLLIW`, etc.
 CSR examples: `cycle`, `instret`, `hartid`, `mepc`, `mcause`, `mtvec`, `mstatus`.
 
 ==**Hart**==: hardware thread with its own architectural state.
+
+Quiz state-classification anchor:
+
+| State | Class |
+|---|---|
+| RV32I `x0-x31`, PC | architectural |
+| RV64IFV GPRs, PC, FP regs, vector regs | architectural |
+| pipeline regs, BHT, BTB, L1I/L1D caches | microarchitectural; regenerated after interrupt |
+| overflow/underflow condition-code flags | not part of RV32I class answer |
 
 ### 2.3 ABI Snapshot
 
@@ -213,6 +223,15 @@ jalr x0, ra, 0      # ret
 
 `JAL` is "jump and link" because a call must both jump and save return PC (`PC+4`) in `ra`.
 
+Reach quick facts:
+
+| Mechanism | Reach |
+|---|---|
+| branch B-type | about `+-4 KiB` |
+| `JAL` | about `+-1 MiB` |
+| `AUIPC + JALR` | about `+-2 GiB` PC-relative |
+| register + `JALR` | full RV32 address space if register holds target |
+
 ## 4. Data Alignment and Layout
 
 ### 4.1 Natural Alignment
@@ -226,7 +245,7 @@ jalr x0, ra, 0      # ret
 | `int/float` | 4 |
 | `long/double/pointer` | 8 |
 
-Why: avoid cache-line/page crossing; simpler/faster hardware.
+Why: avoid cache-line/page crossing, double TLB misses/page faults, and complex hardware handling.
 
 ### 4.2 Struct Padding Rules
 
@@ -311,6 +330,25 @@ addi x1,x1,-0x800
 ```
 
 `addi` immediate is signed 12b; pseudo `li` handles rounding upper bits.
+
+Common pseudo-instr:
+
+| Pseudo | Typical expansion |
+|---|---|
+| `mv rd,rs` | `addi rd,rs,0` |
+| `j label` | `jal x0,label` |
+| `ret` | `jalr x0,ra,0` |
+| `jr rs` | `jalr x0,rs,0` |
+| `li rd,imm` | `addi` if 12b; otherwise `lui` + adjusted `addi` |
+
+Pop-quiz anchors:
+
+| Question | Answer |
+|---|---|
+| supported immediate widths | 12b and 20b |
+| set `x2=0` | `add x2,x0,x0` or `xor x2,x2,x2` |
+| no destination `rd` | branches and stores |
+| `RV32I` means | load/store, 3-operand, RISC, 32b GPR/address |
 
 ## 6. ISA Design Traps
 

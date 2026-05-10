@@ -6,7 +6,7 @@
 - **Benefits**: modularity, separate compilation, library reuse, easier maintenance, time/space efficiency.
 - **Standard linker**: Unix `ld`; compiler driver `gcc` invokes it.
 - **ELF tools**: `readelf` for details; `objdump` for code/relocs; `nm` for symbols.
-- **Linker jobs**: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout.
+- **Linker jobs**: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout/page alignment.
 - **Not linker job**: loading into memory; that is loader/dynamic linker work.
 - **Object file kinds**: relocatable `.o`, executable, shared object `.so`.
 - **ELF sections**: `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.rel.text`, `.rel.data`, `.debug`, section header table.
@@ -66,6 +66,7 @@ patch calls/global-address loads/data pointers
 
 - scan static archives.
 - section alignment/page layout.
+- may tune performance via page sizes / alignments.
 - dynamic relocation metadata.
 - LTO if `-flto`.
 
@@ -257,7 +258,13 @@ Left-to-right scan:
 
 If unresolved after scan -> link error.
 
-If `main.o` defines `malloc`, references to `malloc` can resolve before libc's archive member is pulled; this is why your own `malloc` can override libc's during static linking.
+Own `malloc` override pattern:
+
+| Step | Effect |
+|---|---|
+| earlier `.o` calls `malloc` | `malloc` enters unresolved set |
+| `main.o` defines `malloc` | resolves those refs |
+| linker later scans `libc.a` | libc `malloc` member is not pulled |
 
 ### 10.2 Library Order Matters
 

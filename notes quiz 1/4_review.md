@@ -180,6 +180,14 @@ If value `v` is live across `m` calls:
 | long-lived local/CSE across many calls | use `s` register |
 | value live across rare/cold call | caller-save in cold path |
 
+Quiz allocation anchors:
+
+| Ask | Answer |
+|---|---|
+| caller-saved considered | leaf routines; expression temps |
+| callee-saved considered | temp heavily live across multiple calls; local variables |
+| `A` calls `B`, live regs `s1,t0,a1` | `A` saves/restores `t0,a1`; `B` preserves `s1` |
+
 ### 11.1 Leaf Routine
 
 No nested calls -> can often use `t`/`a` regs and return without stack frame, unless it needs local spills or modifies `s` regs.

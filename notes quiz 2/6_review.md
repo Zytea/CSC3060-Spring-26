@@ -153,6 +153,8 @@ access A,B,A,B,... where set(A)==set(B), tag(A)!=tag(B)
 
 In a direct-mapped cache, addresses separated by a multiple of cache size map to the same set.
 
+Quiz conflict anchor: 4KB, 2-way, 32B line -> `S=4096/(2*32)=64`, so set repeats every `64*32=2048B`. More than 2 live blocks mapping to the same set cause conflicts.
+
 ### 4.2 Set-Associative Trace
 
 On access:
@@ -217,6 +219,14 @@ The 4 cache-design questions:
 
 To minimize tag storage: direct-mapped and larger block reduce tag overhead.
 
+Tag-cost levers:
+
+```text
+t = m - s - b
+increase b (larger line) or s (more sets) -> fewer tag bits per line
+total tag storage still also depends on #lines and associativity
+```
+
 For same `C,B`, direct-mapped has simplest replacement and low tag overhead; fully associative does not automatically have lowest miss rate unless replacement is good/optimal.
 
 Always-true organization facts for same `C,B`:
@@ -224,6 +234,16 @@ Always-true organization facts for same `C,B`:
 - **direct-mapped**: lowest tag overhead + simplest replacement.
 - **fully associative**: not guaranteed lowest miss rate under finite replacement policy.
 - **larger line**: exploits spatial locality and saves tag space, but can increase conflict/capacity misses.
+
+Associativity true/false anchors:
+
+| Claim | Truth |
+|---|---|
+| fully associative is 1-way | false: it is **1-set** |
+| direct-mapped is 1-set | false: it is **1-way** |
+| 2-way has more sets than 4-way, same `C,B` | true |
+| direct-mapped has least tag overhead | true |
+| fully associative has more data lines, same `C,B` | false |
 
 Larger block:
 
@@ -309,7 +329,16 @@ Miss-penalty reducers: critical-word-first/early-restart, non-blocking cache (`l
 
 **Coherence misses are the hardest 4C misses to remove.**
 
-Bandwidth-heavy features: large lines, prefetch, non-blocking caches, many MSHRs, write-through.
+Quiz anchors:
+
+| Miss/feature | Likely fixes / cost |
+|---|---|
+| compulsory | prefetch, larger line |
+| conflict in direct-mapped | larger cache, victim cache, set associativity |
+| capacity | larger cache; prefetch can help/hide sequential capacity effects |
+| bandwidth-heavy | large lines, prefetch, non-blocking caches, many MSHRs, write-through |
+
+Direct-mapped conflict trigger: objects separated by a multiple of cache size map to the same set. Fix with padding/alignment/code repositioning; dummy padding can be optimized away unless it is actually used.
 
 ## 9. Replacement / Victim Cache
 
@@ -366,6 +395,14 @@ Question pattern:
 - L1/L2 inclusive and L2/L3 inclusive -> L1/L3 inclusive.
 - Mixed exclusive/inclusive chains are not automatically sensible.
 
+Quiz nonsensical organization anchors:
+
+| Organization | Why suspicious / quiz answer |
+|---|---|
+| L1I copy-back + L1D write-through | I-cache has no CPU stores; copy-back I-cache policy is meaningless |
+| L1/L2 exclusive + L2/L3 inclusive | awkward/conflicting inclusion semantics |
+| L1D 4-way set-assoc + L2 direct-mapped | lower level has worse placement flexibility than upper level |
+
 ## 11. Cache Coherence
 
 Snoopy coherence: private caches watch shared bus/coherence traffic.
@@ -385,6 +422,19 @@ False sharing: different variables in same line cause invalidations; fix with pa
 
 - **TLB miss may trigger a page fault**.
 - Virtual-address cache / virtually indexed, physically tagged cache can **avoid or overlap address-translation delay**.
+
+### 12.1 TLB / PTE / Page Fault Chain
+
+==**TLB**==: small SRAM cache of recent **PTEs**; maps virtual page -> physical page.
+
+```text
+TLB hit -> use cached translation
+TLB miss -> page-table walk in memory / OS
+PTE invalid/not present -> page fault -> OS brings page from disk or kills process
+```
+
+> [!NOTE]
+> Normal cache miss fetches from DRAM/lower cache, not disk. Page fault is the VM exception path after translation fails.
 
 ## 13. Locality / Applications
 

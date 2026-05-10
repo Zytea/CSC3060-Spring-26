@@ -35,7 +35,7 @@ Optimization goals:
 | Goal | Typical opts |
 |---|---|
 | minimize instructions | CSE, DCE, strength reduction |
-| minimize cycles | register allocation, scheduling, locality, preload/RLE |
+| minimize cycles | register allocation, scheduling, locality, redundant-load elimination |
 | avoid branches | unrolling, inlining, unswitching, branchless transforms |
 
 ## 2. Compiler Optimization Flags
@@ -220,6 +220,7 @@ Costs:
 - code size/I-cache pressure.
 - register pressure.
 - aliasing constraints.
+- small `n` / finishing code may dominate before steady-state CPE is reached.
 
 Too much unrolling can be slower due to I-cache/code size, register pressure, limited FUs.
 
@@ -271,6 +272,15 @@ $$
 | `-O1/-O3` | compiler removes some overhead |
 | `combine4` | local accumulator + direct data pointer |
 | unroll + k accumulators | less loop overhead and shorter dependency chain |
+
+Slide CPE trend:
+
+| Version | Int add | FP add | FP mult |
+|---|---:|---:|---:|
+| combine1 unopt | ~22.7 | ~20.0 | ~20.2 |
+| combine1 `-O3` | ~4.5 | ~6.0 | ~7.8 |
+| combine4 | ~1.27 | ~3.01 | ~5.01 |
+| unroll | ~0.81 | ~1.51 | ~2.51 |
 
 ## 8. Reduction and SIMD
 
