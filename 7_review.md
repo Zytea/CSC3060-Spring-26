@@ -146,16 +146,6 @@ Rules:
 
 `static` file-scope symbols are local to one object file; same name in another file is not a global duplicate.
 
-CMU classification:
-
-| Case | Result |
-|---|---|
-| duplicate strong global | `LE` link error |
-| strong + weak same name | choose strong; possible `SE` if types/sizes mismatch |
-| two weak globals | allowed; arbitrary/common, possible `SE` |
-| file-scope `static` | `OK L`: local to that `.o` |
-| matching `extern` declaration | `OK G`: global reference |
-
 ### 7.1 Silent Error Pattern
 
 ```c
@@ -295,14 +285,6 @@ dlclose(h);
 ```
 
 Used for plugins/modules.
-
-### 11.3 `LD_PRELOAD`
-
-```bash
-LD_PRELOAD=./libwrap.so ./prog
-```
-
-Preloaded shared library can override dynamically linked symbols before normal libraries. Side point; Quiz5 focuses on GOT/PLT and dynamic-linking advantages.
 
 ## 12. PIC, GOT, PLT
 

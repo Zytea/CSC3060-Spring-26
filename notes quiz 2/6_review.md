@@ -14,7 +14,7 @@
 - Non-blocking cache uses **MSHR**. Class quiz L3 MSHR factors: memory latency + bus width/bandwidth.
 - AMAT: $HT+MR\times MP$. Multi-level AMAT uses local miss rates.
 - 4C misses: compulsory/cold, conflict/collision, capacity, coherence.
-- TLB caches **VPN -> PPN** translations, not data.
+- TLB only appears in this lecture as a side point: **TLB miss may trigger a page fault**.
 
 ## 1. Memory Hierarchy
 
@@ -109,7 +109,7 @@ set   = block mod S
 tag   = block / S
 ```
 
-## 4. Cache Simulation / CMU Pattern
+## 4. Cache Simulation / Trace Pattern
 
 ### 4.1 Direct-Mapped Trace
 
@@ -144,7 +144,7 @@ row-major row scan miss rate ~= 1/(B/e) if no conflict/capacity issue
 column scan with large stride often ~= 100% miss
 ```
 
-CMU-style assumptions usually say locals in registers and ignore instruction fetches.
+Trace assumptions often say locals are in registers and instruction fetches are ignored.
 
 > [!IMPORTANT]
 > Always check base address block offset. If `arr[0][0]` starts near end of a line, the first few elements may cross a line earlier than expected.
@@ -322,63 +322,12 @@ MESI:
 
 False sharing: different variables in same line cause invalidations; fix with padding/alignment.
 
-## 12. TLB / Virtual Memory
+## 12. Address Translation Side Points
 
-### 12.1 Address Translation
+PPT scope:
 
-```text
-VA = [ VPN ][ VPO ]
-PA = [ PPN ][ PPO ]
-VPO == PPO
-```
-
-If page size = $2^p$, then `p` offset bits.
-
-TLB fields:
-
-```text
-TLBI = low log2(#TLB sets) bits of VPN
-TLBT = remaining high VPN bits
-```
-
-Translation algorithm:
-
-1. split VA into `VPN,VPO`.
-2. index TLB with `TLBI`; compare `TLBT` in ways.
-3. TLB hit -> get `PPN`.
-4. TLB miss -> read page table entry.
-5. invalid PTE -> page fault.
-6. PA = `(PPN << p) | VPO`.
-
-### 12.2 CMU-Style Example Template
-
-For 20b VA, 18b PA, page size 1 KiB, 2-way TLB with 16 entries:
-
-```text
-p = log2(1024)=10
-VPN bits = 20-10 = 10
-PPN bits = 18-10 = 8
-TLB sets = 16/2 = 8 -> TLBI bits = 3
-TLBT bits = 10-3 = 7
-
-VA:  [ TLBT 7 ][ TLBI 3 ][ VPO 10 ]
-PA:  [ PPN 8 ][ PPO 10 ]
-```
-
-> [!IMPORTANT]
-> Page offset is unchanged by translation. Physical ordering of two virtual addresses in different pages is not determined by virtual ordering.
-
-Reverse lookup `PA -> VA`: keep same page offset, then find every valid `VPN` whose PTE/TLB maps to that `PPN`; answer may be none or multiple.
-
-### 12.3 Page Table Size
-
-PTE count = virtual address space / page size.
-
-```text
-32b VA, 4KiB pages -> 2^32 / 2^12 = 2^20 PTEs
-```
-
-Larger pages: fewer PTEs/TLB misses, more internal fragmentation and bigger page-fault transfer.
+- Speaker note: **TLB miss may trigger a page fault**.
+- Slide: virtual-address cache / virtually indexed, physically tagged cache can **avoid or overlap address-translation delay**.
 
 ## 13. Locality / Applications
 

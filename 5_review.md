@@ -225,15 +225,6 @@ $$
 CPE \ge \max(L/k,\ issue\_limit,\ bandwidth\_limit)
 $$
 
-CMU-style examples:
-
-| Case | Ideal CPE idea |
-|---|---|
-| multiply latency 4, one product chain | `4` |
-| unroll 3 independent chains | `4/3` |
-| dot product add latency 5, unroll 2 accumulators | `5/2=2.5` |
-| target CPE 0.5 with add latency 5 | need `k=10` accumulators if throughput unlimited |
-
 ## 8. Reduction and SIMD
 
 Multiple accumulators:

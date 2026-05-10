@@ -114,8 +114,6 @@ For signed division by $2^k$ rounding toward 0:
 x / (1<<k) == (x < 0 ? x + (1<<k)-1 : x) >> k
 ```
 
-CMU truth-test pattern: `((x>>1)<<1) <= x` is true with arithmetic right shift.
-
 ## 4. Integer Representation
 
 ### 4.1 Unsigned and Two's Complement
@@ -180,7 +178,7 @@ unsigned int u = c;     // c -> int -1 -> unsigned 0xffffffff
 
 Fixed-width arithmetic is modulo $2^w$.
 
-Real C: signed overflow is undefined; unsigned overflow is defined mod $2^w$. CMU bit-vector problems usually assume wraparound.
+Real C: signed overflow is undefined; unsigned overflow is defined mod $2^w$.
 
 Unsigned addition:
 
@@ -203,16 +201,6 @@ Two's-complement negation:
 -x = ~x + 1
 -TMin = TMin
 ```
-
-CMU truth-test traps:
-
-| Expression idea | Trap |
-|---|---|
-| `(x<y)==(-x>-y)` | false for `TMin`: `-TMin == TMin` |
-| `((x+y)<<4)+y-x == 17*y+15*x` | true mod $2^w$ |
-| `~x+~y+1 == ~(x+y)` | true two's-complement identity |
-| `ux-uy == -(y-x)` | true under unsigned mod $2^w$ |
-| `(x>=0)||(x<ux)` | false: negative `x` becomes large unsigned |
 
 ### 5.2 RISC-V Overflow Policy
 
@@ -374,15 +362,6 @@ Default: round to nearest, ties to even.
 | `float/double -> int` | rounds toward 0; overflow undefined/implementation-specific |
 
 High-yield true statement: `A == (int)(double)A` for 32b `int A`.
-
-CMU FP truth traps:
-
-| Expression idea | Trap |
-|---|---|
-| `(double)(float)x == (double)x` | not always: int -> float may round |
-| `dx+dy == (double)(x+y)` | not always: int add may overflow before cast |
-| `dx+dy+dz == dz+dy+dx` | not always: FP addition not associative |
-| `dx*dy*dz == dz*dy*dx` | not always: FP multiply not associative/overflow/underflow |
 
 ### 7.4 FMA / bfloat16
 
