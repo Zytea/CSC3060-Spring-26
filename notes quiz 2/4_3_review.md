@@ -2,17 +2,18 @@
 
 ## Exam Facts
 
-- Pipeline improves **throughput**, not single-instr latency.
-- 5 stages: **IF, ID, EX, MEM, WB**.
-- Ideal N-stage pipeline for `n` instrs: cycles = `n + N - 1`.
-- Ideal scalar pipeline CPI ~= 1; superscalar can have CPI < 1. Quiz phrase: **CPI lower than 1** -> superscalar.
-- Speedup limited by slowest stage, imbalance, pipeline-register overhead, hazards, fill/drain.
-- RISC-V is pipeline-friendly: fixed 32b base, regular fields, load/store ISA, simple formats.
-- Deep 5 -> 20 stages is not 4x faster: more pipeline regs, branch/data penalties, stage imbalance.
-- Deeper pipeline is less desirable with **frequent branch mispredictions, heavy data dependences, frequent I-cache misses**.
-- Long-latency ops can stall or use separate pipelined/iterative FUs.
-- In-order retirement preserves precise architectural state.
-- Pipeline regs carry **control, data, addresses/PC, immediates, register designators**.
+- ==**Pipeline**==: improves **throughput**, not single-instr latency.
+- **5 stages**: **IF, ID, EX, MEM, WB**.
+- **Ideal N-stage cycles**: `n + N - 1` for `n` instrs.
+- **Scalar pipeline CPI**: about `1`; **CPI < 1** implies superscalar/multiple issue.
+- **Speedup limits**: slowest stage, imbalance, pipeline-reg overhead, hazards, fill/drain.
+- **Pipeline-friendly RISC-V**: fixed 32b base, regular fields, load/store ISA, simple formats.
+- **Deep pipeline trap**: 5 -> 20 stages is not 4x faster; branch/data penalties and pipeline regs grow.
+- **Bad for deep pipeline**: frequent branch mispredictions, heavy data dependences, frequent I-cache misses.
+- **Long-latency ops**: stall or use separate pipelined/iterative FUs.
+- **In-order retirement**: preserves precise architectural state.
+- **Pipeline regs carry**: **control, data, addresses/PC, immediates, register designators**.
+- **Pipeline design principles**: multi-stage partitioning, overlapped execution, increased throughput, better resource utilization; **not** lowered instr latency.
 
 ## 1. Pipeline Timing Formulas
 

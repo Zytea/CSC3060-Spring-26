@@ -2,17 +2,17 @@
 
 ## Exam Facts
 
-- Three hazards: ==**structural, data, control**==. "Forward hazard" is not one.
-- Actual CPI = ideal CPI + stall cycles per instruction.
-- Structural hazards: not enough hardware resources.
-- Data-hazard fixes: forwarding/bypassing, stalls/interlocks, compiler scheduling, OoO.
-- Load-use hazard usually needs **1 bubble** even with forwarding.
-- Control-hazard fixes: dynamic prediction, BHT, BTB, RAS, static layout, early resolution.
-- BHT predicts **whether**; BTB predicts **where**; RAS predicts returns.
-- Branch prediction should be in **IF**.
-- Correlated predictor index: current PC combined with global history, often `PC xor GHR`.
-- Hard target prediction: indirect `JALR` from switch/vtable/function pointer. Returns use RAS.
-- Static-only prediction is not plausible for Apple M4/high-performance cores.
+- **Three hazards**: ==**structural, data, control**==; "forward hazard" is **not** one.
+- **Actual CPI**: `ideal CPI + stall cycles per instruction`.
+- ==**Structural hazard**==: not enough hardware resources.
+- **Data-hazard fixes**: `forwarding/bypassing`, stalls/interlocks, compiler scheduling, OoO.
+- **Load-use hazard**: usually needs **1 bubble** even with forwarding.
+- **Control-hazard fixes**: dynamic prediction, BHT, BTB, RAS, static layout, early resolution.
+- **BHT / BTB / RAS**: BHT predicts **whether**; BTB predicts **where**; RAS predicts returns.
+- **Prediction stage**: branch prediction should happen in **IF**.
+- **Correlated predictor index**: current PC combined with global history, often `PC xor GHR`.
+- **Hard target prediction**: indirect `JALR` from `switch`/vtable/function pointer; returns use RAS.
+- **High-performance cores**: static-only prediction is not plausible.
 
 ## 1. Hazard Overview
 
@@ -200,6 +200,11 @@ Hard branch/jump targets:
 - indirect `JALR` for switch jump table.
 - virtual calls/function pointers.
 - returns if RAS mismatch.
+
+Switch vs if-chain:
+
+- dense/continuous cases -> compiler may use jump table -> indirect `JALR`, fast but harder target prediction.
+- sparse/few cases -> compiler may emit conditional branch chain; not necessarily faster than `if/else`.
 
 ## 6. Branch Target at ID Stage
 

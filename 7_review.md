@@ -2,20 +2,20 @@
 
 ## Exam Facts
 
-- ==**Linking**== combines object files and libraries into an executable/shared object.
-- Benefits: modularity, separate compilation, library reuse, easier maintenance, time/space efficiency.
-- Standard linker = Unix `ld`; compiler driver `gcc` invokes it.
-- Read ELF details: `readelf`; inspect code/relocs: `objdump`; symbols: `nm`.
-- Linker jobs: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout.
-- Loading into memory is loader/dynamic linker job, not static linker job.
-- Object file kinds: relocatable `.o`, executable, shared object `.so`.
-- ELF sections: `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.rel.text`, `.rel.data`, `.debug`, section header table.
-- Linker symbols: global, external, local static. Automatic locals are not linker symbols.
-- Strong: functions + initialized globals. Weak/common: uninitialized globals in old common model.
-- Duplicate rules: multiple strong -> error; strong beats weak; multiple weak -> arbitrary/common. Linker does **not** type-check.
-- Static library order matters: put libraries after objects that need them.
-- Dynamic linking data structures: **GOT + PLT**.
-- PLT in executable code (`.plt/.text`); GOT/GOT.plt writable data.
+- ==**Linking**==: combines object files and libraries into an executable/shared object.
+- **Benefits**: modularity, separate compilation, library reuse, easier maintenance, time/space efficiency.
+- **Standard linker**: Unix `ld`; compiler driver `gcc` invokes it.
+- **ELF tools**: `readelf` for details; `objdump` for code/relocs; `nm` for symbols.
+- **Linker jobs**: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout.
+- **Not linker job**: loading into memory; that is loader/dynamic linker work.
+- **Object file kinds**: relocatable `.o`, executable, shared object `.so`.
+- **ELF sections**: `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.rel.text`, `.rel.data`, `.debug`, section header table.
+- **Linker symbols**: global, external, local static; automatic locals are **not** linker symbols.
+- **Strong/weak**: strong = functions + initialized globals; weak/common = uninitialized globals in old common model.
+- **Duplicate rules**: multiple strong -> error; strong beats weak; multiple weak -> arbitrary/common; linker **does not type-check**.
+- **Static library order**: put libraries after objects that need them.
+- **Dynamic linking data structures**: **GOT + PLT**.
+- **Placement**: PLT in executable code (`.plt/.text`); GOT/GOT.plt writable data.
 
 ## 1. Linking
 
@@ -92,7 +92,7 @@ patch calls/global-address loads/data pointers
 | `.rel.data/.rela.data` | data relocation entries |
 | section header table | section metadata |
 
-Quiz: "not a section of ELF" excludes stack/register file/`.static`; `.text/.data/.bss/.symtab` are real.
+ELF sections include `.text/.data/.bss/.symtab`; stack/register file/`.static` are **not** ELF sections.
 
 ## 6. Linker Symbols
 
@@ -232,6 +232,14 @@ gcc main.o -L. -lvector -o prog
 
 `-lvector` searches `libvector.a` / `libvector.so`.
 
+Static vs shared library:
+
+| Static `.a` | Shared `.so` |
+|---|---|
+| archive members copied into executable at link time | mapped/relocated by loader/dynamic linker |
+| larger executable, no runtime `.so` dependency | smaller executable, runtime dependency |
+| library update needs relink/rebuild | ABI-compatible update can benefit programs without relink |
+
 ### 10.1 Static Linker Algorithm
 
 Left-to-right scan:
@@ -255,6 +263,14 @@ Circular libs:
 ```bash
 gcc main.o -lA -lB -lA
 ```
+
+### 10.3 Link Error Triage
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `undefined reference` | missing object/lib or wrong library order | add object/lib; put `-lfoo` after users |
+| `multiple definition` | duplicate strong global/function | one definition; use `extern` declarations |
+| type garbage but link succeeds | strong/weak mismatch; linker no type check | fix declarations; use headers + `-fno-common` |
 
 ## 11. Shared Libraries / Dynamic Linking
 
@@ -290,7 +306,7 @@ Used for plugins/modules.
 
 ==**PIC**==: position-independent code; shared library code works at any load address.
 
-Dynamic-linking quiz: supporting data structures are **GOT + PLT**; not jump table or section header table.
+Dynamic linking uses **GOT + PLT**; not jump table or section header table.
 
 ### 12.1 GOT
 
@@ -324,4 +340,4 @@ later calls -> real function directly via GOT.plt
 | `.got.plt` | lazy function addr table | yes | no |
 | `.data/.bss` | writable data | yes | no |
 
-Quiz: PLT in `.text/.plt`; GOT and GOT.plt in `.data`-like writable region.
+PLT is in `.text/.plt`; GOT and GOT.plt are in `.data`-like writable region.

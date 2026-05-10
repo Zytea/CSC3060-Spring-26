@@ -3,16 +3,16 @@
 ## Exam Facts
 
 - ==**Microarchitecture**==: implementation of an ISA: single-cycle, multi-cycle, pipeline, superscalar, OoO, caches, predictors.
-- ==**Datapath**== moves/computes data. ==**Control**== selects paths and write enables.
-- Execution cycle: **fetch -> decode/read regs -> execute -> memory -> writeback -> update PC**.
-- CPU time = **IC x CPI x clock cycle time**.
-- Single-cycle: CPI=1, clock period must cover slowest instr, usually `lw`.
-- Multi-cycle: shorter clock, reused resources, variable CPI.
-- Pipeline: overlapped instrs, high throughput, hazards add stalls.
-- Superscalar+pipelined can have **CPI < 1**.
-- Throughput order: **superscalar+pipelined > pipelined > multi-cycle > single-cycle**.
-- Scalar RV32I regfile: **2 read ports + 1 write port**.
-- Branch signed compare via subtraction sign can be wrong on overflow; use comparator or `sign(A-B)^overflow`.
+- ==**Datapath**==: moves/computes data. ==**Control**==: selects paths and write enables.
+- **Execution cycle**: `fetch -> decode/read regs -> execute -> memory -> writeback -> update PC`.
+- **CPU time**: `IC x CPI x clock cycle time`.
+- **Single-cycle**: `CPI=1`; clock period must cover slowest instr, usually `lw`.
+- **Multi-cycle**: shorter clock, reused resources, variable CPI.
+- **Pipeline**: overlapped instrs, high throughput, hazards add stalls.
+- **CPI < 1**: only superscalar/multiple-issue style, not ordinary scalar pipeline.
+- **Throughput order**: **superscalar+pipelined > pipelined > multi-cycle > single-cycle**.
+- **Scalar RV32I regfile**: **2 read ports + 1 write port**.
+- **Branch signed compare**: subtraction sign can be wrong on overflow; use comparator or `sign(A-B)^overflow`.
 
 ## 1. Processors and Logic Designs
 
@@ -81,8 +81,8 @@ CISC: fewer complex instrs, higher CPI/cycle/decode cost
 
 Examples:
 
-- combinational: ALU, adder, mux, decoder.
-- sequential: PC, regs, regfile writes, memories, pipeline regs.
+- **Combinational**: ALU, adder, mux, decoder.
+- **Sequential**: PC, regs, regfile writes, memories, pipeline regs.
 
 ### 5.1 Clocking
 
@@ -171,7 +171,7 @@ Slowest common path:
 PC -> IMem -> RegFile -> ALU address -> DMem -> WB mux -> RegFile setup
 ```
 
-Quiz: among `JALR`, `LW`, `SLL`, `LUI`, **`LW`** determines clock rate.
+Among `JALR`, `LW`, `SLL`, `LUI`, **`LW`** determines clock rate.
 
 Limitations:
 

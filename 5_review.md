@@ -2,19 +2,20 @@
 
 ## Exam Facts
 
-- Optimization levers: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
-- Flags: `-O2` safe default; `-O3` aggressive; `-Ofast=-O3 -ffast-math`; `-flto` enables cross-module/LTO optimization.
-- Embedded tight memory: use `-Os`.
-- Cross-module procedure inlining needs `-O3 -flto` style LTO.
-- Compiler cannot change semantics: aliasing, FP non-associativity, volatile/atomics, calls/side effects, exceptions, separate compilation.
-- Basic optimizations: constant folding, DCE, CSE, LICM, strength reduction, inlining, register allocation, scheduling.
-- Cascading DCE can produce huge speedup if it removes almost all work.
-- Loop unrolling reduces overhead and exposes ILP/SIMD; it is **not primarily a locality optimization**.
-- Class-discussed locality optimization: loop transformations such as interchange/fusion/tiling, not CUDA/SIMT.
-- CPE = cycles per element; `cycles = CPE*n + overhead`.
-- Reduction with one accumulator is latency-bound; k accumulators reduce critical-path CPE about `latency/k` until throughput/bandwidth limits.
-- If non-aliasing `*a,*b` stay in memory, use `restrict` or local scalar copies.
-- Pointer-heavy data structures are latency-bound; arrays/B+ trees/open addressing improve locality/MLP.
+- **Optimization levers**: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
+- **Flags**: `-O2` safe default; `-O3` aggressive; `-Ofast = -O3 -ffast-math`; `-flto` enables cross-module/LTO optimization.
+- **Embedded tight memory**: use `-Os`.
+- **Cross-module inlining**: needs `-O3 -flto` style LTO.
+- **Compiler semantic limits**: aliasing, FP non-associativity, volatile/atomics, calls/side effects, exceptions, separate compilation.
+- **Basic optimizations**: constant folding, DCE, CSE, LICM, strength reduction, inlining, register allocation, scheduling.
+- **`switch` vs `if-else`**: not syntax-speed rule; **dense cases** -> `jump table`, **sparse/few cases** -> branch chain.
+- **Cascading DCE**: can produce huge speedup if it removes almost all work.
+- **Loop unrolling**: reduces overhead and exposes ILP/SIMD; **not primarily a locality optimization**.
+- **Locality optimization discussed**: loop transformations such as interchange/fusion/tiling, not CUDA/SIMT.
+- ==**CPE**==: cycles per element; `cycles = CPE*n + overhead`.
+- **Reduction bottleneck**: one accumulator is latency-bound; `k` accumulators reduce critical-path CPE about `latency/k` until throughput/bandwidth limits.
+- **Non-aliasing `*a,*b`**: if compiler keeps reloading/storing, use `restrict` or local scalar copies.
+- **Pointer-heavy data structures**: latency-bound; arrays/B+ trees/open addressing improve locality/MLP.
 
 ## 1. Program Optimization
 
@@ -132,6 +133,18 @@ Bad candidates:
 - many call sites causing code bloat.
 - large cold functions.
 
+Call overhead: argument setup, `jal`/return, saving/restoring live regs, stack-frame setup. Inlining can remove this overhead and expose more optimization, but it is only a compiler decision and may bloat code.
+
+### 4.8 `switch` Codegen
+
+> [!IMPORTANT]
+> `switch` is **not always faster** than nested `if-else`; performance depends on generated code.
+
+| Case pattern | Likely codegen | Consequence |
+|---|---|---|
+| dense/continuous | `jump table` + indirect branch | close to O(1), target prediction harder |
+| sparse/few | compare/branch chain | similar to `if-else`; can be slower |
+
 ## 5. Memory Aliasing
 
 ### 5.1 Problem
@@ -159,7 +172,9 @@ Restricted pointers:
 void f(double *restrict a, double *restrict b, long n);
 ```
 
-Quiz: if `*a,*b` frequently used and do not alias, use **`restrict`** or **manual local copies**.
+If `*a,*b` are frequently used and do not alias, use **`restrict`** or **manual local copies**.
+
+`memcpy(restrict dst, restrict src, ...)` can be much faster because the compiler can assume no aliasing, then vectorize/reorder memory accesses more aggressively.
 
 ### 5.3 Function Calls in Loops
 
@@ -191,7 +206,7 @@ Costs:
 - register pressure.
 - aliasing constraints.
 
-Quiz: too much unrolling can be slower due to I-cache/code size, register pressure, limited FUs.
+Too much unrolling can be slower due to I-cache/code size, register pressure, limited FUs.
 
 ### 6.2 Instruction Scheduling
 
@@ -224,6 +239,8 @@ With `k` independent accumulators:
 $$
 CPE \ge \max(L/k,\ issue\_limit,\ bandwidth\_limit)
 $$
+
+`(a+b)+(c+d)` can expose two independent adds before the final add; `(((a+b)+c)+d)` is a serial chain. For strict FP, compiler cannot freely reassociate unless fast-math/contract rules allow it.
 
 ## 8. Reduction and SIMD
 

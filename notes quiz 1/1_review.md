@@ -2,17 +2,18 @@
 
 ## Exam Facts
 
-- ==**Computer system**==: hardware + system software that run application programs.
-- ==**Computer architecture**==: quiz-simple answer = **interface between software and hardware**; broader = ISA + microarchitecture + system design.
-- System programs: OS, compiler, assembler, linker, loader. Application example: ChatGPT/browser/game.
-- ==**Bits + context**==: same bits can be int, FP, instr, address, char bytes, struct fields.
-- 128 all-0 bits can be integer zeros or fp32/fp128 `+0.0`; **not** ASCII `"0000"` (`0x30` bytes).
-- `gcc` phases: **preprocess -> compile -> assemble -> link**. Loading is **not** part of `gcc` compilation phases.
-- `.o` is relocatable, not executable: some symbol addresses/calls need linker relocation.
-- Linker jobs: **symbol resolution + relocation + section merging + library handling**.
-- OS abstractions: **process, virtual memory, file**.
-- Memory hierarchy illusion: **fast + large + cheap** memory.
-- Amdahl: speedup is limited by the unimproved fraction.
+- ==**Computer system**==: **hardware + system software** that run application programs.
+- ==**Computer architecture**==: **interface between software and hardware**; broader = `ISA + microarchitecture + system design`.
+- **System programs**: `OS`, compiler, assembler, linker, loader. **Application**: ChatGPT/browser/game.
+- ==**Bits + context**==: same bits can be `int`, FP, instr, address, char bytes, struct fields.
+- **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; Unicode covers many languages.
+- **128 all-0 bits**: integer zeros or fp32/fp128 `+0.0`; **not** ASCII `"0000"` (`0x30` bytes).
+- **`gcc` phases**: `preprocess -> compile -> assemble -> link`; **loading is not a gcc compilation phase**.
+- **Relocatable `.o`**: not executable; unresolved symbol addresses/calls need linker relocation.
+- **Linker jobs**: `symbol resolution + relocation + section merging + library handling`.
+- **OS abstractions**: ==**process, virtual memory, file**==.
+- **Memory hierarchy illusion**: memory appears **fast + large + cheap**.
+- **Amdahl**: speedup is limited by the unimproved fraction.
 
 ## 1. Information is Bits + Context
 
@@ -22,7 +23,7 @@
 
 | Bits | Possible meaning |
 |---|---|
-| `0x00000000` | int `0`, fp32 `+0.0`, NULs, RISC-V `illegal?` depends on ISA |
+| `0x00000000` | int `0`, fp32 `+0.0`, NULs; as RISC-V instruction: **illegal** |
 | `0x00000013` | RISC-V `addi x0,x0,0` (`nop`) |
 | `0x30` | ASCII `'0'`, not numeric 0 |
 
@@ -64,6 +65,20 @@ Common linker errors:
 | `multiple definition` | duplicate strong global | one definition + `extern` declarations |
 | `-lfoo` unresolved | static lib before user object | `gcc main.o -lfoo` |
 
+### 2.2 Why Compilation Systems Matter
+
+> [!IMPORTANT]
+> ==**Syntax != performance**==; judge the generated assembly/code.
+
+- **`switch`**: **dense cases** -> `jump table`; **sparse/few cases** -> `branch chain`.
+- **Function call overhead**: `args + jump/return + save/restore regs + stack frame`; `inline` can remove call overhead but may bloat code.
+- **Expression reassociation / ILP**: `(a+b)+(c+d)` exposes parallel adds; `(((a+b)+c)+d)` is a dependency chain.
+- **`restrict`**: no aliasing -> `vectorize/reorder` memory accesses.
+- **`-O`**: missing optimization can cost **2x-20x**.
+- **Link errors**: `undefined reference`, `multiple definition`, wrong library order.
+- **Static vs dynamic libraries**: link-time copy vs load/run-time sharing.
+- **Stack security**: local data + control info (`ra`/saved regs); unsafe writes can corrupt control flow.
+
 ## 3. Hardware Organization
 
 ### 3.1 Processor Interprets Instructions in Memory
@@ -76,11 +91,22 @@ PC -> fetch instr -> decode -> execute/load/store/branch -> writeback -> next PC
 
 | Component | Role |
 |---|---|
-| PC | address of next instr |
-| Register file | small fast CPU storage |
-| ALU | arithmetic/logic/address calc |
-| Main memory | stores instrs + data |
-| Bus/I-O bridge | moves data between CPU, memory, devices |
+| ==**Bus**== | shared interconnect/protocol carrying **address + data + control** signals |
+| I/O devices | keyboard, display, disk, network adapter |
+| Main memory | byte array storing **instructions + data** |
+| ==**CPU / processor**== | engine that interprets/executes instrs; contains **PC + register file + ALU** |
+| PC | one-word register holding **address of next instr** |
+| Register file | named word-size registers |
+| ALU | arithmetic/logic/address calculation |
+| I/O bridge | translates/connects different bus protocols |
+
+Bus questions:
+
+| Question | Bus answer |
+|---|---|
+| who communicates? | CPU / memory / I/O device |
+| what is transferred? | address / data / read-write-control |
+| who gets bus now? | arbitration |
 
 ### 3.2 Running `hello`
 

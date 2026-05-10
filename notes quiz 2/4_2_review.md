@@ -2,14 +2,14 @@
 
 ## Exam Facts
 
-- Control maps opcode/funct/branch result to mux selects and write enables.
-- Main signals: `PCSrc`, `RegWr`, `MemRd`, `MemWr`, `ALUSrc`, `WBSel`, `ALUCtrl`.
-- `RegWr=0` for stores and branches.
-- `MemRd=1` only load. `MemWr=1` only store.
-- `ALUSrc=0` for R-type and branches; `ALUSrc=1` for I/load/store/JALR address.
-- `WBSel`: load -> memory; ALU/I/U -> ALU/imm; JAL/JALR -> `PC+4`.
-- `ALUCtrl` is hardest: depends on `ALUOp + funct3 + funct7[5]`.
-- `funct7[5]`: `ADD/SUB`, `SRL/SRA`.
+- ==**Control**==: maps opcode/funct/branch result to mux selects and write enables.
+- **Main signals**: `PCSrc`, `RegWr`, `MemRd`, `MemWr`, `ALUSrc`, `WBSel`, `ALUCtrl`.
+- **`RegWr=0`**: stores and branches.
+- **Memory control**: `MemRd=1` only load; `MemWr=1` only store.
+- **`ALUSrc`**: `0` for R-type/branches; `1` for I/load/store/JALR address.
+- **`WBSel`**: load -> memory; ALU/I/U -> ALU/imm; JAL/JALR -> `PC+4`.
+- **`ALUCtrl`**: depends on `ALUOp + funct3 + funct7[5]`.
+- **`funct7[5]`**: distinguishes `ADD/SUB` and `SRL/SRA`.
 
 ## 1. High-Level Control Signals
 
@@ -34,7 +34,8 @@
 | `(rs1+I-imm)&~1` | `JALR` |
 | trap vector | exceptions/interrupts |
 
-> Quiz answer for RV32I next fetch address choices: `PC+4`, `PC+imm`, `rs1+imm`. Not memory indirection.
+> [!IMPORTANT]
+> RV32I next-fetch choices are `PC+4`, `PC+imm`, `rs1+imm`; **not** memory indirection.
 
 ## 3. ALU Control
 

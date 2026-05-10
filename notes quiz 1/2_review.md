@@ -2,19 +2,20 @@
 
 ## Exam Facts
 
-- Byte-addressed memory; pointer = virtual address of first byte.
-- 32b address space = $2^{32}$ bytes = 4 GiB.
-- LP64: `char 1`, `short 2`, `int 4`, `long 8`, pointer 8, `float 4`, `double 8`.
-- Little endian: least significant byte at lowest address.
-- If either C integer operand is `unsigned`, the other is converted to `unsigned`.
-- Two's-complement: `TMin=-2^{w-1}`, `TMax=2^{w-1}-1`, `UMax=2^w-1`; `-TMin == TMin`.
-- RISC-V integer overflow does **not** trap.
-- Signed right shift is usually arithmetic; unsigned right shift is logical.
-- IEEE fp32: `s|exp8|frac23`, bias 127. fp64: `s|exp11|frac52`, bias 1023.
-- FP `+,-,*` are not associative; compilers cannot freely reassociate without fast-math.
-- FMA has one final rounding and about 5-6 cycle latency, not multiply+add latency.
-- `bfloat16 = s|exp8|frac7`: fp32 exponent range, less precision.
-- Latency quiz: int multiply 3-5, int divide ~32, SP FP add 4, SP FP multiply 5, FP->int 3-5.
+- **Byte-addressed memory**: pointer = virtual address of first byte; pointer type controls interpretation.
+- **32b address space**: $2^{32}$ bytes = **4 GiB**.
+- **LP64 sizes**: `char 1`, `short 2`, `int 4`, `long 8`, pointer 8, `float 4`, `double 8`.
+- **Little endian**: least significant byte at lowest address.
+- **Unsigned conversion trap**: if either C integer operand is `unsigned`, the other becomes `unsigned`.
+- ==**Two's complement**==: `TMin=-2^{w-1}`, `TMax=2^{w-1}-1`, `UMax=2^w-1`; `-TMin == TMin`.
+- **RISC-V integer overflow**: does **not** trap; software checks if needed.
+- **Right shift**: signed usually arithmetic; unsigned logical.
+- **IEEE fp32/fp64**: `s|exp8|frac23`, bias 127; `s|exp11|frac52`, bias 1023.
+- **Exact binary decimal**: after reducing fraction, denominator must be a power of 2.
+- **Strict FP**: `+,-,*` are not associative; compiler cannot freely reassociate without fast-math.
+- ==**FMA**==: `a*b+c` with one final rounding; about `5-6` cycles, not multiply+add latency.
+- **`bfloat16`**: `s|exp8|frac7`; fp32 exponent range, less precision.
+- **Latency facts**: int multiply `3-5`, int divide `~32`, SP FP add `4`, SP FP multiply `5`, FP->int `3-5`.
 
 ## 1. Information Storage
 
@@ -206,7 +207,7 @@ Two's-complement negation:
 
 - Integer ALU ops wrap silently; no condition-code register.
 - Software must check if overflow matters.
-- Reason: cheaper pipeline/precise-exception logic; unsigned wrap is useful.
+- **Reason**: cheaper pipeline/precise-exception logic; unsigned wrap is useful.
 
 ### 5.3 Adders / SLT
 

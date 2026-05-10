@@ -3,13 +3,13 @@
 ## Exam Facts
 
 - ==**Calling convention**==: ABI rules for args, returns, stack, frame pointer, saved regs.
-- Call: `jal ra,func`; return: `jalr x0,ra,0` (`ret`).
-- `a0-a7`: first 8 args; `a0/a1`: returns; all caller-saved.
-- **Caller-saved**: `ra`, `t0-t6`, `a0-a7`. Caller saves if live across a call.
-- **Callee-saved**: `sp`, `s0-s11`. Callee restores if it modifies.
-- Leaf routine calls no function; often no stack frame.
-- Values live across many calls -> prefer `s` regs. Short temps -> prefer caller-saved.
-- RISC-V Unix ABI stack is 16B aligned at call boundaries; stack grows downward.
+- **Call/return**: `jal ra,func`; return = `jalr x0,ra,0` (`ret`).
+- **Args/returns**: `a0-a7` = first 8 args; `a0/a1` = returns; all are caller-saved.
+- ==**Caller-saved**==: `ra`, `t0-t6`, `a0-a7`; caller saves if value is live across a call.
+- ==**Callee-saved**==: `sp`, `s0-s11`; callee restores if it modifies.
+- **Leaf routine**: calls no function; often no stack frame.
+- **Register choice**: values live across many calls -> `s` regs; short temps -> caller-saved.
+- **Stack rule**: RISC-V Unix ABI stack is **16B aligned** at call boundaries; stack grows downward.
 
 ## 1. Procedure Call Steps
 
@@ -29,6 +29,9 @@ Stack frame may contain:
 - local arrays/spills.
 - outgoing/incoming stack args.
 - alignment padding.
+
+> [!IMPORTANT]
+> **Stack security**: stack frame stores local data plus control data (`ra`, old `fp/s0`, saved regs). An unchecked stack-buffer write can overwrite saved `ra` and hijack control flow.
 
 ```text
 high addr
@@ -175,6 +178,6 @@ No caller-saved register needs saving if its value is dead at the call or intent
 
 ## 12. Summary
 
-- Correctness: obey ABI at module/function boundaries.
-- Performance: choose saved class by live range and call frequency.
+- **Correctness**: obey ABI at module/function boundaries.
+- **Performance**: choose saved class by live range and call frequency.
 - Stack stores saved regs, return address, locals, spills, and extra args.

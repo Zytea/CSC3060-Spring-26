@@ -3,16 +3,16 @@
 ## Exam Facts
 
 - ==**ISA**==: software-visible contract: instrs, regs, memory model, exceptions, ABI-visible behavior.
-- RISC-V: open, modular, load/store, mostly fixed 32b instrs; ISA does **not** require caches.
-- ISA name: `RV{32/64/128}{I/E}{M,A,F,D,C,V}`. Base must be `I` or `E`; `RV32EM` valid, `RV32MI` invalid.
-- `RV32E` has 16 GPRs. `RV32I` has 32 GPRs, each 32b, 32b byte address space.
-- In `RV32I`, **32 means GPR/address width**, not "32 registers" or "32-bit instructions".
-- Without `C`, RISC-V is fixed-length 32b; `C` adds 16b compressed instrs.
-- RV32I architectural state: **32 GPRs + PC + CSRs**. RV64IFV adds FP + vector regs.
-- Microarchitectural state: pipeline regs, BHT, BTB, caches; not saved on interrupt.
-- Scalar RV32I regfile needs **2R/1W**.
-- `JAL`: PC-relative ~$\pm1$ MiB. `JALR`: `rs1+imm12`, full 32/64b reach through register, clears bit 0.
-- No `LW rd,(rs1+rs2)` and no post-increment load: both break regularity / add ports / complicate pipeline.
+- **RISC-V**: open, modular, load/store, mostly fixed 32b instrs; ISA **does not require caches**.
+- **ISA name**: `RV{32/64/128}{I/E}{M,A,F,D,C,V}`; base must be `I` or `E`; `RV32EM` valid, `RV32MI` invalid.
+- **`RV32E`**: 16 GPRs. **`RV32I`**: 32 GPRs, each 32b, 32b byte-address space.
+- **`32` in `RV32I`**: GPR/address width, **not** "32 registers" or "32-bit instructions".
+- **Fixed length**: without `C`, RISC-V base instrs are 32b; `C` adds 16b compressed instrs.
+- **RV32I architectural state**: **32 GPRs + PC + CSRs**. **RV64IFV** adds FP + vector regs.
+- **Microarchitectural state**: pipeline regs, BHT, BTB, caches; regenerated, not saved on interrupt.
+- **Scalar RV32I regfile**: **2R/1W**.
+- **`JAL` vs `JALR`**: `JAL` PC-relative ~$\pm1$ MiB; `JALR` uses `rs1+imm12`, can reach full RV32 address space via register, clears bit 0.
+- **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
 
 ## 1. Assembly Language Instructions
 

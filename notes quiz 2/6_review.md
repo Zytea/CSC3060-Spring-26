@@ -3,18 +3,20 @@
 ## Exam Facts
 
 - ==**Memory hierarchy**==: small/fast/expensive near CPU; large/slow/cheap far away.
-- Management: registers by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
-- SRAM: fast, no refresh, caches. DRAM: dense, cheap, refresh, main memory.
-- Memory wall = CPU speed vs DRAM latency/bandwidth gap.
-- Cache line stores **valid bit, tag, data**, plus dirty bit for write-back and coherence state in multicore.
-- Address split: `tag | set index | block offset`.
-- For cache capacity `C`, block `B`, associativity `E`: `S=C/(B*E)`, `b=log2(B)`, `s=log2(S)`, `t=m-s-b`.
-- Modern L1D quiz: set-associative, write-back, write-allocate; hit latency about **3-4 cycles**.
-- I-cache is easier because CPU does not store to it; stale JIT/self-modifying code needs I-cache flush/invalidate/coherence.
-- Non-blocking cache uses **MSHR**. Class quiz L3 MSHR factors: memory latency + bus width/bandwidth.
-- AMAT: $HT+MR\times MP$. Multi-level AMAT uses local miss rates.
-- 4C misses: compulsory/cold, conflict/collision, capacity, coherence.
-- TLB only appears in this lecture as a side point: **TLB miss may trigger a page fault**.
+- **Management**: regs/local memory by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
+- **SRAM vs DRAM**: SRAM fast/no refresh/cache; DRAM dense/cheap/refresh/main memory.
+- ==**Memory wall**==: CPU speed vs DRAM latency/bandwidth gap.
+- **Cache line metadata**: **valid bit + tag + data**, plus dirty bit for write-back and coherence state in multicore.
+- **Not stored in a cache line**: set number / byte offset; those come from the address bits.
+- **Address split**: `tag | set index | block offset`.
+- **Cache parameters**: `S=C/(B*E)`, `b=log2(B)`, `s=log2(S)`, `t=m-s-b`.
+- **Modern L1D**: set-associative, write-back, write-allocate; hit latency about **3-4 cycles**.
+- **I-cache easier**: no CPU stores; JIT/self-modifying code needs I-cache flush/invalidate/coherence.
+- ==**MSHR**==: non-blocking cache tracks outstanding misses; L3 MSHR count depends on memory latency + bus width/bandwidth.
+- **AMAT**: $HT+MR\times MP$; multi-level AMAT uses local miss rates and fails when misses overlap.
+- **4C misses**: compulsory/cold, conflict/collision, capacity, coherence.
+- **Large line helps**: spatial locality, tag overhead, compulsory misses; hurts miss penalty/bandwidth/fewer lines.
+- **TLB side point**: **TLB miss may trigger a page fault**; VIPT cache can overlap address translation.
 
 ## 1. Memory Hierarchy
 
@@ -44,7 +46,7 @@ Locality:
 | density | lower | higher |
 | use | cache | main memory |
 
-GPU global memory quiz: high-end NVIDIA uses **HBM**.
+GPU global memory: high-end NVIDIA uses **HBM**.
 
 ### 2.2 Memory Wall
 
@@ -177,9 +179,15 @@ for (j=0;j<C;j++)
 | set associative | `E>1` | balance |
 | fully associative | `S=1` | least conflicts, costly search |
 
-Tag-space minimization quiz: direct-mapped and larger block reduce tag overhead.
+To minimize tag storage: direct-mapped and larger block reduce tag overhead.
 
 For same `C,B`, direct-mapped has simplest replacement and low tag overhead; fully associative does not automatically have lowest miss rate unless replacement is good/optimal.
+
+Always-true organization facts for same `C,B`:
+
+- **direct-mapped**: lowest tag overhead + simplest replacement.
+- **fully associative**: not guaranteed lowest miss rate under finite replacement policy.
+- **larger line**: exploits spatial locality and saves tag space, but can increase conflict/capacity misses.
 
 Larger block:
 
@@ -203,14 +211,14 @@ Larger block:
 | write-allocate | fetch line then write | likely reuse |
 | no-write-allocate / write-no-allocate | bypass cache | streaming writes, large `memset`, large logs |
 
-Class quiz: turn on no-write-allocate / write-no-allocate for large `memcpy` destination, large `memset`, database logs.
+Use no-write-allocate / write-no-allocate for large `memcpy` destination, large `memset`, database logs.
 
 Trace implication: under no-write-allocate, a write miss does **not** install the line; a later read to that address can still miss.
 
 ### 6.3 I-Cache
 
 - no CPU stores -> no write policy.
-- JIT/instruction patching: flush I-cache, invalidate affected I-lines, or maintain I/D coherence.
+- **JIT/instruction patching**: flush I-cache, invalidate affected I-lines, or maintain I/D coherence.
 
 ## 7. Cache Performance
 
@@ -259,7 +267,7 @@ AMAT is incomplete for OoO/non-blocking caches because misses overlap.
 | capacity | working set too big | bigger cache, blocking/tiling, reduce footprint |
 | coherence | invalidation by other cores | reduce sharing, padding, partitioning |
 
-Class quiz: coherence is hardest to remove.
+**Coherence misses are the hardest 4C misses to remove.**
 
 Bandwidth-heavy features: large lines, prefetch, non-blocking caches, many MSHRs, write-through.
 
@@ -273,7 +281,7 @@ Bandwidth-heavy features: large lines, prefetch, non-blocking caches, many MSHRs
 | FIFO | simple |
 | Belady optimal | evict farthest future use; theoretical upper bound |
 
-True LRU data structure quiz: stack.
+True LRU data structure: **stack**.
 
 ==**Victim cache**==: small fully-associative buffer of recently evicted lines; helps direct-mapped conflict misses.
 
@@ -285,12 +293,12 @@ True LRU data structure quiz: stack.
 | L2 | larger/slower, often private/unified |
 | L3 | shared last-level cache |
 
-Quiz:
+High-yield facts:
 
 - L3 usually shared by cores.
 - L3 write-through usually does not make sense.
-- L2 vs L1: larger, slower, often unified.
-- Vast chip area in contemporary CPUs: caches.
+- **L2 vs L1**: larger, slower, often unified.
+- **Vast chip area in contemporary CPUs**: caches.
 
 ### 10.1 Inclusion Policies
 
@@ -300,7 +308,7 @@ Quiz:
 | exclusive | line in one level, not duplicated in next |
 | NINE | non-inclusive, non-exclusive |
 
-Project #4 quiz: NINE cache.
+NINE = non-inclusive, non-exclusive cache.
 
 Question pattern:
 
@@ -324,10 +332,8 @@ False sharing: different variables in same line cause invalidations; fix with pa
 
 ## 12. Address Translation Side Points
 
-PPT scope:
-
-- Speaker note: **TLB miss may trigger a page fault**.
-- Slide: virtual-address cache / virtually indexed, physically tagged cache can **avoid or overlap address-translation delay**.
+- **TLB miss may trigger a page fault**.
+- Virtual-address cache / virtually indexed, physically tagged cache can **avoid or overlap address-translation delay**.
 
 ## 13. Locality / Applications
 
@@ -340,7 +346,7 @@ Fixes:
 - open addressing instead of linked collision chains.
 - batch multiple independent traversals.
 
-Sorting locality class quiz: quicksort, insertion sort, bubble sort have high data locality; heapsort is poor.
+Sorting locality: quicksort, insertion sort, bubble sort have high data locality; heapsort is poor.
 
 Hardware vs software cache:
 

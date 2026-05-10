@@ -2,15 +2,15 @@
 
 ## Exam Facts
 
-- Code scheduling reorders independent instrs to fill bubbles while preserving meaning.
-- Legal schedule = topological order of dependence DAG.
-- Register dependences: **RAW, WAR, WAW**. RAW is true dependence.
-- Memory scheduling is conservative because aliasing and latency are often unknown.
-- Cannot move a load before an earlier store or swap stores unless addresses proven independent.
-- Arc weight = latency/order delay. Critical path = longest weighted path.
-- List scheduling: ready list + priority such as no-stall, max delay, original order, more children.
-- Quiz limitations: **memory aliasing** and **unknown memory latency**.
-- Hardware mitigates hazards with forwarding/interlocks/OoO/prediction; compiler mitigates with scheduling/layout.
+- ==**Code scheduling**==: reorder independent instrs to fill bubbles while preserving meaning.
+- **Legal schedule**: topological order of dependence DAG.
+- **Register dependences**: **RAW, WAR, WAW**; RAW is true dependence.
+- **Memory scheduling limits**: aliasing and latency are often unknown.
+- **Store/load ordering**: cannot move load before earlier store or swap stores unless addresses proven independent.
+- **Arc weight**: latency/order delay. **Critical path** = longest weighted path.
+- **List scheduling**: ready list + priority such as no-stall, max delay, original order, more children.
+- **Compiler limits**: **memory aliasing** and **unknown memory latency**.
+- **Mitigation split**: HW = forwarding/interlocks/OoO/prediction; compiler = scheduling/layout.
 
 ## 1. Why Rearrange Code Sequence?
 
@@ -42,7 +42,7 @@ Worst-case legal schedules can be huge:
 | chain of 50 dependent instrs | 1 |
 | all 50 independent | `50!` |
 
-MIPS ("Microprocessor without Interlocked Pipeline Stages") relied on software scheduling; main failure reason in quiz: compatibility/scalability.
+MIPS ("Microprocessor without Interlocked Pipeline Stages") relied on software scheduling; main failure reason: compatibility/scalability.
 
 ## 3. Three Register Data Dependences
 

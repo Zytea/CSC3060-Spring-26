@@ -7,7 +7,15 @@
 # Note Convention
 
 ```
-clarity/precision/organization > 省字符 > 什么都不做
+clarity/precision/organization > 可读性 > 省字符 > 什么都不做
+```
+什么叫可读性？“术语标签”和“枚举内容”理应分层，如：
+```
+- **Function call overhead**: `args + jump/return + save/restore regs + stack frame`; `inline` can remove call overhead but may bloat code.
+
+比下面这个可读性好多了：
+- Function call overhead**: args + jump/return + save/restore regs + stack frame; inline can remove call overhead but may bloat code.
+
 ```
 
 - notes md should be english
