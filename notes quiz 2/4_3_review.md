@@ -149,9 +149,9 @@ Control decoded in ID, used later:
 
 | Stage | Control |
 |---|---|
-| EX | operand muxes, ALU control, branch compare mode |
-| MEM | `MemRW`, branch/jump redirect |
-| WB | `RegWr`, `WBSel` |
+| EX | `ASel/BSel`, `ALUCtrl`, `BrUn`, operands/imm |
+| MEM | `MemRW`, `PCSel`, branch/jump redirect |
+| WB | `RegWr/WRen`, `WBSel`, `rd` |
 
 ## 13. Hazards Preview
 

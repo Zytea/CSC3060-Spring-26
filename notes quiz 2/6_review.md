@@ -50,6 +50,8 @@ GPU global memory: high-end NVIDIA uses **HBM**.
 
 SRAM is expensive because it uses many transistors per bit, has lower density, and is more complex/low-volume than DRAM.
 
+DRAM read: `RAS` selects row into row buffer; `CAS` selects column; refresh/writeback restores charge.
+
 ### 2.2 Memory Wall
 
 ==**Memory wall**==: processor improves faster than main-memory latency/bandwidth.
@@ -284,6 +286,8 @@ AMAT=HT_1+MR_1(HT_2+MR_2(HT_3+MR_3MP_{mem}))
 $$
 
 AMAT is incomplete for OoO/non-blocking caches because misses overlap.
+
+Miss-penalty reducers: critical-word-first/early-restart, non-blocking cache (`lockup-free`, hit-under-miss, miss-under-miss), prefetch, write/writeback buffers.
 
 ## 8. Reducing Misses: 4C
 

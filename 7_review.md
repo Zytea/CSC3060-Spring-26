@@ -240,6 +240,8 @@ Static vs shared library:
 | larger executable, no runtime `.so` dependency | smaller executable, runtime dependency |
 | library update needs relink/rebuild | ABI-compatible update can benefit programs without relink |
 
+Static archives are **pay-as-you-go**: only needed members are copied.
+
 ### 10.1 Static Linker Algorithm
 
 Left-to-right scan:
@@ -294,6 +296,8 @@ gcc main.o ./libv.so -o prog
 At load: `ld-linux.so` maps deps, resolves needed relocations/lazy bindings.
 
 `PT_INTERP` in the executable names the dynamic linker path; the kernel maps the program and `ld-linux.so`, then the dynamic linker maps needed `.so` files.
+
+Load-time dynamic linking produces a **partially linked executable**; final shared-library addresses are fixed by the dynamic linker at load time.
 
 ### 11.2 Run-Time Dynamic Linking
 

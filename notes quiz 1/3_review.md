@@ -80,7 +80,7 @@ RV64 adds `LD`, `SD`, `LWU`, `ADDW`, `SLLIW`, etc.
 
 `x0` is hardwired 0: clear, copy, compare, discard result, or memory hint/probe (`lw x0,0(x1)`).
 
-CSR examples: `cycle`, `instret`, `mepc`, `mcause`, `mtvec`, `mstatus`.
+CSR examples: `cycle`, `instret`, `hartid`, `mepc`, `mcause`, `mtvec`, `mstatus`.
 
 ==**Hart**==: hardware thread with its own architectural state.
 
@@ -207,6 +207,8 @@ jal  ra, func       # call
 jal  x0, label      # jump
 jalr x0, ra, 0      # ret
 ```
+
+`JAL` is "jump and link" because a call must both jump and save return PC (`PC+4`) in `ra`.
 
 ## 4. Data Alignment and Layout
 
@@ -353,6 +355,8 @@ RISC-V uses explicit compare-and-branch (`beq/blt/...`), not hidden condition-co
 ## 7. Exceptions, CSRs, GDB
 
 Trap/interrupt must preserve architectural state; microarchitectural state is regenerated.
+
+Missing extension / illegal instr can trap; a handler may emulate it or terminate the program, depending on OS/runtime.
 
 Trap sketch:
 

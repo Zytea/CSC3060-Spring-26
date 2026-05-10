@@ -58,6 +58,8 @@ If an unsigned `int` computation can exceed $2^{32}-1$ but stays below $2^{64}$,
 | `float` | 4 | 4 |
 | `double` | 8 | 8 |
 
+LP64 won over ILP64 in mainstream 64b systems: `int` stays 4B for data compatibility; `long`/pointers become 8B.
+
 ## 2. Byte Ordering and Pointer Casts
 
 ### 2.1 Big vs Little Endian
@@ -89,6 +91,8 @@ For `int x=12345=0x00003039`:
 
 > [!IMPORTANT]
 > `*((char*)p + k)` reads byte `k`. `((T*)p)[k]` advances by `k*sizeof(T)`.
+
+==**C string**==: byte array terminated by `0`; common encoding is ASCII, e.g. `'0'` = `0x30`.
 
 Text strings are usually more portable than binary data. Binary code depends on the ABI: ISA + OS + calling convention.
 

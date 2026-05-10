@@ -11,7 +11,7 @@
 - **`gcc` phases**: `preprocess -> compile -> assemble -> link`; **loading is not a gcc compilation phase**.
 - **Relocatable `.o`**: not executable; unresolved symbol addresses/calls need linker relocation.
 - **Linker jobs**: `symbol resolution + relocation + section merging + library handling`.
-- **Hardware org**: bus carries `address + data + control`; CPU contains **PC + register file + ALU**.
+- **Hardware org**: bus carries `address + data + control`; CPU contains **PC + register file + ALU**; bus interface handles protocol conversion/queueing/buffering.
 - **OS abstractions**: ==**process, virtual memory, file**==.
 - **System calls**: controlled transfer into kernel for protected OS services.
 - **Memory hierarchy illusion**: memory appears **fast + large + cheap**.
@@ -102,6 +102,14 @@ PC -> fetch instr -> decode -> execute/load/store/branch -> writeback -> next PC
 | ALU | arithmetic/logic/address calculation |
 | I/O bridge | translates/connects different bus protocols |
 
+==**Bus interface**==:
+
+| Job | Why |
+|---|---|
+| protocol conversion | CPU core is synchronous/fast; external bus has waits/arbitration |
+| request queueing/arbitration | many agents may compete for shared channels |
+| data buffering | CPU is fast; memory/I/O is slower |
+
 Bus questions:
 
 | Question | Bus answer |
@@ -112,14 +120,29 @@ Bus questions:
 
 ### 3.2 Running `hello`
 
-```text
-shell reads command
--> OS loads executable from disk to memory, often via DMA
--> CPU starts at entry
--> program/OS writes bytes to terminal
+<img src="assets\1.4.2.png" alt="1.4.2" style="zoom: 67%;" />
+
+```mermaid
+graph LR
+    A[键盘 Input] --> B(Shell 用户程序)
+    B --> C{操作系统 内核}
+    C --> D[(磁盘 hello可执行文件)]
+    D --> E[DMA 控制器]
+    E --> F[主存 代码 + 数据]
+    F --> G(PC 寄存器)
+    
+    
+    subgraph CPU内部
+    G --> H(取指)
+    H --> I(执行)
+    end
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style G fill:#bbf,stroke:#333,stroke-width:2px
+    style D fill:#dfd,stroke:#333,stroke-width:2px
 ```
 
-==**DMA**==: device/disk moves bytes directly to memory; CPU sets up the transfer instead of copying every byte itself.
+==**DMA**==: **device/disk** moves bytes directly to **memory**; **CPU sets up the transfer** instead of copying every byte itself.
 
 ## 4. Caches and Storage Hierarchy
 
@@ -130,7 +153,7 @@ shell reads command
 | L4 | DRAM | main memory |
 | L5/L6 | disk/remote | persistent, slow |
 
-Locality:
+**Locality:**
 
 | Type | Meaning | Example |
 |---|---|---|
@@ -142,17 +165,35 @@ Locality:
 
 ## 5. OS Manages Hardware
 
-| Abstraction | Virtualizes | Illusion |
-|---|---|---|
-| process | CPU + address space | program owns CPU/memory |
-| virtual memory | DRAM/disk/pages | private contiguous address space |
-| file | I/O devices/data | byte stream |
+```
+┌───────────────────────────────────────┐ 
+│          Application programs         │ ┐
+├───────────────────────────────────────┤ │ Software
+│            Operating system           │ ┘
+╞══════════════╤═════════════╤══════════╡ 
+│   Processor  │ Main memory │  I/O dev │ ┐ Hardware
+└──────────────┴─────────────┴──────────┘ ┘
+```
+
+```
+                 ┌─────────────────── Processes ──────────┐
+                 │                                        │        
+                 │          ┌─────── Virtual memory ──────┐       
+                 │          │                             │       
+                 │          │               ┌─── Files ───┐       
+  ┌──────────────┴┐┌────────┴────────┐┌─────┴─────────────┴─────┐ 
+  │   Processor   ││   Main memory   ││       I/O devices       │ 
+  └───────────────┘└─────────────────┘└─────────────────────────┘ 
+```
 
 - ==**Process**==: running program + context (`PC`, regs, address-space state, OS metadata).
+  - **Context switching** between processes, managed by **OS**.
+
 - ==**Thread**==: execution stream in a process; shares address space, has own PC/regs/stack.
-- Process switch changes address-space context and has stronger isolation; thread switch is cheaper but shares code/global data.
+- Process switch changes address-space context and has **stronger isolation**; thread switch is cheaper but shares code/global data.
 - ==**System call**==: application requests OS service by entering kernel mode, then returns.
 - ==**Virtual memory**==: each process sees its own address space; page 0 is normally unmapped to catch `NULL`; heap grows up, stack grows down; shared libs can map the same physical pages into many processes.
+- ==**Unix I/O / file**==: uniform byte-stream abstraction for disks, terminals, networks, etc.
 - ==**Virtualization**==: one physical CPU/memory/I/O system is presented as many processes, virtual address spaces, files, or VMs.
 - When one process blocks on I/O, the OS can context-switch the CPU to another runnable process.
 
@@ -166,8 +207,6 @@ $$
 T_{new}=(1-\alpha)T_{old}+\frac{\alpha T_{old}}{k};\quad
 Speedup=\frac{1}{(1-\alpha)+\alpha/k}\le\frac{1}{1-\alpha}
 $$
-
-> Example: 90% improvable, target `4x`: $4=1/(0.1+0.9/k)\Rightarrow k=6$.
 
 ### 6.2 Concurrency / Parallelism / ILP / DLP
 
