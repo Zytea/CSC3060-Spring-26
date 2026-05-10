@@ -231,8 +231,6 @@ Who the fucking know what is so-called ` 20b imm × 2 `? If you have read `notes
 次一级的是CSC3050 quiz，大部分题目是重合的，但是你的更改需要审查
 最次的是CMU exam，小部分重合，你的更改更需要审查
 
-4_1_review.md,..., 6_review.md,5_review.md,...7_review.md
-
 当你生成完毕后，从头到尾读一遍exams\raw（抽样毫无意义；考试里一道题做不出就是零分，不能说这题你在题库里没抽到；注意可能部分CMU题目不在考纲内,那些题就不用管了，毕竟我们是CSC3060（但如果是x86的题能转换成riscv的题在考纲内来考的话，那么这题依然很重要），在不在考纲内的话你在Quiz文件夹或pptx或我总结的md有没有来判断）和Quiz文件夹下的所有文件来审计一下，如果有题目无法从你生成的一堆_review.md快速推断出答案，那么你是失败的，据此在相应md的相应知识点处做相应修正，做完一遍后再去读一遍exams\raw重复迭代，如此harness，直到100%的train set acr
 
-注意，你做完agent的运行时间无上限，一切以考试为目的
+注意，你作为agent的运行时间无上限，一切以考试为目的
