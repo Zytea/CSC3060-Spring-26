@@ -6,6 +6,7 @@
 - `-O0`: debug/no opt; `-O1/-O`: basic; `-O2`: more safe opts; `-O3`: aggressive loop/SIMD/unroll; `-Os`: size; `-O3 -flto`: link-time/whole-program.
 - Cross-module inlining requires **LTO**: quiz answer `-O3 -flto`.
 - Optimizations with no primary locality goal: **loop unrolling**.
+- Class-discussed optimization focus: **loop transformations for locality**, not CUDA/SIMT/multithreading.
 - Cascading DCE can produce huge speedups if earlier opts expose dead code.
 - Compiler limits: **aliasing, FP semantics, volatile, function side effects, separate compilation, unknown runtime data**.
 - Use `restrict` or local scalar copies when frequent pointer loads block register allocation/vectorization.
