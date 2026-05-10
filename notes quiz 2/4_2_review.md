@@ -9,6 +9,7 @@
 - **`ALUSrc`**: `0` for R-type/branches; `1` for I/load/store/JALR address.
 - **`WBSel`**: load -> memory; ALU/I/U -> ALU/imm; JAL/JALR -> `PC+4`.
 - **`ALUCtrl`**: depends on `ALUOp + funct3 + funct7[5]`; quiz: **hardest control signal to generate**.
+- **WB-stage controls**: only values needed to write back (`rd`, `RegWr/WRen`, `WBSel`) travel to WB; branch request/compare info is not WB control.
 - **`funct7[5]`**: distinguishes `ADD/SUB` and `SRL/SRA`.
 - **HDL control**: synthesizable Verilog/VHDL logic can map opcode/funct bits to a netlist of control signals.
 
@@ -129,4 +130,5 @@ All shorter instrs waste the same long clock.
 
 - CPI = 1, cycle time long.
 - Regular field positions make control easier.
+- Branch/store have `RegWr=0`; load is the only instruction with `MemRd=1`; store is the only one with `MemWr=1`.
 - Good teaching design, not high-performance design.

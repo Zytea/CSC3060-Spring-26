@@ -7,6 +7,7 @@
 - **Standard linker**: Unix `ld`; compiler driver `gcc` invokes it.
 - **ELF tools**: `readelf` for details; `objdump` for code/relocs; `nm` for symbols.
 - **Linker jobs**: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout/page alignment.
+- **Performance layout**: linker can tune page/section/function placement; placing hot caller/callee code together can reduce I-cache misses.
 - **Not linker job**: loading into memory; that is loader/dynamic linker work.
 - **Object file kinds**: relocatable `.o`, executable, shared object `.so`.
 - **ELF sections**: `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.rel.text`, `.rel.data`, `.debug`, section header table.
@@ -66,6 +67,7 @@ patch calls/global-address loads/data pointers
 
 - scan static archives.
 - section alignment/page layout.
+- function/code layout for locality when profile/layout info is available.
 - may tune performance via page sizes / alignments.
 - dynamic relocation metadata.
 - LTO if `-flto`.

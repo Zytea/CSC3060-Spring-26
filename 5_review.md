@@ -11,6 +11,7 @@
 - **`switch` vs `if-else`**: not syntax-speed rule; **dense cases** -> `jump table`, **sparse/few cases** -> branch chain.
 - **Cascading DCE**: can produce huge speedup if it removes almost all work.
 - **Loop unrolling**: reduces overhead and exposes ILP/SIMD; **not primarily a locality optimization**.
+- **Procedure layout/I-cache**: repeated `A()->B()` calls can miss I-cache if far apart; fix by inlining or linker/code layout placing hot procedures adjacent.
 - **Locality optimization discussed**: loop transformations such as interchange/fusion/tiling, not CUDA/SIMT.
 - ==**CPE**==: cycles per element; `cycles = CPE*n + overhead`.
 - **Reduction bottleneck**: one accumulator is latency-bound; `k` accumulators reduce critical-path CPE about `latency/k` until throughput/bandwidth limits.
@@ -148,6 +149,8 @@ Bad candidates:
 
 Call overhead: argument setup, `jal`/return, saving/restoring live regs, stack-frame setup. Inlining can remove this overhead and expose more optimization, but it is only a compiler decision and may bloat code.
 
+Inlining can also improve **I-cache locality** when hot caller/callee code would otherwise ping-pong between distant cache lines/pages.
+
 ### 4.8 `switch` Codegen
 
 > [!IMPORTANT]
@@ -231,6 +234,8 @@ Unroll-by-4 is incorrect without a cleanup path when `n` is not a multiple of 4.
 Move independent loads/ops earlier to hide latency, but do not move stores/loads across possible aliases.
 
 Scheduling example trap: moving loads from `B/C` before stores to `A` is wrong if `A` overlaps `B` or `C`.
+
+If scheduling crosses many branches, the basic-block scope becomes too small; this is a compiler limit even when aliasing is not the blocker.
 
 ## 7. CPE / Critical Path
 

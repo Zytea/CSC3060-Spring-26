@@ -3,11 +3,12 @@
 ## Exam Facts
 
 - ==**Calling convention**==: ABI rules for args, returns, stack, frame pointer, saved regs.
+- It defines **argument/return registers, caller/callee-saved regs, stack alignment/frame layout**; not variable names or legal C data types.
 - **Call/return**: `jal ra,func`; return = `jalr x0,ra,0` (`ret`).
 - **Args/returns**: `a0-a7` = first 8 args; `a0/a1` = returns; all are caller-saved.
 - ==**Caller-saved**==: `ra`, `t0-t6`, `a0-a7`; caller saves if value is live across a call.
 - ==**Callee-saved**==: `sp`, `s0-s11`; callee restores if it modifies.
-- **Leaf routine**: calls no function; often no stack frame.
+- **Leaf routine**: calls no function; often no stack frame; prefer caller-saved `a0-a7`, `t0-t6` / `x28-x31`.
 - **Register choice**: values live across many calls -> `s` regs; short temps -> caller-saved.
 - **Stack rule**: RISC-V Unix ABI stack is **16B aligned** at call boundaries; stack grows downward.
 
@@ -187,10 +188,14 @@ Quiz allocation anchors:
 | caller-saved considered | leaf routines; expression temps |
 | callee-saved considered | temp heavily live across multiple calls; local variables |
 | `A` calls `B`, live regs `s1,t0,a1` | `A` saves/restores `t0,a1`; `B` preserves `s1` |
+| local array under `fp` | locals are often at **negative offsets** from `fp`; compute element byte offset + frame layout |
 
 ### 11.1 Leaf Routine
 
 No nested calls -> can often use `t`/`a` regs and return without stack frame, unless it needs local spills or modifies `s` regs.
+
+> [!IMPORTANT]
+> CSC3050 quiz anchor: a leaf routine should try `a0-a7`, `t0-t6`, especially `x28-x31`; **not** `s0-s11`, because saving/restoring callee-saved regs costs memory ops.
 
 ### 11.2 Non-Leaf
 

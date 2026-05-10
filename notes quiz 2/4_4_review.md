@@ -40,6 +40,8 @@ Von Neumann bottleneck in pipeline = structural hazard.
 
 Split I/D caches help because they avoid IF/MEM conflict and increase access bandwidth; not primarily for hit rate.
 
+Quiz anchor: a **vanilla unified-memory Von Neumann** organization is a poor fit for single-cycle/pipelined/superscalar instruction+data overlap; multi-cycle can time-share the memory more naturally.
+
 > [!IMPORTANT]
 > Moving R-type WB earlier can create a structural hazard with other instrs that write the regfile at the normal WB time.
 
@@ -194,7 +196,7 @@ Why untagged:
 
 Cost: aliasing between branches.
 
-High-performance predictors may add tags or richer metadata; simple class BHTs are often untagged.
+High-performance predictors may add tags or richer metadata; "good for high-performance" is **not** the reason an untagged BHT is used.
 
 Simple BHT indexing often uses lower PC bits; correlated/2-level predictors combine PC with history.
 

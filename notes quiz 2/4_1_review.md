@@ -11,6 +11,7 @@
 - **Pipeline**: overlapped instrs, high throughput, hazards add stalls.
 - **CPI < 1**: only superscalar/multiple-issue style, not ordinary scalar pipeline.
 - **Throughput order**: **superscalar+pipelined > pipelined > multi-cycle > single-cycle**.
+- **Single-cycle vs pipeline quiz**: single-cycle has lower CPI (`1`) but usually worse throughput/clock due long cycle.
 - **Scalar RV32I regfile**: **2 read ports + 1 write port**; reads are combinational, writes are clocked.
 - **Branch signed compare**: subtraction sign can be wrong on overflow; use comparator or `sign(A-B)^overflow`.
 
@@ -71,6 +72,18 @@ RISC vs CISC:
 RISC: more simple instrs, lower CPI/cycle
 CISC: fewer complex instrs, higher CPI/cycle/decode cost
 ```
+
+Iron-law levers:
+
+| Technique | Mainly improves |
+|---|---|
+| SIMD/vector/RVV | lower **IC** by doing many elements per instr |
+| pipelining / multi-cycle partitioning | shorter **cycle time** |
+| superscalar / OoO / prediction / caches / scheduling | lower **CPI** |
+| FMA | can reduce IC/rounding for `a*b+c`, but **not all 3 factors** automatically |
+| RISC regularity | lower CPI/cycle time, maybe higher IC |
+| CISC compact instrs | lower IC, often higher CPI/cycle time |
+| calling convention | lower IC/memory ops for calls |
 
 Class 4-instr timing pattern:
 
@@ -180,7 +193,7 @@ signed_lt = sign(A-B) ^ overflow
 Equality via subtraction zero is safe.
 
 > [!IMPORTANT]
-> Class quiz reason for a separate branch comparison unit: **avoid wrong taken/not-taken from subtraction overflow**. It is not because comparison cannot trap.
+> Separate branch comparison unit reasons: **avoid subtraction-overflow compare bugs**, can be faster than full subtract, and frees ALU for address/ALU work. It is **not** because comparison cannot trap.
 
 ## 9. Single-Cycle RISC-V Processor
 

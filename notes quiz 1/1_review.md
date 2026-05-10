@@ -6,7 +6,7 @@
 - ==**Computer architecture**==: **interface between software and hardware**; broader = `ISA + microarchitecture + system design`.
 - **System programs**: `OS`, compiler, assembler, linker, loader. 
 - ==**Bits + context**==: same bits can be `int`, FP, instruct, address, char bytes, struct fields.
-- **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; Unicode covers many languages.
+- **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; C strings store character bytes such as `'0'=0x30`.
 - **128 all-0 bits**: integer zeros or fp32/fp128 `+0.0`; **not** ASCII `"0000"` (`0x30` bytes) 
 - **`gcc` phases**: `preprocess -> compile -> assemble -> link`; loading ❌ 
 - **Relocatable `.o`**: not executable; unresolved symbol addresses/calls need linker relocation.
@@ -27,6 +27,8 @@
 |---|---|
 | `0x00000000` | int `0`, fp32 `+0.0`, NULs; as RISC-V instruction: **illegal** |
 | `0x00000013` | RISC-V `addi x0,x0,0` (`nop`) |
+| `0x00000033` | RISC-V `add x0,x0,x0` (no effect), signed/unsigned int `51`, ASCII byte `'3'` + NULs |
+| `0xffffffff` | unsigned `UMax`, signed `-1`, fp32 **NaN**, possible top address |
 | `0x30` | ASCII `'0'`, not numeric 0 |
 
 > [!IMPORTANT]
@@ -124,17 +126,17 @@ Bus questions:
 
 ```mermaid
 graph LR
-    A[键盘 Input] --> B(Shell 用户程序)
-    B --> C{操作系统 内核}
-    C --> D[(磁盘 hello可执行文件)]
-    D --> E[DMA 控制器]
-    E --> F[主存 代码 + 数据]
-    F --> G(PC 寄存器)
+    A[Keyboard input] --> B(Shell user program)
+    B --> C{OS kernel}
+    C --> D[(Disk hello executable)]
+    D --> E[DMA controller]
+    E --> F[Main memory code + data]
+    F --> G(PC register)
     
     
-    subgraph CPU内部
-    G --> H(取指)
-    H --> I(执行)
+    subgraph CPU
+    G --> H(fetch)
+    H --> I(execute)
     end
 
     style A fill:#f9f,stroke:#333,stroke-width:2px
@@ -239,13 +241,15 @@ T_{new}=(1-\alpha)T_{old}+\frac{\alpha T_{old}}{k};\quad
 Speedup=\frac{1}{(1-\alpha)+\alpha/k}\le\frac{1}{1-\alpha}
 $$
 
-### 6.2 Concurrency / Parallelism / ILP / DLP
+### 6.2 Concurrency / Parallelism / ILP / DLP / TLP / MLP
 
-| Term | Meaning |
+| Term | Meaning / exam anchor |
 |---|---|
 | **concurrency** | multiple activities in progress; time-sliced (context switching) |
 | **parallelism** | actually execute at same time |
-| **ILP** | - multiple instructs from one thread overlap/issue<br>- pipelining, superscalar, OOE |
-| **DLP** | same op over many data elements (loop; SIMD/vector) |
+| **ILP** | multiple instrs from one thread overlap/issue<br>pipeline, superscalar, OoO, scheduling, branch prediction |
+| **DLP / SIMD** | same op over many data elements<br>SIMD/vector/RVV/subword parallelism; GPU is DLP-style |
+| **TLP** | independent threads/tasks run in parallel<br>multicore, SMT, OS threads |
+| **MLP** | multiple outstanding memory ops/misses<br>non-blocking cache, MSHR, interleaved memory banks, OoO memory overlap |
 
 **Parallelism implies concurrency; concurrency does not imply parallelism.**

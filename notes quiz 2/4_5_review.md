@@ -9,12 +9,12 @@
 - **Store/load ordering**: cannot move load before earlier store or swap stores unless addresses proven independent.
 - **Arc weight**: latency/order delay. **Critical path** = longest weighted path.
 - **List scheduling**: ready list + priority such as no-stall, max delay, original order, more children.
-- **Compiler limits**: **memory aliasing** and **unknown memory latency**.
+- **Compiler limits**: **memory aliasing**, unknown memory latency, and frequent branches limiting scheduling scope.
 - **Mitigation split**: HW = forwarding/interlocks/OoO/prediction; compiler = scheduling/layout.
 
 ## 1. Why Rearrange Code Sequence?
 
-Goal: reduce pipeline bubbles without changing observable behavior.
+Goal: reduce pipeline bubbles and expose **ILP** without changing observable behavior.
 
 ```asm
 lw  t0,0(a0)

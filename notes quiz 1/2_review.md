@@ -13,10 +13,14 @@
 - **RISC-V integer overflow**: does **not** trap; software checks if needed.
 - **Right shift**: signed usually arithmetic; unsigned logical.
 - **IEEE fp32/fp64**: `s|exp8|frac23`, bias 127; `s|exp11|frac52`, bias 1023.
+- **IEEE standards**: IEEE 754-1985 covers fp32/fp64; IEEE 754-2008 adds fp16/quad. Quiz: bfloat16/FP8/FP4 not 754-2008.
 - **Exact binary decimal**: after reducing fraction, denominator must be a power of 2.
+- **Quiz exact decimals**: `0.5`, `0.0625` exact; `0.1`, `0.2`, `0.3` not exact.
 - **Strict FP**: `+,-,*` are not associative; compiler cannot freely reassociate without fast-math.
 - ==**FMA**==: `a*b+c` with one final rounding; about `5-6` cycles, not multiply+add latency.
 - **`bfloat16`**: `s|exp8|frac7`; fp32 exponent range, less precision.
+- **FP4/FP8 use**: ML throughput/power/bandwidth, **not** accuracy; not IEEE 754-2008 in quiz.
+- **Saturation arithmetic**: clips overflow at bounds; high-yield for audio/video/quantized AI.
 - **Latency facts**: int multiply `3-5`, int divide `~32`, SP FP add `4`, SP FP multiply `5`, FP->int `3-5`.
 
 ## 1. Information Storage
@@ -198,6 +202,9 @@ Fixed-width arithmetic is modulo $2^w$.
 
 Real C: signed overflow is undefined; unsigned overflow is defined mod $2^w$.
 
+> [!IMPORTANT]
+> Do **not** detect signed overflow by first doing overflowing signed arithmetic, e.g., `if (a+b < 0)`. In C, signed overflow is UB; precheck, use unsigned logic, or widen first.
+
 Unsigned addition:
 
 $$
@@ -308,7 +315,10 @@ A decimal is exactly representable in binary iff, after reduction, denominator i
 
 | Decimal | Exact? | Reason |
 |---|---|---|
+| `0.5` | yes | `1/2` |
+| `0.0625` | yes | `1/16` |
 | `1.625` | yes | `13/8` |
+| `0.1`, `0.2`, `0.3` | no | denominator has factor 5 |
 | `1.405` | no | denominator has factor 5 |
 
 ### 6.2 IEEE Layout and Value
@@ -318,7 +328,9 @@ A decimal is exactly representable in binary iff, after reduction, denominator i
 | fp32 | `s|exp8|frac23` | 127 |
 | fp64 | `s|exp11|frac52` | 1023 |
 | fp16 | `s|exp5|frac10` | 15 |
-| bfloat16 | `s|exp8|frac7` | 127 |
+| bfloat16 | `s|exp8|frac7` | 127; not IEEE 754-2008 quiz answer |
+| fp8/minifloat | often `s|exp4|frac3` | AI format, not IEEE 754-2008 quiz answer |
+| fp4/nibble-float | often `s|exp2|frac1` | AI format, throughput/bandwidth/power |
 
 `float` exactly represents all integers from `0` through $2^{24}$; above that, spacing exceeds 1.
 
@@ -351,10 +363,13 @@ fp32 constants:
 
 | Hex | Value |
 |---|---|
+| `0x00000000` | `+0.0` |
+| `0x80000000` | `-0.0` |
 | `0x3f800000` | `1.0` |
 | `0x40800000` | `4.0` |
 | `0xc0800000` | `-4.0` |
 | `0x7f800000` | `+inf` |
+| `0xffffffff` | NaN |
 
 ### 6.4 Custom Minifloat Template
 
@@ -431,7 +446,7 @@ High-yield cast traps:
 
 ### 7.4 FMA / bfloat16
 
-FMA computes `a*b+c` with one final rounding. It is ~5-6 cycles because addend alignment overlaps product reduction and no intermediate normalize/round is needed.
+==**FMA / FMAC**== computes `a*b+c` with **one final rounding**. Separate `FMUL; FADD` rounds twice, so FMA is often more accurate and faster than the serialized pair.
 
 Low precision on GPUs:
 
@@ -440,3 +455,12 @@ Low precision on GPUs:
 - acceptable for approximate ML.
 
 `bfloat16` beats fp16 for many ML uses because it keeps fp32's 8-bit exponent range.
+
+Saturation math:
+
+```text
+normal int8:  120 + 20 -> -116   # wrap
+saturating:   120 + 20 -> 127    # clip
+```
+
+Used for audio/video pixels/samples and quantized AI (`int4/int8`), not text or normal FP arithmetic.

@@ -9,6 +9,7 @@
 - **Speedup limits**: slowest stage, imbalance, pipeline-reg overhead, hazards, fill/drain.
 - **Pipeline-friendly RISC-V**: fixed 32b base, regular fields, load/store ISA, simple formats.
 - **Deep pipeline trap**: 5 -> 20 stages is not 4x faster; branch/data penalties and pipeline regs grow.
+- **More stages**: clock may improve, but branch/data penalties and pipeline-register overhead grow; throughput may improve, latency usually not.
 - **Bad for deep pipeline**: frequent branch mispredictions, heavy data dependences, frequent I-cache misses.
 - **Long-latency ops**: stall or use separate pipelined/iterative FUs.
 - **In-order retirement**: preserves precise architectural state.
@@ -85,6 +86,8 @@ Example: single-cycle `lw` 800ps; pipeline stage 200ps -> higher throughput afte
 | single-cycle | 1 long cycle | 1 instr per long cycle |
 | multi-cycle | several short cycles | variable |
 | pipeline | 5 short stages | about 1 instr per short cycle after fill |
+
+Quiz anchor: compared with pipelined datapath, single-cycle mainly has **lower CPI**; not higher throughput or faster clock.
 
 ## 6. Pipeline-Oriented ISA Design
 

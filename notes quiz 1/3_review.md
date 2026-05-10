@@ -11,10 +11,13 @@
 - **RV32I architectural state**: **32 GPRs + PC + CSRs**. **RV64IFV** adds FP + vector regs.
 - **Microarchitectural state**: pipeline regs, BHT, BTB, caches; regenerated, not saved on interrupt.
 - **All-zero 32b word as RV instr**: opcode `0000000` is not valid -> illegal instruction in class quizzes.
+- **`0x00000033` as RV32I**: `add x0,x0,x0`, no architectural effect; quiz also accepts signed/unsigned `51` and ASCII `'3'`.
 - **Scalar RV32I regfile**: **2R/1W**.
 - **`JAL` vs `JALR`**: `JAL` PC-relative ~$\pm1$ MiB; `JALR` uses `rs1+imm12`, can reach full RV32 address space via register, clears bit 0.
+- **Return pattern**: `jalr x0,ra,0`; class quiz infers this as procedure return.
 - **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
 - **No `LWU` in RV32I**: `LW` already fills the 32b GPR; zero/sign extension difference matters only when `XLEN>32` (e.g., RV64).
+- **RV64I-only quiz clues**: `LD`, `SD`, `LWU`, and wide shifts such as `slli rd,rs,48`.
 - **Offsets**: B/J immediates have implicit bit0=0; range is in **2-byte units** because compressed `C` may use 16b instrs.
 
 ## 1. Assembly Language Instructions
@@ -71,6 +74,8 @@ RISC may increase instr count, but often lowers CPI/cycle time.
 | system/CSR | `ECALL EBREAK CSRRW CSRRS CSRRC` |
 
 RV64 adds `LD`, `SD`, `LWU`, `ADDW`, `SLLIW`, etc.
+
+Project/quiz shorthand: RV32IM = RV32I plus integer multiply/divide (`M`).
 
 ### 2.2 Architectural State
 
@@ -339,16 +344,27 @@ Common pseudo-instr:
 | `j label` | `jal x0,label` |
 | `ret` | `jalr x0,ra,0` |
 | `jr rs` | `jalr x0,rs,0` |
+| `call label` | usually `auipc ra,hi20; jalr ra,lo12(ra)` for far calls |
 | `li rd,imm` | `addi` if 12b; otherwise `lui` + adjusted `addi` |
 
 Pop-quiz anchors:
 
 | Question | Answer |
 |---|---|
-| supported immediate widths | 12b and 20b |
-| set `x2=0` | `add x2,x0,x0` or `xor x2,x2,x2` |
+| supported immediate widths | 12b and 20b; 12 explicit bits in I/load/JALR, S/store, B/branch (+ implicit bit0=0) |
+| set `x2=0` | `add x2,x0,x0`, `xor x2,x2,x2`, or `and x2,x0,x2` |
 | no destination `rd` | branches and stores |
 | `RV32I` means | load/store, 3-operand, RISC, 32b GPR/address |
+| return instruction | `jalr x0,ra,0` |
+| direct procedure call in quiz | `jal ra,offset` |
+
+Bounds check anchor:
+
+```asm
+# int A[100], idx in x5, len=100 in x6
+blt  x5,x0,out          # negative index
+bgeu x5,x6,out          # idx >= 100; also catches negative if first test omitted
+```
 
 ## 6. ISA Design Traps
 
@@ -397,10 +413,11 @@ RISC-V uses explicit compare-and-branch (`beq/blt/...`), not hidden condition-co
 
 | Proposal | Class answer |
 |---|---|
-| 1024 GPRs | no: huge encodings/regfile/context-switch cost |
+| 1024 GPRs | no: longer access/cycle, more save/restore/context-switch, longer instr encoding; **not** "compiler harder" in quiz |
 | fast procedure call single instr | usually no: complex stack/register side effects |
 | register pairs for wider data | hurts regularity; use extensions/ABI rules |
 | static branch-prediction bit | not worth encoding cost for modern dynamic predictors |
+| multidim arrays/strings/structs in regs | usually no: need memory layout, addresses, variable indexing |
 
 ## 7. Exceptions, CSRs, GDB
 

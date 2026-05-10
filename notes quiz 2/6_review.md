@@ -3,7 +3,8 @@
 ## Exam Facts
 
 - ==**Memory hierarchy**==: small/fast/expensive near CPU; large/slow/cheap far away.
-- **Management**: regs/local memory by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
+- **Management**: regs/local/scratchpad memory by compiler/programmer; caches by hardware; VM/main memory by OS+MMU; files by OS/apps.
+- **Broad "cache" examples**: L1/L2/L3, TLB, BTB, BHT/branch predictor table.
 - **SRAM vs DRAM**: SRAM fast/no refresh/cache; DRAM dense/cheap/refresh/main memory.
 - ==**Memory wall**==: CPU speed vs DRAM latency/bandwidth gap.
 - **Cache line metadata**: **valid bit + tag + data**, plus dirty bit for write-back and coherence state in multicore.
@@ -11,11 +12,12 @@
 - **Address split**: `tag | set index | block offset`.
 - **Cache parameters**: `S=C/(B*E)`, `b=log2(B)`, `s=log2(S)`, `t=m-s-b`.
 - **Modern L1D**: set-associative, write-back, write-allocate; hit latency about **3-4 cycles**.
-- **I-cache easier**: no CPU stores; JIT/self-modifying code needs I-cache flush/invalidate/coherence.
-- ==**MSHR**==: non-blocking cache tracks outstanding misses; L3 MSHR count depends on memory latency + bus width/bandwidth.
+- **I-cache easier**: no CPU stores and no dirty bit; JIT/self-modifying code needs I-cache flush/invalidate/coherence.
+- ==**MSHR**==: non-blocking cache tracks outstanding misses; L3 MSHR count depends on memory latency + bus width/bandwidth; CSC3050 also counts #sharing cores.
 - **AMAT**: $HT+MR\times MP$; multi-level AMAT uses local miss rates and fails when misses overlap.
 - **4C misses**: compulsory/cold, conflict/collision, capacity, coherence.
 - **Large line helps**: spatial locality, tag overhead, compulsory misses; hurts miss penalty/bandwidth/fewer lines.
+- **VA/PA**: load/store generate virtual addresses; TLB caches PTEs; page table is in main memory; physically tagged caches compare PA tags.
 - **TLB side point**: **TLB miss may trigger a page fault**; VIPT cache can overlap address translation.
 
 ## 1. Memory Hierarchy
@@ -23,6 +25,7 @@
 | Level | Example | Managed by |
 |---|---|---|
 | L0 | regs | compiler |
+| local/scratchpad | GPU/shared local memory | programmer/compiler |
 | L1/L2/L3 | SRAM caches | hardware |
 | L4 | DRAM / VM pages | OS + MMU |
 | L5/L6 | disk/remote | OS/filesystem/apps |
@@ -80,6 +83,16 @@ Mitigation:
 addr = [ tag ][ set index ][ block offset ]
 ```
 
+Cache-like structures:
+
+| Structure | What it caches | Tag? |
+|---|---|---|
+| L1/L2/L3 | data/instruction lines | yes |
+| TLB | recent PTE translations | usually yes/associative |
+| BTB | branch target PCs | usually tagged/partially tagged |
+| BHT/PHT | branch direction history | often **untagged** |
+| single-level page table | VPN-indexed PTE array | no cache tag; VPN is index |
+
 Lookup:
 
 1. `set = index bits`.
@@ -104,6 +117,8 @@ b = 5, s = 9, t = 32-9-5 = 18
 ```
 
 Quiz4 #4 answer: **tag 18, set index 9, block offset 5**.
+
+Set-count anchor: `64 KiB` cache, `64B` lines -> direct-mapped has `1024` sets; fully associative has **1 set**.
 
 Total cache bits:
 
@@ -275,7 +290,7 @@ Trace implication: under no-write-allocate, a write miss does **not** install th
 
 ### 6.3 I-Cache
 
-- no CPU stores -> no write policy.
+- no CPU stores -> no write policy and no dirty bit; still has valid/tag/data like other caches.
 - **JIT/instruction patching**: flush I-cache, invalidate affected I-lines, or maintain I/D coherence.
 
 ## 7. Cache Performance
@@ -340,6 +355,8 @@ Quiz anchors:
 
 Direct-mapped conflict trigger: objects separated by a multiple of cache size map to the same set. Fix with padding/alignment/code repositioning; dummy padding can be optimized away unless it is actually used.
 
+Increasing cache size mainly reduces **capacity** and **conflict** misses; not compulsory or coherence misses.
+
 ## 9. Replacement / Victim Cache
 
 | Policy | Note |
@@ -353,6 +370,8 @@ Direct-mapped conflict trigger: objects separated by a multiple of cache size ma
 True LRU data structure: **stack**.
 
 ==**Victim cache**==: small fully-associative buffer of recently evicted lines; helps direct-mapped conflict misses.
+
+Usually fully associative in quiz: **TLB** and **victim cache**. Ordinary L1D is usually set-associative, not fully associative.
 
 LRU/FIFO trap: if set holds `A,B,C`, then access `A`, then miss on `D`; LRU evicts `B`, FIFO evicts `A`.
 
@@ -371,8 +390,11 @@ Victim cache vs 2-way: victim cache is tiny/fully-associative behind direct-mapp
 High-yield facts:
 
 - L3 usually shared by cores.
+- L3's main goal is to reduce main-memory traffic/latency seen by private caches.
+- L1's main goal is fast hit time.
 - L3 write-through usually does not make sense.
 - **L2 vs L1**: larger, slower, often unified.
+- **Split L1I/L1D**: greater IF+data bandwidth and different management policies; not necessarily higher hit rate/associativity.
 - **Vast chip area in contemporary CPUs**: caches.
 
 ### 10.1 Inclusion Policies
@@ -405,7 +427,7 @@ Quiz nonsensical organization anchors:
 
 ## 11. Cache Coherence
 
-Snoopy coherence: private caches watch shared bus/coherence traffic.
+==**Snoopy coherence**==: private caches watch shared bus/coherence traffic to maintain coherent copies in bus-connected multiprocessors; it is not a single-core cache-miss-reduction trick.
 
 MESI:
 
@@ -422,6 +444,7 @@ False sharing: different variables in same line cause invalidations; fix with pa
 
 - **TLB miss may trigger a page fault**.
 - Virtual-address cache / virtually indexed, physically tagged cache can **avoid or overlap address-translation delay**.
+- Virtual-address-tagged caches are complicated by **synonyms/aliasing**: two virtual addresses can map to the same physical line.
 
 ### 12.1 TLB / PTE / Page Fault Chain
 
@@ -436,6 +459,23 @@ PTE invalid/not present -> page fault -> OS brings page from disk or kills proce
 > [!NOTE]
 > Normal cache miss fetches from DRAM/lower cache, not disk. Page fault is the VM exception path after translation fails.
 
+Page table facts:
+
+| Item | Exam answer |
+|---|---|
+| page table location | main memory, pointed to by a CPU page-table register |
+| PTE contains | physical page number + valid/permission/status bits |
+| invalid/not-present PTE | may point to disk/swap info; reference causes page fault |
+| TLB purpose | avoid slow page-table walk on most accesses |
+
+TLB/cache address split:
+
+```text
+VA = [ VPN ][ VPO ];  PA = [ PPN ][ PPO ], and VPO == PPO
+TLBI = VPN mod (#TLB sets);  TLBT = VPN >> log2(#TLB sets)
+physical cache lookup uses PA: [ cache tag ][ set index ][ block offset ]
+```
+
 ## 13. Locality / Applications
 
 Pointer chasing (`while (p) p=p->next`) has poor spatial locality and a load-use dependency chain.
@@ -448,6 +488,8 @@ Fixes:
 - batch multiple independent traversals.
 
 Sorting locality: quicksort, insertion sort, bubble sort have high data locality; heapsort is poor.
+
+Cray/vector note: vector loads/stores exploit regular streams, but without data caches they cannot exploit irregular temporal/spatial locality well, especially pointer-aliasing-heavy languages.
 
 Hardware vs software cache:
 
