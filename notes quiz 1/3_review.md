@@ -14,6 +14,7 @@
 - **`JAL` vs `JALR`**: `JAL` PC-relative ~$\pm1$ MiB; `JALR` uses `rs1+imm12`, can reach full RV32 address space via register, clears bit 0.
 - **Rejected memory forms**: no `LW rd,(rs1+rs2)` and no post-increment load; they break regularity / add ports / complicate pipeline.
 - **No `LWU` in RV32I**: `LW` already fills the 32b GPR; zero/sign extension difference matters only when `XLEN>32` (e.g., RV64).
+- **Offsets**: B/J immediates have implicit bit0=0; range is in **2-byte units** because compressed `C` may use 16b instrs.
 
 ## 1. Assembly Language Instructions
 
@@ -169,6 +170,8 @@ Range: 13-bit signed byte offset with bit0=0 -> about $\pm4$ KiB.
 
 > [!IMPORTANT]
 > S-type offset is base-relative byte offset. B-type offset is PC-relative with implicit low `0` and **no `rd`**.
+
+Branch offset uses 2B granularity, not 4B, so it remains compatible with 16b compressed instructions.
 
 No `BGT/BLE` needed: swap operands.
 
@@ -351,6 +354,15 @@ RISC-V uses explicit compare-and-branch (`beq/blt/...`), not hidden condition-co
 | Compare-and-branch | Condition codes |
 |---|---|
 | no implicit flag dependence; less architectural state; easier OoO/precise state | can reuse one compare for several branches, but flags create hidden dependencies |
+
+### 6.6 ISA Design Checklist
+
+| Proposal | Class answer |
+|---|---|
+| 1024 GPRs | no: huge encodings/regfile/context-switch cost |
+| fast procedure call single instr | usually no: complex stack/register side effects |
+| register pairs for wider data | hurts regularity; use extensions/ABI rules |
+| static branch-prediction bit | not worth encoding cost for modern dynamic predictors |
 
 ## 7. Exceptions, CSRs, GDB
 

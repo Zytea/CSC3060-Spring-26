@@ -27,6 +27,8 @@ main.o + sum.o + libs -> linker -> executable
 
 `gcc -o prog main.c sum.c` performs all phases, then invokes `ld`.
 
+Compiler driver path: `cpp/cc1/as` produce relocatable `.o`; `ld` produces the executable.
+
 ## 2. Why Linkers?
 
 | Benefit | Meaning |
@@ -165,6 +167,8 @@ Recommendations:
 - put `extern` declarations in headers.
 - one definition in one `.c`.
 - use `-fno-common`.
+
+Header pattern: declarations use `extern`; exactly one `.c` file owns the definition/initialization.
 
 ## 8. Relocation
 

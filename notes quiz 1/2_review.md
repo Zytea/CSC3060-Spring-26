@@ -30,6 +30,8 @@
 | address | byte index in virtual/physical memory |
 | pointer | address + type-directed interpretation |
 | word size | nominal pointer/GPR size; controls address-space size |
+| virtual address | process-visible address |
+| physical address | DRAM address after MMU/page-table translation |
 
 Useful powers: `2^10=1 KiB`, `2^20=1 MiB`, `2^30=1 GiB`, `2^32=4 GiB`.
 
@@ -156,6 +158,8 @@ Other signed encodings:
 | two's complement | no |
 | IEEE FP | yes |
 
+Why two's complement dominates: one zero, simple add/sub hardware, no end-around carry.
+
 ### 4.2 Signed <-> Unsigned
 
 Bit pattern unchanged; interpretation changes.
@@ -227,7 +231,8 @@ Two's-complement negation:
 
 - Integer ALU ops wrap silently; no condition-code register.
 - Software must check if overflow matters.
-- **Reason**: cheaper pipeline/precise-exception logic; unsigned wrap is useful.
+- **Reason**: overflow is rare, traps are expensive, precise exceptions/OoO are harder, and unsigned wrap is useful.
+- FP hardware may set flags; software must explicitly check/poll if it cares.
 
 ### 5.3 Adders / SLT
 
@@ -257,6 +262,8 @@ set = sign(A-B) ^ overflow
 | add/logic | 1 cycle |
 | int multiply | 3-5 cycles |
 | int divide | ~32 cycles, hard to pipeline |
+
+Multiplier idea: tree of adders reduces delay from linear toward log-depth; divider is iterative/control-heavy.
 
 Project add/sub:
 

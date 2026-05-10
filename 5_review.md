@@ -30,6 +30,14 @@
 
 > Optimize from measurement/profiling, not guesswork.
 
+Optimization goals:
+
+| Goal | Typical opts |
+|---|---|
+| minimize instructions | CSE, DCE, strength reduction |
+| minimize cycles | register allocation, scheduling, locality, preload/RLE |
+| avoid branches | unrolling, inlining, unswitching, branchless transforms |
+
 ## 2. Compiler Optimization Flags
 
 | Flag | Meaning |
@@ -252,6 +260,17 @@ CPE \ge \max(L/k,\ issue\_limit,\ bandwidth\_limit)
 $$
 
 `(a+b)+(c+d)` can expose two independent adds before the final add; `(((a+b)+c)+d)` is a serial chain. For strict FP, compiler cannot freely reassociate unless fast-math/contract rules allow it.
+
+### 7.1 Vector Combine Pattern
+
+`combine4` improvements: hoist `vec_length`, get data pointer once, accumulate in local scalar, store `*dest` once.
+
+| Version idea | Why faster |
+|---|---|
+| `combine1` | function/bounds/store overhead every element |
+| `-O1/-O3` | compiler removes some overhead |
+| `combine4` | local accumulator + direct data pointer |
+| unroll + k accumulators | less loop overhead and shorter dependency chain |
 
 ## 8. Reduction and SIMD
 

@@ -22,6 +22,8 @@ $$
 
 Hazards insert bubbles or flush wrong-path instrs.
 
+Pipeline loss sources: unbalanced stages, fill/drain, and structural/data/control hazards.
+
 ## 2. Structural Hazards
 
 ==**Structural hazard**==: two stages need same resource in same cycle.
@@ -87,6 +89,8 @@ MEM/WB.RegWr && MEM/WB.rd!=0 && MEM/WB.rd==ID/EX.rs2 -> ForwardB=MEM/WB
 
 If both match, newer EX/MEM wins. Never forward from `x0` or non-writing instr.
 
+Forwarding checks must include both `RegWr=1` and `rd != x0`; otherwise stores/branches/`x0` create false forwards.
+
 ### 3.4 Load-Use Hazard
 
 ```asm
@@ -128,6 +132,8 @@ No-prediction taken-branch case uses taken fraction instead of mispredict rate.
 | IF via BTB+BHT | 0 if correct |
 
 Textbook 3 vs class 2: textbook redirects fetch one stage later; class assumes EX can resteer sooner.
+
+If no prediction and only taken branches flush, use `BranchFreq x TakenRate x Penalty`.
 
 ### 4.2 Penalty Examples
 

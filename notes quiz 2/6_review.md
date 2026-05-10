@@ -52,6 +52,13 @@ SRAM is expensive because it uses many transistors per bit, has lower density, a
 
 DRAM read: `RAS` selects row into row buffer; `CAS` selects column; refresh/writeback restores charge.
 
+Main-memory transactions:
+
+| Transaction | Bus action |
+|---|---|
+| read | CPU puts address on bus -> memory returns word -> CPU copies to reg |
+| write | CPU puts address + data + control on bus -> memory stores data |
+
 ### 2.2 Memory Wall
 
 ==**Memory wall**==: processor improves faster than main-memory latency/bandwidth.
@@ -232,6 +239,8 @@ Larger block:
 |---|---|
 | write-through | update cache + next level now; needs write buffer |
 | write-back | update cache, set dirty; write on eviction |
+
+Write buffer hides write latency; if stores arrive faster than DRAM drains, buffer fills and CPU stalls. Write combining can reduce traffic.
 
 ### 6.2 Write Miss
 

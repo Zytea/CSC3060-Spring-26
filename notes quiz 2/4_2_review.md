@@ -16,6 +16,16 @@
 
 Control is the "brain"; datapath is the "brawn". Control chooses mux inputs and enables writes.
 
+Fast expressions:
+
+```text
+PCSrc = BranchTaken || JAL/JALR
+RegWr = !(Branch || Store)
+MemRd = Load
+MemWr = Store
+ALUSrc = !Rtype || Load || Store || JALR
+```
+
 | Instr | `RegWr` | `MemRd` | `MemWr` | `ALUSrc` | `WBSel` | Next PC |
 |---|---:|---:|---:|---:|---|---|
 | R ALU | 1 | 0 | 0 | 0 | ALU | `PC+4` |

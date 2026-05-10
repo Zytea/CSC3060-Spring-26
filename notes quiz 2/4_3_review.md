@@ -30,6 +30,9 @@ $$
 
 For large `n`, balanced pipeline speedup approaches `T_long/T_stage`, ideally `N`.
 
+> [!IMPORTANT]
+> Ideal speedup assumes balanced stages and ignores register overhead/hazards; short sequences lose to fill/drain.
+
 ## 2. Pipelining
 
 ==**Latency**==: time for one instr/task to finish.
@@ -108,6 +111,11 @@ Pipeline losses:
 Register file teaching trick: write in first half, read in second half, so WB can feed ID in same cycle.
 
 Do not use current ID instruction's `rd` for WB. The correct `rd` is carried in MEM/WB.
+
+```text
+same cycle: WB writes first half -> ID reads second half
+wrong rd bug: using IF/ID.rd for WB writes the younger instruction's register
+```
 
 ## 9. Long-Latency Ops and Retirement
 

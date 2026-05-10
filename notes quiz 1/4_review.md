@@ -172,6 +172,14 @@ If value `v` is live across `m` calls:
 
 ## 11. Worked Patterns
 
+| Pattern | Save/alloc answer |
+|---|---|
+| no values live across call | save none |
+| leaf routine | prefer caller-saved `t/a`; often no frame |
+| non-leaf using `ra` later | save `ra` |
+| long-lived local/CSE across many calls | use `s` register |
+| value live across rare/cold call | caller-save in cold path |
+
 ### 11.1 Leaf Routine
 
 No nested calls -> can often use `t`/`a` regs and return without stack frame, unless it needs local spills or modifies `s` regs.

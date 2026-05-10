@@ -72,6 +72,14 @@ RISC: more simple instrs, lower CPI/cycle
 CISC: fewer complex instrs, higher CPI/cycle/decode cost
 ```
 
+Class 4-instr timing pattern:
+
+| Design | CPI/clock idea | Example total |
+|---|---|---|
+| single-cycle | `CPI=1`, one long cycle | `4 x 4 = 16` short-cycle units |
+| multi-cycle | variable short cycles | `4+2+3+4 = 13` |
+| pipeline | overlapped short cycles | about `N + stages - 1 = 7` |
+
 ## 5. Logic Design Basics
 
 | Element | Stores state? | Output depends on |
@@ -126,6 +134,8 @@ Required components:
 3. Assemble datapath for each instr class.
 4. Determine control settings.
 5. Build control logic.
+
+Shortcut: **check datapath requirements -> assemble datapath components -> add control signals**.
 
 ### 7.1 RISC-V Regularity
 

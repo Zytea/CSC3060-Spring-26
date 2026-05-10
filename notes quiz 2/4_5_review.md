@@ -143,6 +143,8 @@ Some notes include node latency inside edge weight; be consistent with the given
 4. Pick best ready node each cycle.
 5. Update ready list.
 
+Ready-list invariant: a node enters only after all predecessors are scheduled; RAW edges may also wait for producer latency.
+
 Tie-breaks:
 
 | Priority | Why |
@@ -152,6 +154,8 @@ Tie-breaks:
 | original order | simple/predictable |
 | more children | unlock work |
 | final use of reg | reduce live range |
+
+Candidate-list trap: if a ready arithmetic op would stall waiting for a load/mul, pick an independent ready op instead.
 
 ## 8. Worked Scheduling Pattern
 
