@@ -23,7 +23,7 @@ for example,
 > ...
 ```
 
-2. latex formulas, tables, diagrams, pics, bullet points, etc. whenever appropriate
+2. latex formulas, tables, diagrams, pics (you can use pics in \assets of the corresponding note or screenshot it from the .pptx if you think it's necessary), bullet points, etc. whenever appropriate
 
 3. be concise, no bullshit
 
@@ -110,7 +110,7 @@ $$
 >  (this is just for demonstration, as I don't need a example for such a simple knowledge point, as you can see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; **this is the major criterion for whether to include an example or not!!!**)
 ```
 
-Bad example (inefficient in height and for look up):
+Another Bad example (inefficient in height and for look up):
 ```
 - A bit pattern may represent:
   - an integer,
@@ -151,3 +151,8 @@ Good example (efficient!):
 
 
 6. If you have gone though the quizz and exams files. If you see that in quizzes the instructor don’t test anything beyond this formula and I haven’t see any traps in applying this for problem solving, so raise your Occam's Razor; otherwise, include it or use [!NOTE] or [!IMPORTANT] whenever appropriate; **this is the major criterion for whether to include an example or not!!!**
+
+# Harness
+当你生成完毕后，读一遍exams\raw（注意可能部分题目不在考纲内,那些题就不用管了（但如果是x86的题能转换成riscv的题在考纲内来考的话，那么这题依然很重要），在不在考纲内的话你在Quiz文件夹或pptx或我总结的md有没有来判断）和Quiz文件夹下的所有文件来审计一下，如果有题目无法从你生成的一堆_review.md快速推断出答案，那么你是失败的，据此在相应md的相应知识点处做相应修正，做完一遍后再去读一遍exams\raw重复迭代，如此harness，直到100%的train set acr
+
+注意，你做完agent的运行时间无上限，一切以考试为目的
