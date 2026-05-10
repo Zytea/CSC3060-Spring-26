@@ -2,64 +2,69 @@
 
 ## Exam Facts
 
-- Code scheduling rearranges independent instrs to fill pipeline bubbles while preserving program meaning.
-- Legal schedule = any topological order of dependence DAG.
-- Three register dependences: **RAW, WAR, WAW**.
-- RAW is true dependence and carries producer latency. WAR/WAW are order/name dependences.
+- Code scheduling reorders independent instrs to fill bubbles while preserving meaning.
+- Legal schedule = topological order of dependence DAG.
+- Register dependences: **RAW, WAR, WAW**. RAW is true dependence.
 - Memory scheduling is conservative because aliasing and latency are often unknown.
-- Cannot move a load before an earlier store or swap stores unless addresses are proven independent.
-- Arc weight = operation latency. Critical path = longest weighted path through DAG.
-- Maximum delay:
-
-$$
-MD(node)=\max_{child}(MD(child)+arc\_weight)
-$$
-
-- List scheduling: maintain ready list; issue best ready instr by no-stall, max MD, original order/children/final-use tie-breaks.
-- Quiz limitations answer: **memory aliasing** and **unknown memory latency**.
-- HW mitigates hazards with forwarding/interlocks/OoO/prediction; compiler mitigates with scheduling/reordering.
+- Cannot move a load before an earlier store or swap stores unless addresses proven independent.
+- Arc weight = latency/order delay. Critical path = longest weighted path.
+- List scheduling: ready list + priority such as no-stall, max delay, original order, more children.
+- Quiz limitations: **memory aliasing** and **unknown memory latency**.
+- Hardware mitigates hazards with forwarding/interlocks/OoO/prediction; compiler mitigates with scheduling/layout.
 
 ## 1. Why Rearrange Code Sequence?
 
-Pipeline stalls occur when a consumer is issued before producer result is ready. If there is independent work, the compiler can move it into the waiting slots.
+Goal: reduce pipeline bubbles without changing observable behavior.
 
-Goal: reduce bubbles without changing observable behavior.
+```asm
+lw  t0,0(a0)
+add t1,t0,t2     # load-use stall
+```
+
+If independent work exists:
+
+```asm
+lw  t0,0(a0)
+addi s0,s0,1     # fills bubble
+add t1,t0,t2
+```
 
 ## 2. Dependence DAG
 
-==**Dependence DAG**==: node = instruction/operation; edge = scheduling constraint; edge weight = latency/order delay.
+==**Dependence DAG**==: node = instr/op; edge = required order; weight = latency/order cost.
 
-Any schedule must place every predecessor before its successor. A legal schedule is a topological sort. Best schedule minimizes stalls/total cycles.
+Any legal schedule must place every predecessor before successor.
 
-Exhaustive search is infeasible: possible orders grow like `N!`, so compilers use heuristics.
+Worst-case legal schedules can be huge:
+
+| Case | # schedules |
+|---|---:|
+| chain of 50 dependent instrs | 1 |
+| all 50 independent | `50!` |
+
+MIPS ("Microprocessor without Interlocked Pipeline Stages") relied on software scheduling; main failure reason in quiz: compatibility/scalability.
 
 ## 3. Three Register Data Dependences
 
-### 3.1 RAW: Read After Write / Flow Dependence
-
-`B` reads a register written by older `A`.
+### 3.1 RAW: Read After Write
 
 ```asm
 lw  p1,a
 add p3,p1,p2
 ```
 
-`lw` must produce `p1` before `add` consumes it. RAW is a true dependence and usually carries operation latency.
+`add` needs value produced by `lw`; carries producer latency.
 
-### 3.2 WAR: Write After Read / Anti-Dependence
-
-`B` writes a register that older `A` reads.
+### 3.2 WAR: Write After Read
 
 ```asm
-sw p6,0(p5)    # reads p6 and p5
-lw p6,c        # writes p6
+sw p6,0(p5)   # reads old p6
+lw p6,c       # writes p6
 ```
 
-`sw` must read old `p6` before later `lw` overwrites it. WAR is a name/order dependence, not value production.
+Order/name dependence: later write must not occur before earlier read.
 
-### 3.3 WAW: Write After Write / Output Dependence
-
-Two instrs write the same register; final value must come from later program-order writer.
+### 3.3 WAW: Write After Write
 
 ```asm
 lw p1,a
@@ -67,146 +72,21 @@ lw p1,a
 lw p1,c
 ```
 
-WAW preserves final register value.
+Final value must come from later write.
 
-### 3.4 Dependence Detection Summary
+### 3.4 Detection Summary
 
-| Dependence | Add edge when | Typical latency |
+| Edge | Add when | Latency |
 |---|---|---|
-| RAW | last writer of source reg -> current reader | producer operation latency |
-| WAR | previous reader of dest reg -> current writer | 0/order-only in simple list scheduling |
-| WAW | last writer of dest reg -> current writer | 0 or 1/order-only |
+| RAW | previous writer -> current reader | real producer latency |
+| WAR | previous reader -> current writer | order-only |
+| WAW | previous writer -> current writer | order-only |
 
-Implementation idea:
-
-- track last writer per register for RAW/WAW.
-- track readers since last write for WAR.
-- ignore `x0` as a real destination.
+Ignore `x0` as destination.
 
 ## 4. Memory Dependence / Aliasing
 
-Scheduling memory instrs is harder than registers because addresses may be unknown at compile time.
-
-Conservative rules:
-
-- do not move a load before an earlier store if addresses may alias.
-- do not swap two stores if addresses may alias.
-- be careful moving memory ops around calls, volatile, I/O, or possible traps.
-
-Reasons:
-
-- pointer aliasing.
-- array index unknown.
-- cache hit/miss latency unknown.
-- memory system resources shared: cache, DRAM, bus, interconnect.
-- speculative load/store may trap.
-
-> A `restrict` pointer or proven non-overlap can remove alias edges and expose scheduling freedom.
-
-## 5. Operation Latency and Arc Weights
-
-| Operation | Latency idea |
-|---|---:|
-| integer add / ALU | 1 |
-| load | 2 |
-| multiply | 3 |
-| FADD | 3-4 |
-| FMUL | 4-5 |
-| FMA | 5-6 |
-| integer divide | about 32 |
-
-Arc weight is the delay from producer issue/result to consumer readiness.
-
-## 6. Critical Path and Maximum Delay
-
-Nodes on critical paths should be scheduled as early as possible.
-
-Compute MD by reverse topological traversal:
-
-$$
-MD(n)=
-\begin{cases}
-latency(n), & n\ has\ no\ successors \\
-\max_{e:n\to c}(MD(c)+weight(e)), & otherwise
-\end{cases}
-$$
-
-Some schedulers treat WAR/WAW edges as order-only with no result latency, and RAW edges as latency-carrying.
-
-## 7. List Scheduling Algorithm
-
-Basic block list scheduling:
-
-1. Build dependence DAG.
-2. Compute MD/priority for each node.
-3. Initialize ready list with nodes whose predecessors are scheduled/satisfied.
-4. At each cycle, pick one ready instr.
-5. Mark issued instr; release WAR/WAW successors immediately if order is satisfied.
-6. Release RAW successors only when producer latency is satisfied.
-7. Continue until all nodes scheduled.
-
-Tie-break heuristics:
-
-| Priority | Reason |
-|---|---|
-| can issue without stalling | avoid bubble |
-| larger MD | protect critical path |
-| original order | preserve locality/simple code |
-| more children | unlock more future ready nodes |
-| final use of register | shorten live ranges |
-| longer processing time | LPT heuristic for some machines |
-
-## 8. Worked Scheduling Pattern
-
-Example ready sets from lecture:
-
-| Step | Candidate list | Choose | Reason |
-|---|---|---|---|
-| 1 | `{1,2,9}` | `1` | highest MD and original order |
-| 2 | `{2,9}` | `2` | high MD, no stall |
-| 3 | `{3,5,9}` | `9` | `3/5` wait for load results; `9` fills slot |
-| 4 | `{3,5}` | `3` | result ready, larger MD |
-| 5 | `{4,5}` | `4` | larger MD |
-| 6 | `{6,10,5}` | `5` | `6` waits for multiply; choose independent work |
-| 7 | `{6,10,8}` | `8` | fill multiply latency |
-
-Key idea: do not blindly choose first ready child if it would stall waiting for a latency edge.
-
-## 9. Schedule Counts and Quiz Patterns
-
-For a 5-stage pipeline:
-
-| Situation | Typical bubble count |
-|---|---:|
-| RAW ALU producer -> immediate consumer, no forwarding | up to 2-3 depending regfile timing |
-| load -> immediate use, with forwarding | 1 |
-| ALU producer -> consumer, with forwarding | 0 |
-| branch resolved in EX after wrong fetch | about 2 |
-| branch resolved in MEM after wrong fetch | about 3 |
-
-Quiz 2 scheduling/hazard pattern:
-
-- Without forwarding, a chain may generate many bubbles, e.g., total 9 in the given schedule.
-- With forwarding, ALU-ALU RAWs use EX/MEM or MEM/WB forwarding.
-- Load-use still needs one bubble unless independent instr is scheduled between.
-
-## 10. Hardware vs Software Hazard Mitigation
-
-| Technique | Hazard | Who |
-|---|---|---|
-| forwarding/bypassing | data RAW | hardware |
-| interlock/stall | data/structural | hardware |
-| split I/D cache, more ports | structural | hardware |
-| BHT/BTB/RAS | control | hardware |
-| OoO execution | data/resource | hardware |
-| compiler scheduling | data/structural | software |
-| branch layout/static prediction | control | compiler/software |
-| `restrict`, local scalar copies | memory aliasing | programmer/compiler |
-| deeper pipeline | not a fix | often worsens data/control penalties |
-
-## 11. Memory-Scheduling Restrictions
-
-Do not reorder these unless proven safe:
+Do not reorder unless proven safe:
 
 ```asm
 sw x5,0(x1)
@@ -218,18 +98,108 @@ sw x5,0(x1)
 sw x6,0(x2)    # cannot swap if x1 may equal x2
 ```
 
-Safe reorder examples:
+Safe evidence:
 
-- different proven stack offsets.
-- independent scalar regs.
-- `restrict` pointers.
-- compiler can prove arrays do not overlap.
+- distinct stack offsets.
+- `restrict`.
+- proven non-overlapping arrays.
+- no volatile/I-O/call/trap issue.
+
+## 5. Operation Latency and Arc Weights
+
+| Operation | Latency idea |
+|---|---:|
+| int ALU | 1 |
+| load hit | 2-3 |
+| int multiply | 3-5 |
+| FADD | 3-4 |
+| FMUL | 4-5 |
+| FMA | 5-6 |
+| int divide | ~32 |
+
+## 6. Critical Path and Maximum Delay
+
+Schedule critical path early.
+
+$$
+MD(n)=
+\begin{cases}
+0,&n\ has\ no\ successors\\
+\max_{n\to c}(weight(n,c)+MD(c)),&otherwise
+\end{cases}
+$$
+
+Some notes include node latency inside edge weight; be consistent with the given graph.
+
+## 7. List Scheduling Algorithm
+
+1. Build dependence DAG.
+2. Compute max delay / priority.
+3. Ready list = nodes whose predecessors are scheduled and latency satisfied.
+4. Pick best ready node each cycle.
+5. Update ready list.
+
+Tie-breaks:
+
+| Priority | Why |
+|---|---|
+| no stall now | avoid bubble |
+| larger MD | protect critical path |
+| original order | simple/predictable |
+| more children | unlock work |
+| final use of reg | reduce live range |
+
+## 8. Worked Scheduling Pattern
+
+Common idea: schedule independent loads/ALU ops between producer and consumer.
+
+Do **not** move memory ops across unknown stores:
+
+```text
+instr 10/12 loads cannot move before instr 7 store if alias possible
+```
+
+Quiz 2 hazard schedule: any schedule reducing bubbles and respecting memory dependence earns; exact "free of hazards" may be impossible under alias constraints.
+
+## 9. Schedule Counts and Quiz Patterns
+
+| Pattern | Bubble count |
+|---|---:|
+| ALU -> ALU, forwarding | 0 |
+| load -> use, forwarding | 1 |
+| no forwarding, producer -> close consumer | up to 2-3 |
+| branch resolved EX | about 2 |
+| branch resolved MEM | about 3 |
+
+## 10. Hardware vs Software Hazard Mitigation
+
+| Technique | Who | Hazard |
+|---|---|---|
+| forwarding/bypassing | HW | data RAW |
+| interlock/stall | HW | data/structural |
+| split I/D cache, more ports | HW | structural |
+| BHT/BTB/RAS | HW | control |
+| OoO | HW | data/resource |
+| instruction scheduling | compiler | data/structural |
+| branch layout/static predict | compiler | control |
+| `restrict`, local copies | programmer/compiler | aliasing |
+
+Deeper pipeline is not a mitigation; it often worsens data/control penalties.
+
+## 11. Memory-Scheduling Restrictions
+
+Search trigger: **alias**, **unknown memory latency**, **store-load**, **volatile**, **call**.
+
+When in doubt for exam:
+
+```text
+register RAW/WAR/WAW -> build DAG
+memory ops -> keep original order unless non-alias proven
+```
 
 ## 12. RAW vs WAR/WAW Release Timing
 
-In simple list scheduling:
+- RAW successor ready only after producer latency.
+- WAR/WAW successor ready once required order/read/write name condition is satisfied.
 
-- RAW successor becomes ready only after producer latency completes.
-- WAR/WAW successor can become ready when predecessor is issued/read/order preserved, because no produced value must be waited for.
-
-> This distinction explains why the scheduler may release order-only edges earlier than true value edges.
+This is why order-only edges do not necessarily create bubbles.
