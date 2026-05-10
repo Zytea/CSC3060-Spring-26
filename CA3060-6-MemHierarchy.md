@@ -46,9 +46,9 @@ AI workload requires both “size” and “bandwidth”
 
 ## RAM Technologies
 
-<img src="img%5CCA3060-6-MemHierarchy_2.png" style="zoom:25%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_2.png" style="zoom:25%;" />
 
-<img src="img%5CCA3060-6-MemHierarchy_3.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_3.png" style="zoom:50%;" />
 
 ## SRAM vs DRAM Summary
 
@@ -75,7 +75,7 @@ AI workload requires both “size” and “bandwidth”
 * d x w DRAM:
   * d⋅ w total bits organized as d ==supercells== of size w bits
 
-  <img src="img%5CCA3060-6-MemHierarchy_0.png" style="zoom:50%;" />
+  <img src="assets%5CCA3060-6-MemHierarchy_0.png" style="zoom:50%;" />
 
 ## Reading DRAM Supercell (2,1)
 
@@ -83,7 +83,7 @@ Step 1(a): Row access strobe ( ==RAS== ) selects row 2.
 
 Step 1(b): Row 2 copied from DRAM array to row buffer.
 
-<img src="img%5CCA3060-6-MemHierarchy_1.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_1.png" style="zoom:50%;" />
 
 Step 2(a): Column access strobe ( ==CAS== ) selects column 1.
 
@@ -91,7 +91,7 @@ Step 2(b): Supercell (2,1) copied from buffer to data lines, and eventually back
 
 Step 3: All data written back to row to provide refresh
 
-<img src="img%5CCA3060-6-MemHierarchy_1-1.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_1-1.png" style="zoom:50%;" />
 
 > **第一步：行访问 (Row Access)**
 >
@@ -116,7 +116,7 @@ Step 3: All data written back to row to provide refresh
 
 ## Memory Modules
 
-<img src="img%5CCA3060-6-MemHierarchy_2-1.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_2-1.png" style="zoom:50%;" />
 
 ## Enhanced DRAMs, NV, and Disks
 
@@ -161,13 +161,13 @@ A **bus** is a collection of parallel wires that carry address, data, and contro
 
 Buses are typically shared by multiple devices.
 
-<img src="img%5CCA3060-6-MemHierarchy_4.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_4.png" style="zoom: 50%;" />
 
 ## 1. Memory Read Transaction
 
 1. CPU places address A on the memory bus (→).
 
-<img src="img%5CCA3060-6-MemHierarchy_23.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_23.png" style="zoom: 50%;" />
 
 2. Main memory reads A from the memory bus, retrieves word x, and places it on the bus (←).
 3. CPU reads word x from the bus and copies it into register X1 (↑).
@@ -176,7 +176,7 @@ Buses are typically shared by multiple devices.
 
 1. CPU places address A on bus. 
 
-<img src="img%5CCA3060-6-MemHierarchy_24.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_24.png" style="zoom: 50%;" />
 
 2. Main memory reads it and waits for the corresponding data word to arrive.
 
@@ -184,13 +184,13 @@ Buses are typically shared by multiple devices.
 
 The gap *widens* between DRAM, disk, and CPU speeds.
 
-<img src="img%5CCA3060-6-MemHierarchy_25.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_25.png" style="zoom: 50%;" />
 
 ## **2. Processor/Memory Latency Gap**
 
 **Impact from the Power Wall** 
 
-<img src="img%5CCA3060-6-MemHierarchy_26.png" style="zoom: 33%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_26.png" style="zoom: 33%;" />
 
 
 
@@ -214,7 +214,7 @@ The gap *widens* between DRAM, disk, and CPU speeds.
 
 ## Levels of Memory Hierarchy
 
-<img src="img%5CCA3060-6-MemHierarchy_27.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_27.png" style="zoom: 50%;" />
 
 ### Why Memory Hierarchy Works
 
@@ -237,7 +237,7 @@ The gap *widens* between DRAM, disk, and CPU speeds.
 * Then accessed data supplied from the upper-level
 * ==Hit time << Miss penalty==
 
-<img src="img%5CCA3060-6-MemHierarchy_5.png" style="zoom: 25%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_5.png" style="zoom: 25%;" />
 
 ## How Is the Memory Hierarchy Managed
 
@@ -326,7 +326,7 @@ Example: IBM 360/91 vs 360/85
 
 AMD Barcelona: 4 processor cores
 
-<img src="img%5CCA3060-6-MemHierarchy_6.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_6.png" style="zoom:50%;" />
 
 ## Four Questions for Memory Hierarchy Design
 
@@ -345,7 +345,7 @@ Difference: this is cache: temporary space, data come and goes. It is a fix, sma
 
 ## Two Simple Caches
 
-<img src="img%5CCA3060-6-MemHierarchy_28.png" style="zoom: 67%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_28.png" style="zoom: 67%;" />
 
 Each block is a cache line with 64Bytes
 
@@ -393,7 +393,7 @@ tag用来标识地址信息，valid表示用来标识当前的数据是否有效
 
 - 8 set is a group of lines that can hold memory blocks
 
-<img src="img%5CCA3060-6-MemHierarchy_29.png" style="zoom: 67%;" />
+<img src="assets%5CCA3060-6-MemHierarchy_29.png" style="zoom: 67%;" />
 
 **Step 1**: 根据 **Index** 找到缓存中的特定行。
 
@@ -499,7 +499,7 @@ Assuming 32b addresses, how many ==a) tag bits== and ==b) number of sets== are u
   * `Cache: 16KB`
   * `256 blocks` `×` `16 words/block`
 
-![](img%5CCA3060-6-MemHierarchy_9.png)
+![](assets%5CCA3060-6-MemHierarchy_9.png)
 
 ## Block Size Considerations
 
@@ -520,1068 +520,724 @@ Assuming 32b addresses, how many ==a) tag bits== and ==b) number of sets== are u
 
 <img src="assets/image-20260507135445218.png" alt="image-20260507135445218" style="zoom:50%;" />
 
-## Cache Hit and Miss
+## 9. Cache Hit and Miss
 
-* Cache read
-  * Read hit
-  * Read miss
-* Cache write
-  * Write hit
-    * **Write-through**: every time the CPU writes data to the cache, the same data is also written to main memory or the next cache level.
-    * **Write-back**: the CPU writes data only to the cache first. Main memory or the next cache level is updated only when the cache line is replaced.
-  * Write miss
-    * **Write-allocate**: if the data being written is not in the cache, the block containing that data is first loaded into cache, then the write is performed on the cached copy.
-    * **No-write-allocate**: if the data being written is not already in the cache, it is written directly to memory and the cache is bypassed.
-
----
-
-## Cache Hit and Miss
-
-* Cache read
-  * Read hit
-  * Read miss
-* Cache write
-  * Write hit
-    * Write-through
-    * Write-back
-  * Write miss
-    * Write allocate
-    * No-write allocate
-
-**Question:** How do we know when to use write-allocate? When to use no-write-allocate?
-
-For example:
-
-* `strcpy()`, `memset()`, `memcpy()`, initialization of arrays, ... -> **no-allocate**
-* Local variable updates, array element updates -> **write-allocate**
-
-Most caches today use **write-back** and **write-allocation** policy.
-
----
-
-## Write Allocate vs Write-no-allocate
-
-On a write miss:
-
-* **Write-Allocate**
-  * Also called **fetch-on-write**.
-  * The system first loads the missing data block from main memory into the cache, then writes the new data to the cache line.
-  * Often works with copy-back / write-back caches.
-  * Initial cost is high, but later reuse is fast.
-* **Write-NoAllocate**
-  * The system **bypasses the cache** and writes directly to main memory, without loading the block into the cache.
-  * The write may be sent to a write buffer waiting for a write-combining opportunity, instead of being written to memory immediately.
-  * Often works with write-through caches.
-  * Initial action is fast, but later reuse is slow. A good case is writing logs.
-
----
-
-## Cache Read
-
-* **Read hit**
-  * On a cache hit, CPU proceeds normally.
-* **Read miss**
-  * On a cache miss:
-    * Stall the CPU pipeline for a **blocking** or **lockup** cache.
-    * Fetch the block from the next level of the hierarchy.
-    * Instruction cache miss: restart instruction fetch.
-    * Data cache miss: complete data access.
-
----
-
-## Non-Blocking Cache
-
-* **Blocking cache**
-  * A cache miss stalls the CPU pipeline.
-  * Called **stall-on-miss**.
-* **Non-blocking cache**
-  * On a cache miss, the CPU does not stall the whole pipeline immediately. It can continue working on other instructions while data is being fetched.
-  * A stall occurs only when the fetched data is required.
-  * Uses the **Miss Status Holding Register (MSHR)** to track outstanding misses.
-  * Called **stall-on-use**.
-  * Two standard models: **hit-under-miss** and **miss-under-miss**.
-  * Non-blocking caches, also called lockup-free caches, support **MLP (Memory Level Parallelism)**.
-
----
-
-## Non-Blocking Cache
-
-![](img/CA3060-6-MemHierarchy_11.png)
-
-* **Blocking cache**: a miss stalls the CPU pipeline, so it is **stall-on-miss**.
-* **Non-blocking cache**: the processor can continue executing independent work and stalls only when the missing value is used, so it is **stall-on-use**.
-* MSHRs track outstanding misses.
-* Hit-under-miss and miss-under-miss allow multiple memory operations to overlap.
-
----
-
-## Instruction Cache Miss Handling
-
-* On instruction cache miss:
-  * Send the original PC value to memory.
-  * Instruct main memory to perform a read and wait for memory to complete the access.
-  * Write the cache entry: put the data from memory in the data portion, write the upper address bits into the tag field, and turn the valid bit on.
-  * Restart instruction execution at the first step, which re-fetches the instruction and now finds it in cache.
-* **Instruction cache prefetching** is a commonly used hardware optimization to reduce instruction cache misses.
-
-Questions:
-
-* Can you prefetch for instruction cache in software?
-* If we prefetch on every miss, why not just use a larger cache line size?
-* Why does the GPU prefetch the next 10-12 lines, but the CPU only prefetches 1-2 lines?
-
----
-
-## Instruction Cache Miss Handling
-
-* On instruction cache miss:
-  * Send the original PC value to memory.
-  * Read the missing instruction block.
-  * Fill the cache entry, update tag and valid bit.
-  * Restart fetching the instruction.
-* Instruction cache prefetching is commonly done in hardware.
-
-```c
-Main() {
-    .....
-    for() {
-        .....
-        if () { f1(); ... f2(); }
-        prefetch(&f3());
-        ...
-        f3(); // I$ miss
-        ...
-    }
-}
+```
+Cache read:    Read hit | Read miss
+Cache write:   Write hit  → Write-through | Write-back
+               Write miss → Write allocate | No-write allocate
 ```
 
-Why not just use a large line?
+- **Write-through:** every time the CPU writes data to the cache, that same data is simultaneously written directly to main memory (or the next level of cache).
+- **Write-back:** the CPU writes data only to the cache initially. Main memory (or the next level) is not updated right away. Update happens only when the cache line is replaced.
+- **Write-allocate:** if the data being written is not in the cache, the entire block containing that data is first read from main memory and loaded into the cache, and then the write operation is performed on the cached copy.
+- **No-write-allocate:** if the data being written is not already in the cache, it is written directly to main memory, and the cache is bypassed.
 
-* Large lines increase the cost of every miss.
-* Branches make huge lines wasteful.
-* Large lines reduce effective cache capacity and are more likely to cause conflict.
-* Prefetch is more flexible.
-* Large line and small line + prefetch are similar only for sequential execution, not for all cases.
+### When to Use Write-Allocate vs No-Write-Allocate
 
----
+- `strcpy()`, `memset()`, `memcpy()`, initialization of arrays → **no-allocate**.
+- Local variable updates, array element updates → **write-allocate**.
 
-## Write Hit - Write-Through Policy
+> Most caches today are using write-back and write-allocation policy.
 
-* **Write-through**: also update data in memory.
-* Advantage:
-  * Fast retrieval while making sure the data is in the backing store.
-  * Data is not lost if the cache is disrupted.
-* Disadvantages:
-  * Writing experiences latency because two places must be written every time.
-  * Memory traffic increases.
-  * Writes take longer.
-  * If base CPI = 1, 10% of instructions are stores, and a memory write takes 100 cycles:
-    * Effective CPI = `1 + 0.1 x 100 = 11`
-* Solution: **write buffer**
-  * Holds data waiting to be written to memory.
-  * CPU continues immediately.
-  * CPU stalls only if the write buffer is full.
+### Write-Allocate vs Write-No-Allocate (on a write miss)
 
----
+- **Write-Allocate:**
 
-## Avoid Waiting for Memory in Write Through
+  - The system first loads the missing data block from main memory into the cache, then writes the new data to the cache line.
+  - Often work with copy-back caches.
+  - The initial cost is high, and the reuse is fast.
 
-* Use a **write buffer (WB)**.
-  * Processor writes data into cache and WB.
-  * Memory controller writes WB data to memory.
-* Write buffer is just a FIFO.
-  * Typical number of entries: 4.
-* Memory system designer's nightmare:
-  * Store frequency > `1 / DRAM write cycle`.
-  * Write buffer saturation => CPU stalled.
-  * Write buffer allows write-coalescing / combining to reduce memory traffic.
+- **Write-NoAllocate:**
 
-Flow:
+  - The system **bypasses the cache** and writes directly to main memory, without loading the block into the cache. The write may be sent to a write buffer waiting for a write-combining opportunity, rather than writing to memory directly.
+  - Often work with write-through cache.
+  - Initial action is fast, but the reuse would be slow. Best case: writing logs.
 
-```text
-Processor -> Cache -> Store Buffer -> DRAM
-                         |
-                  Memory controller
+  ## write hit 和 write miss
+
+  当CPU 执行 store：
+
+  ```
+  A[i] = 10;
+  ```
+
+  cache 会先查 `A[i]` 在不在 cache 里。
+
+  ### 情况 A：write hit
+
+  ```
+  A[i] 已经在 cache 里
+  ```
+
+  那就直接更新 cache。之后看 policy：
+
+  ```
+  write-through: 同时写 cache 和 memory
+  write-back: 只写 cache，之后 evict 时再写回 memory
+  ```
+
+  ### 情况 B：write miss
+
+  ```
+  A[i] 不在 cache 里
+  ```
+
+  这时候用以下两种规则：
+
+  ```
+  write allocate
+  还是
+  write no-allocate
+  ```
+
+  write-allocate 是 miss 时先把整个 block 从 main memory 读进 cache，再在 cache 中写；no-write-allocate 是 miss 时直接写 main memory，绕过 cache。
+
+### Cache Read
+
+- **Read Hit:** CPU proceeds normally.
+- **Read Miss:**
+  - Stall the CPU pipeline (for blocking or lockup cache).
+  - Fetch block from next level of hierarchy.
+  - Instruction cache miss → restart instruction fetch.
+  - Data cache miss → complete data access.
+
+这里是I-cache miss和D-cache miss的区别
+
+```
+IF stage 想取下一条 instruction
+I-cache miss
+前端没有 instruction 可以 decode
+pipeline 前端停住
+block 回来后重新 fetch instruction
 ```
 
-Yet another reason to go for **write-back cache**.
-
----
-
-## Write Hit - Write-Back Policy
-
-* Just update the block in cache.
-  * Keep track of whether each block is **dirty**; one dirty bit is required.
-* When a dirty block is replaced:
-  * Write it back to memory.
-  * Can use a write buffer to allow a replacing block to be read first.
-* Data in cache and memory is inconsistent.
-  * What if another processor wants to read the shared data?
-* Advantage:
-  * Low latency and high throughput for write-intensive applications.
-  * Much lower memory traffic, which is significant for multi-processor systems.
-* Disadvantage:
-  * Data availability risk: the cache could fail before data is persisted to the backing store.
-  * This is why caches are often enhanced with ECC for protection against errors.
-
----
-
-## Writeback-buffer
-
-* **Writeback buffer** sits between the copy-back data cache and the next lower-level memory.
-* Dirty cache lines can be written to memory asynchronously, reducing stall time.
-* Improves overall memory throughput: reads can proceed while writes sit in the buffer.
-
-```text
-Processor -> Copy-back Data Cache -> Writeback buffer -> Memory
+```
+lw x1, 0(x2)
+D-cache miss
+load 不能完成
+需要从下一级 cache / memory 拿数据
+数据回来后完成这次 load
 ```
 
----
+### Non-Blocking Cache
 
-## Example - Intrinsity FastMATH
+- **Blocking cache:** a cache miss stalls the CPU pipeline → "Stall-on-Miss".
+- **Non-blocking cache:** on a cache miss, the CPU doesn't stall the pipeline; it can continue working on other instructions while the data is being fetched. A stall occurs only when the fetched data is required → "Stall-on-Use".
+  - Use the **Miss Status Holding Register (MSHR)** to track outstanding misses.
+  - Two standard models: **Hit-under-miss** and **Miss-under-miss**.
+  - Non-blocking caches (also called **lockup-free caches**) support **MLP (Memory Level Parallelism)**.
+  - MSHR can do miss merging and coalescing.
 
-* Embedded MIPS processor
-  * 12-stage pipeline
-  * Instruction and data access on each cycle
-* Split cache: separate I-cache and D-cache
-  * Each 16KB: `256 blocks x 16 words/block`
-  * D-cache: write-through or write-back
-* SPEC2000 miss rates
-  * I-cache: 0.4%
-  * D-cache: 11.4%
-  * Weighted average: 3.2%
+### Instruction Cache Miss Handling
 
-SPEC2000 benchmarks are desktop apps. Instruction locality is higher. DBMS apps, virtual machines, interpreters, JIT compilers, and object-oriented programs tend to have more I-cache misses.
+On instruction cache miss:
 
----
+1. Send the original PC value to the memory.
+2. Instruct main memory to perform a read and wait for the memory to complete its access.
+3. Write the cache entry — putting the data from memory in the data portion, the upper bits of the address into the tag field, and turning the valid bit on.
+4. Restart the instruction execution at the first step, which will re-fetch the instruction, this time finding it in the cache.
 
-## Review
+Instruction cache prefetching is a commonly used hardware optimization to reduce instruction cache misses.
 
-* Cache organization
-* Set associative cache
-  * Where in the address are the index / set selection bits?
-  * Where in the address are the tag bits?
-* Cache hit
-  * Write-through: use a write buffer.
-  * Write-back: significantly cuts down memory traffic; extremely important for multi-core systems. Uses a writeback buffer.
-* Cache miss
-  * Write-noallocate: bypass the cache.
-  * Write-allocate: presume data will be used later.
-* Non-blocking cache: supports MLP (Memory Level Parallelism).
+**Big lines vs small lines + prefetch:**
 
----
+- Large line increases the cost of every miss.
+- Branches make huge lines wasteful.
+- Large lines reduce effective cache capacity — more likely to cause conflict.
+- Prefetch is more flexible.
 
-## Measuring Cache Performance
+> In summary: large line and small line + prefetch are only similar for sequential execution, not for all cases.
+>
+> - For a large line: fetch the code block, and pay for the next few code blocks.
+> - For smaller lines + prefetch: fetch the current block, and fetch the next block if it is deemed useful.
 
-* Components of CPU time:
-  * Program execution cycles
-    * Includes cache hit time.
-  * Memory stall cycles
-    * Mainly from cache misses.
-* With simplified assumptions, use equal penalty for read and write.
+> Q1: Can you prefetch for instruction cache in software?
+>
+> Yes, if the ISA/hardware supports instruction prefetch hints, software can prefetch future code addresses. But it is harder than data prefetch because the future instruction stream depends on control flow. Therefore I-cache prefetch is usually done by hardware, while software mainly helps through code layout.
+>
+> Q2: If we prefetch on every miss, why not just use a larger cache line size?
+>
+> Large cache lines and prefetch are only similar for purely sequential execution. In real programs, branches make large lines wasteful. Large lines increase miss penalty, reduce effective cache capacity, and cause pollution/conflicts. Prefetch is more flexible because it can fetch future lines only when they are likely useful.
+>
+> Q3: Why does the GPU prefetch for the next 10–12 lines, but the CPU only prefetches for 1–2 lines?
+>
+> GPU can prefetch more instruction cache lines because:
+>     1. Many warps execute the same kernel code, so instruction reuse is high.
+>     2. GPU workloads often have more regular instruction streams.
+>     3. GPU focuses on throughput and can hide latency with many active warps.
+>     4. GPU memory systems support many outstanding requests.
+>
+> CPU prefetches only 1–2 lines because:
+>     1. General-purpose CPU code has frequent branches/calls/returns.
+>         2. Long-distance instruction prefetch is more likely to be wrong.
+>         3. Wrong prefetch wastes bandwidth and pollutes I-cache.
+>         4. CPU cares more about low latency and precise front-end efficiency.
 
-```text
-CPU time = (program execution cycles + memory stall cycles) x clock cycle time
-```
+### Write Hit — Write-Through Policy
 
-<img src="img/CA3060-6-MemHierarchy_35.png" style="zoom:50%;" />
+- **Advantage:** Ensure fast retrieval while making sure the data is in the backing store and is not lost in case the cache is disrupted.
+- **Disadvantage:** Writing data will experience latency as you have to write to two places every time. Increase the traffic to memory. Writes take longer.
 
-<img src="img/CA3060-6-MemHierarchy_36.png" style="zoom:50%;" />
+Example: base CPI = 1, 10% of instructions are stores, write to memory takes 100 cycles → Effective CPI = `1 + 0.1 × 100 = 11`.
 
----
+**Solution: Write Buffer**
 
-## Cache Performance Exercise
+- Hold data waiting to be written to memory.
+- CPU continues immediately.
+- Only stalls on write if the write buffer is full.
+
+### Avoid Waiting for Memory in Write-Through
+
+- Use a write buffer (WB).
+- Processor: writes data into cache and WB.
+- Memory controller: writes WB data to memory.
+- Write Buffer is just a FIFO. Typical number of entries: 4.
+- Memory system designer's nightmare: store frequency > 1 / DRAM write cycle → write buffer saturation → CPU stalled.
+- Write buffer allows write-coalescing/combining to reduce traffic to memory.
+- Yet another reason to go for write-back cache.
+
+### Write Hit — Write-Back Policy
+
+- Just update the block in cache.
+- Keep track of whether each block is dirty — one dirty bit is required.
+- When a dirty block is replaced, write it back to memory. Can use a write buffer to allow a replacing block to be read first.
+- Data in cache and memory is inconsistent (what if another processor wants to read the shared data?).
+
+**Advantage:** Low latency and high throughput for write-intensive applications. Much lower memory traffic (significant for multi-processor systems).
+
+**Disadvantage:** There is a data availability risk because the cache could fail (and so suffer from data loss) before the data is persisted to the backing store. (This is why caches are often enhanced with ECC for protection against errors.)
+
+### Writeback Buffer
+
+- Sits between the copyback data cache and the next lower-level memory.
+- Dirty cache lines can be written to memory asynchronously, reducing stall time.
+- Improves overall memory throughput: reads can proceed while writes sit in the buffer.
+
+### Example — Intrinsity FastMATH
+
+- Embedded MIPS processor, 12-stage pipeline.
+- Instruction and data access on each cycle.
+- **Split cache:** separate I-cache and D-cache, each 16 KB (256 blocks × 16 words/block).
+- D-cache: write-through or write-back.
+- SPEC2000 miss rates:
+  - I-cache: 0.4%
+  - D-cache: 11.4%
+  - Weighted average: 3.2%
+- SPEC2000 benchmarks are desktop apps — instruction locality is higher.
+- DBMS apps, virtual machines, interpreters, JIT compilers, and object-oriented programs tend to have more I-cache misses.
+
+### Review
+
+- **Cache organization:** set associative cache; where in the address are the index (set selection) bits and tag bits.
+- **Cache Hit:**
+  - Write-through → write buffer.
+  - Write-back → significantly cuts memory traffic; extremely important for multi-core; uses a writeback buffer.
+- **Cache Miss:**
+  - Write-no-allocate → bypass the cache.
+  - Write-allocate → presume data will be used later.
+- **Non-blocking cache** → supports MLP.
+
+## 10. Measuring Cache Performance
+
+Components of CPU time:
+
+- Program execution cycles (includes cache hit time).
+- Memory stall cycles (mainly from cache misses).
+
+With simplified assumptions (equal penalty for read/write).
+![image-20260506232256541](C:\Users\lenovo\AppData\Roaming\Typora\typora-user-images\image-20260506232256541.png)
+
+
+
+### Cache Performance Exercise
 
 Given:
 
-* I-cache miss rate = 2%
-* D-cache miss rate = 4%
-* Miss penalty = 100 cycles
-* Base CPI with ideal cache = 2
-* Loads and stores are 36% of instructions
+- I-cache miss rate = 2%
+- D-cache miss rate = 4%
+- Miss penalty = 100 cycles
+- Base CPI (ideal cache) = 2
+- Loads & stores are 36% of instructions
 
-Compute the actual CPI and how many times faster it would be with a perfect cache.
+Compute the actual CPI and how many times faster it would be with a perfect cache:
 
----
+- I-cache miss cycles per instruction = `0.02 × 100 = 2`
+- D-cache miss cycles per instruction = `0.36 × 0.04 × 100 = 1.44`
+- Actual CPI = `2 + 2 + 1.44 = 5.44`
+- Speedup = `5.44 / 2 = 2.72×`
 
-## Cache Performance Exercise
+> Typical CPI of a pipelined processor with perfect caches may be 1.1 – 1.5. If you see a benchmark reporting a CPI of 10, what would be the performance bottleneck?
 
-Given:
+### Average Memory Access Time (AMAT)
 
-* I-cache miss rate = 2%
-* D-cache miss rate = 4%
-* Miss penalty = 100 cycles
-* Base CPI with ideal cache = 2
-* Loads and stores are 36% of instructions
+Hit time is also important for performance (hit may take > 1 cycle).
 
-Miss cycles per instruction:
-
-* I-cache: `0.02 x 100 = 2`
-* D-cache: `0.36 x 0.04 x 100 = 1.44`
-* Actual CPI = `2 + 2 + 1.44 = 5.44`
-* Speedup with perfect cache = `5.44 / 2 = 2.72x`
-
-Typical CPI of a pipelined processor with perfect caches may be 1.1-1.5. If a benchmark reports a CPI of 10, what is the performance bottleneck?
-
----
-
-## Average Memory Access Time (1)
-
-* Hit time is also important for performance. A hit may take more than 1 cycle.
-* Average memory access time (**AMAT**):
-  * Data Cache AMAT = `Hit time + Miss rate x Miss penalty`
-  * Overall AMAT = `%instr x Instruction cache AMAT + %data x Data cache AMAT`
-* Example:
-  * CPU with 1ns clock, hit time = 1 cycle, miss penalty = 20 cycles, cache miss rate = 5%.
-  * AMAT = `1 + 0.05 x 20 = 2ns`
-  * 2 cycles per instruction.
-
----
-
-## Average Memory Access Time (1) - L1D Hit Latency
-
-* Hit time is also important for performance. A hit may take more than 1 cycle.
-* Data Cache AMAT = `Hit time + Miss rate x Miss penalty`
-* Overall AMAT = `%instr x Instruction cache AMAT + %data x Data cache AMAT`
-
-| Typical L1D hit latency today | Latency |
-| :- | :-: |
-| Intel Skylake / Ice Lake | 4-5 cycles |
-| AMD Zen | 4-5 cycles |
-| ARM | 3-4 cycles |
-
-Main contributors: VA-to-PA translation / index, tag comparison, alignment, ECC, and forwarding/register path.
-
----
-
-## AMAT (2)
-
-* Hit time is also important for performance.
-* Average memory access time (**AMAT**):
-  * Data Cache AMAT = `Hit time + Miss rate x Miss penalty`
-  * Overall AMAT = `%instr x Instruction cache AMAT + %data x Data cache AMAT`
-* `%instr` is the percentage of instruction accesses among total memory accesses.
-* `%data` is the percentage of data accesses among total memory accesses.
-* Usually `%instr` is higher than `%data`, but I-cache hits better.
-* With SIMD / vector loads and stores, `%data` could be higher than `%instr`.
-
----
-
-## AMAT No Longer Accurate
-
-* AMAT was a popular and accurate way to estimate memory performance during the 80s-90s.
-* It fit systems with:
-  * Blocking caches.
-  * In-order execution processors.
-* AMAT faded away as cache miss latency became hideable through:
-  * Out-of-order execution processors.
-  * Non-blocking caches with miss-under-miss.
-  * Cache prefetching.
-  * Split I/D cache.
-
----
-
-## Low Hit Latency
-
-* Small and simple.
-  * Small is fast.
-* Direct-map or low associativity.
-* Prediction: predict which way to compare first.
-* Virtual address cache or virtually indexed, physically tagged cache.
-  * Avoid or overlap address translation delay.
-* Cache layout closer to CPU to minimize signal delay.
-
-More advanced techniques.
-
----
-
-## Lower Misses: Associative Caches
-
-* **Fully associative**
-  * Allow a given block to go in any cache entry.
-  * Requires all entries to be searched at once.
-  * Comparator per entry: expensive and slow.
-* **n-way set associative**
-  * Each set contains `n` entries.
-  * Block number determines which set:
-    * `(Block number) modulo (#Sets in cache)`
-  * Search all entries in a given set at once.
-  * `n` comparators: less expensive and fast.
-
-Address view:
-
-```text
-Address = [ Cache block / line number ][ Byte offset ]
-Set number is selected from the cache block / line number.
+```
+Data Cache AMAT = Hit time + Miss rate × Miss penalty
+Overall AMAT = %instr × (I-Cache AMAT) + %data × (D-Cache AMAT)
 ```
 
+**Example:** CPU with 1 ns clock, hit time = 1 cycle, miss penalty = 20 cycles, cache miss rate = 5%.
+
+- AMAT = `1 + 0.05 × 20 = 2 ns` = 2 cycles per instruction.
+
+| Typical L1D hit latency today | cycles |
+| ----------------------------- | ------ |
+| Intel Skylake/Ice Lake        | 4–5    |
+| AMD Zen                       | 4–5    |
+| ARM                           | 3–4    |
+
+Stages: VA→PA, index | Tag comparison | Align, ECC | Forwarding/reg.
+
+- `%instr` is the percentage of instruction accesses in relation to total memory accesses.
+- `%data` is the percentage of data accesses compared to total memory accesses.
+- Usually `%instr > %data`. But I-cache hits better.
+- With SIMD/Vector loads/stores, `%data` could be higher than `%instr`.
+
+### AMAT No Longer Accurate
+
+AMAT was a popular and accurate way to estimate memory performance during the 80s–90s:
+
+- Blocking caches.
+- In-order execution processors.
+
+AMAT faded away as cache miss latency can be hidden:
+
+- Out-of-Order Execution Processors.
+- Non-blocking caches with miss-under-miss.
+- Cache prefetching.
+- Split I/D cache.
+
 ---
 
-## Pop Quiz
+## 11. Improving Cache Performance
+
+```
+Average memory access time = hit time + miss-rate × miss-penalty
+```
+
+Three strategies:
+
+- Reduce the cache hit time.
+- Decrease the cache miss ratio.
+- Decrease the cache miss penalty.
+
+### Low Hit Latency
+
+- Small and Simple — small is fast.
+- Direct-map or low associativity.
+- Prediction (predict which way to compare first).
+- Virtual address cache, or virtual index and physical tagged cache → avoid or overlap with address translation delay.
+- Cache layout closer to CPU to minimize signal delay.
+
+### Lower Misses: Associative Caches
+
+- **Fully associative:**
+  - Allow a given block to go in any cache entry.
+  - Requires all entries to be searched at once.
+  - Comparator per entry (expensive and slow).
+- **N-way set associative:**
+  - Each set contains N entries.
+  - Block number determines which set: `(Block number) mod (#Sets in cache)`.
+  - Search all entries in a given set at once.
+  - N comparators (less expensive and fast).
+
+### Pop Quiz on Set Associative Caches
 
 Which of the following statements are true?
 
-1. A fully associative cache is a 1-way cache.
-2. A direct-mapped cache is a 1-set cache.
-3. A 2-way set associative cache has more sets than a 4-way one.
-4. A direct mapped cache has the least tag overhead.
-5. A fully associative cache has more cache lines than a direct mapped cache.
+1. A fully associative cache is a 1-way cache. **False** — N-way cache means N is the number of cache lines per set; a fully associative cache is a 1-set cache.
+2. A direct-mapped cache is a 1-set cache. **False** — direct-mapped is a 1-way cache; it has N sets.
+3. A 2-way set associative cache has more sets than a 4-way one. **True**.
+4. A direct mapped cache has the least tag overhead. **True** — one tag per cache line, least number of tag bits.
+5. A fully associative cache has more cache lines than a direct mapped cache. **False** — same number of lines (determined by cache size and line size).
 
-**Answer:** 3, 4
+### Associativity Example
 
----
+Compare 4-block caches: Direct mapped (1-way), 2-way set associative, fully associative (4-way).
+Block access sequence: 0, 8, 0, 6, 8.
 
-## Pop Quiz on Set Associative Caches
+**Direct mapped:**
 
-Which of the following statements are true?
+| Block address | Cache index | Hit/miss | Cache content after access |
+| ------------- | ----------- | -------- | -------------------------- |
+| 0 (0000)      | 0           | miss     | Mem[0]                     |
+| 8 (1000)      | 0           | miss     | Mem[8]                     |
+| 0 (0000)      | 0           | miss     | Mem[0]                     |
+| 6 (0110)      | 2           | miss     | Mem[0], Mem[6]             |
+| 8 (1000)      | 0           | miss     | Mem[8], Mem[6]             |
 
-1. A fully associative cache is a 1-way cache.
-2. A direct-mapped cache is a 1-set cache.
-3. A 2-way set associative cache has more sets than a 4-way one.
-4. A direct mapped cache has the least tag overhead.
-5. A fully associative cache has more cache lines than a direct mapped cache.
+**2-way set associative:**
 
-Notes:
+| Block address | Cache index | Hit/miss | Set 0 contents |
+| ------------- | ----------- | -------- | -------------- |
+| 0 (0000)      | 0           | miss     | Mem[0]         |
+| 8 (1000)      | 0           | miss     | Mem[0], Mem[8] |
+| 0 (0000)      | 0           | hit      | Mem[0], Mem[8] |
+| 6 (0110)      | 0           | miss     | Mem[0], Mem[6] |
+| 8 (1000)      | 0           | miss     | Mem[8], Mem[6] |
 
-* An **N-way cache** means `N` is the number of cache lines per set.
-* A **1-way cache** has `N` sets if there are `N` total cache lines.
-* One tag per cache line; direct mapped has the least number of tag bits.
-* The number of cache lines is determined by cache size and line size.
+**Fully associative:**
 
----
+| Block address | Hit/miss | Cache content after access |
+| ------------- | -------- | -------------------------- |
+| 0             | miss     | Mem[0]                     |
+| 8             | miss     | Mem[0], Mem[8]             |
+| 0             | hit      | Mem[0], Mem[8]             |
+| 6             | miss     | Mem[0], Mem[8], Mem[6]     |
+| 8             | hit      | Mem[0], Mem[8], Mem[6]     |
 
-## Associativity Example (1)
+### Conflicts in Set-Associative Caches
 
-Compare **4-block caches**:
+For a direct-mapped cache, the following sequence of block addresses will run into intensive conflict misses:
 
-* Direct mapped (**1-way**)
-* 2-way set associative
-* Fully associative (**4-way**)
-* Block access sequence: `0, 8, 0, 6, 8`
-
-Direct mapped:
-
-| Block address | Cache index | Hit/miss | Set 0 | Set 1 | Set 2 | Set 3 |
-| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `0 (0000)` | 0 | miss | Mem[0] | | | |
-| `8 (1000)` | 0 | miss | Mem[8] | | | |
-| `0 (0000)` | 0 | miss | Mem[0] | | | |
-| `6 (0110)` | 2 | miss | Mem[0] | | Mem[6] | |
-| `8 (1000)` | 0 | miss | Mem[8] | | Mem[6] | |
-
-First miss is compulsory; repeated misses from mapping to the same set are conflict misses.
-
----
-
-## Associativity Example (2)
-
-2-way set associative with access sequence `0, 8, 0, 6, 8`:
-
-| Block address | Cache index | Hit/miss | Set 0 way 0 | Set 0 way 1 | Set 1 way 0 | Set 1 way 1 |
-| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `0 (0000)` | 0 | miss | Mem[0] | | | |
-| `8 (1000)` | 0 | miss | Mem[0] | Mem[8] | | |
-| `0 (0000)` | 0 | hit | Mem[0] | Mem[8] | | |
-| `6 (0110)` | 0 | miss | Mem[0] | Mem[6] | | |
-| `8 (1000)` | 0 | miss | Mem[8] | Mem[6] | | |
-
-Fully associative with access sequence `0, 8, 0, 6, 8`:
-
-| Block address | Hit/miss | Entry 0 | Entry 1 | Entry 2 | Entry 3 |
-| :-: | :-: | :-: | :-: | :-: | :-: |
-| 0 | miss | Mem[0] | | | |
-| 8 | miss | Mem[0] | Mem[8] | | |
-| 0 | hit | Mem[0] | Mem[8] | | |
-| 6 | miss | Mem[0] | Mem[8] | Mem[6] | |
-| 8 | hit | Mem[0] | Mem[8] | Mem[6] | |
-
----
-
-## Conflicts in Set-Associative Caches
-
-* In the above example, the cache has only 4 blocks.
-* For a direct-mapped cache, the following **block address** sequences cause intensive conflict misses:
-  * `0, 4, 8, 12, 16, 20, ...`
-  * `1, 5, 9, 13, 17, 21, ...`
-  * `2, 6, 10, 14, 18, ...`
-* As long as the **distance is a multiple of the cache size**, conflict can happen.
-* For set-associative caches, each set can accommodate more lines, so misses can reduce.
-
----
-
-## Conflict Misses
-
-* Conflict misses occur when multiple lines are mapped to the same set.
-  * Their **set select bits / index bits** are identical.
-* When the address distance between two lines is a multiple of the cache size, the set selection bits will be identical.
-* Example: 4KB direct mapped cache, 64B cache line.
-  * There are 64 sets.
-  * Address bits:
-
-```text
-[31:12] Tag | [11:6] Set selection | [5:0] Byte offset
+```
+0, 4, 8, 12, 16, 20…   or   1, 5, 9, 13, 17, 21…   or   2, 6, 10, 14, 18, …
 ```
 
-If the distance to another line address is `+4096`, the set selection bits are identical.
+As long as the distance is a multiple of the cache size. For set-associative caches, each set can accommodate more lines so that misses would reduce.
 
----
+### Conflict Misses
 
-## Common Cases for Conflict Misses
+Conflict misses occur when multiple lines are mapped to the same set — their set selection bits (index bits) are identical. When the address distance between two lines is a multiple of the cache size, the set selection bits will be identical.
 
-Assuming direct-mapped caches, cache size 4KB, line size 64B.
+Example: 4 KB direct-mapped cache, 64 B cache line → 64 sets.
 
-* Scenario 1: I-cache
-  * Procedure A calls Procedure B, and the distance between A and B is a multiple of 4K.
-* Scenario 2: D-cache
+- If the distance to another line address is +4096 → set selection bits identical.
+
+### Common Cases for Conflict Misses
+
+Assuming direct-mapped caches, cache size 4 KB, line size 64 B.
+
+**Scenario 1 — I-cache:**
+Procedure A calls Procedure B; the distance between A and B is a multiple of 4 K.
+
+**Scenario 2 — D-cache:**
 
 ```c
 float A[1024][1024];
-// loop on j
-B[i] = A[i][j] + A[i+1][j];
-```
-
-* Scenario 3: D-cache
-
-```c
-double A[1024], B[1024], C[1024];
-for (i) {
-    C[i] = A[i] + B[i];
+loop on j {
+    B[i] = A[i][j] + A[i+1][j];
 }
 ```
 
----
-
-## Common Cases for Conflict Misses
-
-Assuming direct-mapped caches, cache size 4KB, line size 64B.
-
-* Scenario 1: I-cache
-  * Procedure A calls Procedure B, and the distance between A and B is a multiple of 4K.
-* Scenario 2: D-cache
-
-```c
-float A[1024][1024];
-// loop
-B[i] = A[i][j] + A[i+1][j];
-```
-
-* Scenario 3: D-cache
+**Scenario 3 — D-cache:**
 
 ```c
 double A[1024], B[1024], C[1024];
-for (i) {
-    C[i] = A[i] + B[i];
-}
+for (i) { C[i] = A[i] + B[i]; }
 ```
 
-Code repositioning:
+**Code Repositioning** (mitigations):
 
-* Layout B next to A.
-* `A[1024][1040]`
-* `A[1024], Dummy0[8], B[1024], Dummy1[8], C[1024]`
-* This may not always work because the compiler may remove unused dummy arrays.
-
----
-
-## Cache Block Replacement
-
-* Direct mapped: no choice; each set has only one line.
-* Set associative or fully associative:
-  * Random.
-  * **LRU (Least Recently Used)**
-    * Hardware keeps track of access history and replaces the block that has not been used for the longest time.
-  * Pseudo-LRU example for a two-way set associative cache:
-    * Use a pointer to point at each block in turn.
-    * Whenever accessing the block that the pointer points at, move the pointer to the next block.
-    * When replacement is needed, replace the block currently pointed at.
-  * **FIFO (First-In First-Out)**
-    * Replaces older data.
-
-True LRU needs a stack, but stack operations are expensive.
-
-Example: a set has 3 blocks. A calls B, B returns, A calls C, C calls D. The set now has A, B, C. When D is referenced, which block should be replaced? LRU -> B, FIFO -> A.
+- Layout B next to A.
+- `A[1024][1040]` (pad row to break stride alignment).
+- `A[1024], Dummy0[8], B[1024], Dummy1[8], C[1024]`.
+- However, this may not always work, since the compiler may remove `Dummy[]` because they are not used.
 
 ---
 
-## Cache Block Replacement
+## 12. Cache Block Replacement
 
-General LRU strategy implementation:
+- **Direct mapped:** No choice; each set has only one line.
+- **Set associative or fully associative:**
+  - **Random**.
+  - **LRU (Least Recently Used):** Hardware keeps track of the access history and replaces the block that has not been used for the longest time.
+    - Pseudo LRU (for a two-way set associative): use a pointer to point at each block in turn. Whenever access to the block the pointer is pointing at, move the pointer to the next block. When need to replace, replace the block currently pointed at.
+    - True LRU needs to use a stack, but stack ops are expensive.
+  - **FIFO (First-In First Out):** replace older data.
 
-* For a 4-block/set cache, use a `log2(4) = 2` bit counter for each block.
-* Reset the counter to 0 whenever the block is accessed.
-* Counters of other blocks in the same set should be incremented.
-* On cache miss, replace / uncache a block with a counter reaching 3.
+> Example: A set has 3 blocks. A calls B, B returns, A calls C, C calls D. The cache set now has A, B, and C blocks. When D is referenced, which block should be replaced? **LRU → B; FIFO → A.**
 
-Optimal replacement:
+### General LRU Strategy Implementation
 
-* **Belady's algorithm**
-  * Replace the block that will be referenced in the farthest future.
-  * Or replace the item not needed for the longest time.
-  * This gives the optimal hit rate, but not necessarily the least memory traffic because replacing a clean block is cheaper.
-* Not implementable because we do not know the future.
+For a 4-block/set cache, use a `log₂(4) = 2` bit counter for each block:
 
----
+- Reset the counter to 0 whenever the block is accessed.
+- Counters of other blocks in the same set should be incremented.
+- On cache miss, replace/uncache a block with a counter reaching 3.
 
-## A Case that DM is Better than FA
+### Optimal Replacement (Belady's Algorithm)
 
-If a loop has 5 cache lines: line 0, line 1, line 2, line 3, line 4.
+- Replace the block that will be referenced in the farthest future (or replace the item not needed for the longest time).
+- This gives the optimal hit rate, but not the least memory traffic (because replacing a clean block is cheaper).
+- Not implementable because we do not know the future.
 
-* Direct-mapped cache with 4 blocks:
-  * Line 0 and line 4 map to the same set.
-  * Line 1, line 2, and line 3 each map to a different set.
-  * Hit rate is 60%: line 1, line 2, and line 3 hit; line 0 and line 4 conflict all the time.
-* Fully associative cache with LRU:
-  * Hit rate is 0%.
-  * Access pattern: `0,1,2,3,4`, then line 4 replaces 0; 0 misses and replaces 1; 1 misses and replaces 2; 2 misses and replaces 3; ...
+### A Case That DM Is Better Than FA
 
-Questions:
+If a loop has 5 cache lines (line 0–4), and the cache is a Direct-Mapped (DM) cache with 4 blocks:
 
-* Why not consider random replacement?
-* What could be a better combination? Some adaptive approach?
+- Line 0 and line 4 will be mapped to the same set; lines 1, 2, 3 each map to different sets.
+- The loop will have 60% hit rate — lines 1, 2, 3 hit; lines 0 and 4 conflict with each other.
 
----
+If the cache is Fully Associative (FA) with LRU:
 
-## Classifying Cache Misses (3 C’s or 4 C’s)
+- The loop will have 0% hit. All lines will be missed in the cache.
+- Sequence: 0,1,2,3,4 (line 4 misses, replaces 0); 0 misses, replaces 1; 1 misses, replaces 2; 2 misses, replaces 3, …
 
-* **Compulsory / cold miss**
-  * When a piece of data is requested for the first time and needs to be brought into cache.
-  * Example: `1, 4, 3, 5, 7`
-* **Conflict / collision miss**
-  * Multiple references map to the same set, and the set is not large enough to hold them.
-  * Example: `3, 4, 8, 11, 12, 19, 4`
-* **Capacity miss**
-  * Cache is not large enough to hold the needed blocks.
-  * Example: `1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8,9`
-* **Coherency miss**
-  * Occurs when invalidation requests are issued by other processors in a multiprocessor system to maintain coherence of cached data.
+> Why not consider using random replacement? What could be a better combination — some adaptive approach?
 
 ---
 
-## Pop Quiz
+## 13. Classifying Cache Misses (3 C's or 4 C's)
 
-My application experiences intensive conflict misses. After reviewing the computer configuration, I discovered that the L1 cache is direct-mapped. Which of the following may reduce the cache misses in my application?
+- **Compulsory (Cold) Miss:** when a piece of data is requested for the very first time and needs to be brought into the cache. Example: 1, 4, 3, 5, 7.
+- **Conflict (Collision) Miss:** multiple references are mapping to the same set, and the set is not large enough to hold them ("collision"-caused misses). Example: 3, 4, 8, 11, 12, 19, 4.
+- **Capacity Miss:** cache is not large enough to hold needed blocks. Example: 1,2,3,4,5,6,7,8,9, 1,2,3,4,5,6,7,8,9.
+- **Coherency Miss:** occurs when invalidation requests are issued by other processors in a multiprocessor system to maintain coherence of cached data.
 
-1. Get a larger L1 cache.
-2. Get a higher associative L1 cache.
-3. Get a larger line size.
-4. Get a larger tag size.
-5. Redesign the algorithm of the application.
-
-**Answer:** 1, 2, 5
+> 3C is foundational, 4C is more advanced.
 
 ---
 
-## Pop Quiz
+## 14. Victim Cache
 
-Assume the L1 cache is 4KB and the line size is 64B.
+- A small fully-associative backup cache, called **victim cache**, could be added to a direct-mapped L1 cache to hold recently evicted cache lines.
+- To defend against cases where some repeated access patterns (maybe bursty) incur multiple power-of-two addresses and cause intensive conflict misses. Such conflict misses often occur within a small number of sets.
+- The victim cache is small, usually 4–8 lines, so it can be accessed quickly.
 
-Array A and B are defined as `double int A[4096], B[4096];`
+**Example:** consider the sequence `0, 4, 8, 2, 3, 12, 4, 8, 0, 12, 4, 0, 5, 6, …`
 
-Which loops will encounter frequent conflict misses if the cache is direct-mapped?
+- 0, 4, 8, 12 may be mapped to the same set, so the hit rate is low — but all of them could be sitting in the victim cache.
 
-```c
-for (i = 0; i < n; i++) A[i] = B[i];
+> Victim cache combines the advantages of a direct-mapped cache and the benefit of a fully associative cache.
 
-for (i = 0; i < n; i++) A[i] = A[i-1] + A[i+1];
+### DM + VC vs Two-Way Associative Cache?
 
-for (i = 0; i < n; i++) A[i] = 0;
+Both can reduce conflict misses. Which one is better?
 
-for (j = 0; j < m; j++)
-    for (i = 0; i < 2048; i++) A[i] += A[i+1024] * 100;
+- **Victim cache:**
+  - Good at handling repetitive references to clustered conflict misses.
+  - Higher temporal locality.
+  - Example: 4, 8, 12, 16, 20, 24, 4, 8, 12, 16, 20, …
+
+- **Two-way set-associative cache:**
+  - Good at handling evenly distributed conflict misses from many sets.
+  - Lower temporal locality.
+  - Example: 4, 8, 4, 7, 11, 15, 8, 6, 10, 8, 6, 7, 8, 11, 10, 15, …
+
+In general-purpose systems (e.g., desktops, servers, laptops), two-way set associative caches are far more common. Direct-mapped caches + victim cache are more specialized and are typically found in embedded systems, older designs, or cost-driven applications.
+
+### Associativity and Miss Rates
+
+In general, increased associativity decreases miss rate, but with diminishing returns.
+
+Simulation of a system with 64 KB D-cache, 16-word blocks, SPEC2000:
+
+- 1-way: 10.3%
+- 2-way: 8.6%
+- 4-way: 8.3%
+- 8-way: 8.1%
+
+A more general estimation:
+
+| Associativity | General miss rate |
+| ------------- | ----------------- |
+| Direct-mapped | 3% – 10%          |
+| 2-way         | 2% – 7%           |
+| 4-way         | 1.5% – 5%         |
+| 8-way         | 1% – 4.5%         |
+
+> A sweet spot exists.
+
+### Pop Quiz
+
+My application experiences intensive conflict misses. The L1D cache is direct-mapped. Which of the following may reduce the cache misses?
+
+1. A larger L1D cache. ✅
+2. A higher associative L1D cache. ✅
+3. A larger line size.
+4. A larger tag.
+5. Redesign the algorithm of the application. ✅
+
+**Answer: 1, 2, 5.**
+
+### Pop Quiz
+
+L1D cache is 4 KB, line size 64 B. `double A[4096], B[4096];` Which loops will experience frequent conflict misses in a direct-mapped cache?
+
+1. `for (i=0; i<n; i++) A[i] = B[i];` ✅
+2. `for (i=0; i<n; i++) A[i] = A[i-1] + A[i+1];`
+3. `for (i=0; i<n; i++) A[i] = 0;`
+4. `for (j=0; j<m; j++) for (i=0; i<10; i++) A[i] += A[i+1024]*C;` ✅
+
+**Answer: 1, 4.**
+
+---
+
+## 15. Multilevel Caches
+
+- Primary cache is next to the CPU — small and fast.
+- Level-2 cache services misses from the primary cache — larger, slower, but still much faster than main memory.
+- High-end systems often include an L3 cache — usually shared by multiple cores on the same chip.
+- We need to maintain consistency across different levels of the cache.
+
+### Multilevel Cache AMAT
+
+```
+AMAT          = L1 hit time + L1 miss rate × L1 miss penalty
+L1 miss penalty = L2 hit time + L2 miss rate × L2 miss penalty
+AMAT          = L1 hit time + L1 miss rate × (L2 hit time + L2 miss rate × L2 miss penalty)
 ```
 
-**Answer:** 1, 4
+> Beware, the L2 miss rate here is a relative miss rate: the ratio of L1 misses that miss the L2.
 
----
+**Typical Hit Rates (Approximate):**
 
-## Victim Cache
+- L1 Cache: 80–95%.
+- L2 Cache: 50–80% (L2 accesses are L1 misses).
+- L3 Cache: 20–40% (L3 accesses are L2 misses; the references to L3 are tough memory references).
 
-![](img/CA3060-6-MemHierarchy_12.png)
-
-* A small fully-associative backup cache, called a **victim cache**, can be added to a direct-mapped L1 cache to hold recently evicted cache lines.
-* It defends against repeated access patterns with multiple power-of-two addresses that cause intensive conflict misses.
-* The victim cache is small, usually 4-8 lines, so it can be accessed quickly.
-
-Consider the sequence:
-
-```text
-0, 4, 8, 2, 3, 12, 4, 8, 0, 12, 4, 0, 5, 6, ...
-```
-
-`0, 4, 8, 12` may map to the same set, so the hit rate is low, but all of them could sit in the victim cache.
-
----
-
-## Victim Cache
-
-![](img/CA3060-6-MemHierarchy_13.png)
-
-* A victim cache is a small fully-associative backup cache added to a direct-mapped L1 cache.
-* It holds recently evicted cache lines.
-* It helps when conflict misses occur within a small number of sets.
-* It combines the advantage of a direct-mapped cache with the benefit of a fully associative cache.
-
----
-
-## Associativity and Miss Rates
-
-* In general, increased associativity decreases miss rate.
-  * But with diminishing returns.
-* Simulation of a system with 64KB D-cache, 16-word blocks, SPEC2000:
-  * 1-way: 10.3%
-  * 2-way: 8.6%
-  * 4-way: 8.3%
-  * 8-way: 8.1%
-
----
-
-## Cache Sizes and Associativity
-
-![](img/CA3060-6-MemHierarchy_14.png)
-
----
-
-## DM+VC or Two-way Associative Cache?
-
-Both direct-mapped cache enhanced with a victim cache and two-way set-associative cache can reduce conflict misses. Which one is better?
-
-* **Victim cache**
-  * Good at handling repetitive references to clustered conflict misses.
-  * Higher temporal locality.
-  * Example: `4,8,12,16,20,24,4,8,12,16,20,...`
-* **Two-way set-associative cache**
-  * Good at handling evenly distributed conflict misses from many sets.
-  * Lower temporal locality.
-  * Example: `4,8,4,7,11,15,8,6,10,8,6,7,8,11,10,15,...`
-
-In general-purpose systems such as desktops, servers, and laptops, **two-way set associative caches** are far more common. Direct-mapped caches plus victim cache are more specialized and typically found in embedded systems, older designs, or cost-driven applications.
-
-Assume the cache has 4 lines. Lines 4, 8, and 12 are block addresses. Line 4 and line 8 map to the same set. Lines 7, 11, 15 map to the same set. Lines 6 and 10 map to the same set.
-
----
-
-## Improving Cache Performance
-
-* Reduce the cache hit time.
-* Decrease the cache miss ratio.
-* Decrease the cache miss penalty.
-
-```text
-Average memory access time = hit time + miss-rate x miss-penalty
-```
-
----
-
-## Multilevel Caches
-
-* Primary cache attached to the CPU:
-  * Small, but fast.
-* Level-2 cache services misses from the primary cache:
-  * Larger, slower, but still faster than main memory.
-* Main memory services L2 cache misses.
-* High-end systems often include an L3 cache.
-  * L3 cache is usually shared by multiple cores on the same chip.
-* Still need to keep consistency between different cache levels.
-
----
-
-## Multilevel Cache AMAT
-
-* `AMAT = L1 hit time + L1 miss rate x L1 miss penalty`
-* `L1 miss penalty = L2 hit time + L2 miss rate x L2 miss penalty`
-* So in total:
-  * `AMAT = L1 hit time + L1 miss rate x (L2 hit time + L2 miss rate x L2 miss penalty)`
-* Beware: the L2 miss rate here is a **relative miss rate**, the ratio of L1 misses that also miss in L2.
-* Typical hit rates, approximate:
-  * L1 Cache: 80-95%
-  * L2 Cache: 50-80%, because L2 accesses are L1 misses.
-  * L3 Cache: 20-40%, because L3 accesses are L2 misses and are tough memory references.
-
----
-
-## Multilevel Cache Example (1)
+### Multilevel Cache Example
 
 Given:
 
-* CPU base CPI = 1, clock rate = 4GHz.
-* Miss rate / instruction = 2%.
-* Main memory access time = 100ns.
+- CPU base CPI = 1, clock rate = 4 GHz.
+- Miss rate per instruction = 2%.
+- Main memory access time = 100 ns.
 
-With just primary cache (L1):
+**With just primary cache (L1):**
 
-* Miss penalty = `100ns / 0.25ns = 400 cycles`.
-* Effective CPI = `1 + 0.02 x 400 = 9`.
+- Miss penalty = `100 ns / 0.25 ns = 400 cycles`.
+- Effective CPI = `1 + 0.02 × 400 = 9`.
 
----
+**Now add an L2 cache:**
 
-## Multilevel Cache Example (2)
+- L1 miss rate to L2 = 2% (already given as miss rate).
+- L2 access time = 5 ns (vs main memory: 100 ns).
+- L2 miss rate to main memory = 50%.
+- Primary miss with L2 hit (assuming 80% hit in L2): penalty = `5 ns / 0.25 ns = 20 cycles`.
+- Primary miss with L2 miss (20%): penalty = 400 cycles.
+- CPI = `1 + 0.02 × (20 + 0.2 × 400) = 1 + 2 = 3`.
+- Performance ratio = `9 / 3 = 3`.
 
-Now add L2 cache:
+> Once again, AMAT is only an approximation. It is not accurate when the cache miss penalty can be overlapped with other instruction executions.
 
-* L1 miss rate to L2 = 2%.
-* L2 access time = 5ns, access to memory = 100ns.
-* L2 miss rate to main memory = 50%.
-* Primary miss with L2 hit:
-  * Penalty to access L2 = `5ns / 0.25ns = 20 cycles`.
-* Primary miss with L2 miss, assuming 80% hit in L2:
-  * Penalty to access memory = 400 cycles.
-* CPI = `1 + 0.02 x 20 + 0.02 x 0.2 x 400 = 1.4 + 1.6`.
-* Performance ratio = `9 / 3 = 3`.
+### Multilevel Cache Considerations
 
-Once again, AMAT is only an approximation. It is not accurate when cache miss penalty can be overlapped with other instruction execution.
+- **L1 cache:**
+  - Focus on minimal hit time, must be fast.
+  - Spatial locality more important.
+  - Write-through to L2 is one option.
+- **L2 cache:**
+  - Focus on low miss rate to avoid going to main memory (reduce latency as well as both memory and bus traffic).
+  - Hit time has less overall impact.
+  - Temporal locality more important.
+  - Write-back is more common.
 
----
+### Alternatives to Reduce Cache Miss Penalty
 
-## Multilevel Cache Considerations
-
-* **L1 cache**
-  * Focus on minimal hit time; it must be fast.
-  * Spatial locality is more important.
-  * Write-through to L2 is one option.
-* **L2 cache**
-  * Focus on low miss rate to avoid going to main memory.
-  * Reduces latency, memory traffic, and bus traffic.
-  * Hit time has less overall impact.
-  * Temporal locality is more important.
-  * Write-back is more common.
-
----
-
-## Alternatives to Reduce Cache Miss Penalty
-
-* **Critical word first and early restart**
-  * Fetch the requested critical word from memory before the rest of the cache line, and resume execution immediately after receiving the critical word.
-* **Non-blocking caches**
-  * Allow multiple misses to overlap.
-* **Cache prefetching**
-  * Trigger the miss earlier.
-* **Write buffer for copy-back cache**
-* **Cache-aware code scheduling**
-  * Attempt to hide the miss penalty.
+- **Critical word first and early restart:** Fetch the requested (critical word) from memory before the rest of the cache line, and resume execution immediately after receiving the critical word.
+- **Non-blocking caches:** Allow multiple misses to overlap.
+- **Cache prefetching:** Trigger the miss to occur earlier.
+- **Write buffer for copy-back cache.**
+- **Cache-aware code scheduling:** Attempt to hide the miss penalty.
 
 ---
 
-## Cache Coherence in Multiprocessors
+## 16. Cache Coherence in Multiprocessors
 
-With a **write-back cache policy**, multiple processors can have private cached copies of the same memory block.
+With multiple processors, each having a private cache and a write-back policy, the same memory location can have different values across caches → coherence problem.
 
-```text
-Processor + Cache    Processor + Cache    Processor + Cache    Processor + Cache
-          \              |                  |                  /
-                           Memory
-```
+> Write through doesn't help! (Other caches still hold stale values.)
 
-The coherence problem starts when one cached copy changes but other cached copies or memory still contain old values.
+### Snoopy Cache Coherence Schemes
 
----
+**Basic idea:**
 
-## Cache Coherence in Multiprocessors
+- All coherence-related activities are broadcast to all processors (e.g., on a global bus).
+- Each processor (i.e., cache controller) monitors (aka "snoops") these actions and reacts to those relevant to current contents of its cache.
 
-With a **write-back cache policy**:
+**Examples:**
 
-1. Multiple processors cache `u:5`.
-2. One processor updates its cached copy.
-3. Other processors or memory may still hold the stale value.
+- If one processor wishes to write to a cache line, it needs to "invalidate" all copies in other caches.
+- If another processor wishes to read a line for which this cache has a dirty copy, it needs to supply and share the copy.
 
-This creates the need for a coherence protocol.
+Example machines: SGI Challenge, SUN Enterprise, multiprocessor PCs, etc.
 
----
+### MESI Protocol
 
-## Potential Problem (Data Coherence)
+Four states:
 
-With a **write-back cache policy**:
+- **M:** Modify state.
+- **E:** Exclusive.
+- **S:** Shared.
+- **I:** Invalid.
 
-* Processor P writes `u = 7` in its cache.
-* Memory may still contain `u:5`.
-* Other processors may have cached `u:5`.
+### Implementing a Snoopy Protocol
 
-Question shown in the PPT:
+- Cache controller receives inputs from both sides:
+  - Requests from processor.
+  - Bus requests/responses from snooper in cache controller.
+- In either case, takes zero or more actions:
+  - Updates state.
+  - Responds with data.
+  - Generates new bus transactions.
+- Protocol is a distributed algorithm: cooperating state machines.
+- Set of states, state transition diagram, actions.
+- Granularity of coherence is a cache block (similar to allocation in cache and transfer to/from cache).
 
-```text
-u = ?
-u = ?
-u = 7
-```
+### Exclusive / Inclusive Caches
 
----
+- **Inclusive caches** (assuming L1/L2): Every line in L1 must be presented in L2. Suitable for L1/L2.
+- **Exclusive caches:** If a line A is in L1, it must NOT be presented in L2 (L1/L2 exclusive). Greater capacity efficiency. AMD had adopted this for L2/L3.
+- **NINE (Non-Inclusive and Non-Exclusive):** More suitable for L2/L3.
 
-## Incoherent Data
+### Advantages of Exclusive/Inclusive Caches
 
-**Write through doesn't help!**
+- **Inclusive caches (L1/L2):** In a multiprocessor architecture with private L1 caches, when a processor issues a write request to its L1 cache, it must invalidate the corresponding cache lines in the L1 caches of other processors. With an inclusive L2 cache, the invalidation check can be performed in the L2 cache, which usually has more cycles available to manage coherence traffic effectively.
+- **Exclusive caches:** Inclusion property will cause duplications of lines. L1 lines must be duplicated in L2. So if L1 is 16 KB and L2 is 64 KB, then 25% of cache space in L2 is wasted.
 
-Even if writes reach memory, other processors can still hold stale cache copies unless the coherence protocol invalidates or updates those copies.
+> More modern processors are using inclusive caches than exclusive caches.
 
-```text
-P writes u:7
-Other cache copies may still contain u:5
-Observed values can become incoherent without coherence handling.
-```
+### Special Operations of Exclusive/Inclusive Caches
 
----
+**Inclusive caches (L1/L2):**
 
-## Snoopy Cache Coherence Schemes
+- If L2 evicts a line, it must invalidate the respective line in L1.
 
-![](img/CA3060-6-MemHierarchy_16.png)
+**Exclusive caches:**
 
-* Basic idea:
-  * All coherence-related activities are broadcast to all processors, for example on a **global bus**.
-  * Each processor, or cache controller, monitors / **snoops** these actions and reacts to those relevant to its cache contents.
-* Examples:
-  * If one processor wants to write to a cache line, it must **invalidate** all copies in other caches.
-  * If another processor wants to read a line for which this cache has a dirty copy, this cache must supply and share the copy.
-* Example machines:
-  * SGI Challenge, SUN Enterprise, multiprocessor PCs, etc.
+- If L1 evicts a line, this line moves to L2.
+- If both L1 and L2 miss, the new line moves from main memory and is placed in L1 only.
+- If L1 misses but hits in L2, the L2 line migrates to L1.
+- Inclusive caches allow lower-level caches to have larger line sizes.
+- Exclusive caches usually have the same cache line size.
 
----
+### Operations of Inclusive Caches (illustration)
 
-## Implementing a Snoopy Protocol
+- Case 1: Initial state.
+- Case 2: X miss in L1.
+- Case 3: Y miss in L1.
+- Case 4: X evicted from L1.
+- Case 5: Y evicted from L2 → back-invalidated in L1.
 
-* Cache controller receives inputs from both sides:
-  * Requests from processor.
-  * Bus requests / responses from snooper in cache controller.
-* In either case, it takes zero or more actions:
-  * Updates state.
-  * Responds with data.
-  * Generates new bus transactions.
-* Protocol is a **distributed algorithm**: cooperating state machines.
-  * Set of states.
-  * State transition diagram.
-  * Actions.
-* Granularity of coherence is a **cache block**.
-  * Similar to allocation in cache and transfer to/from cache.
+### Operations of Exclusive Caches (illustration)
 
-MESI protocol states:
+- Case 1: Initial state.
+- Case 2: X miss in L1, moved from memory to L1 directly.
+- Case 3: Y miss in L1.
+- Case 4: X evicted from L1, must be placed in L2.
 
-* M: Modified
-* E: Exclusive
-* S: Shared
-* I: Invalid
+### Interactions with Advanced CPUs
 
----
+- Out-of-order (OOO) CPUs can execute instructions during a cache miss — independent instructions continue.
+- With non-blocking caches, OOO can trigger multiple cache misses to overlap.
+- The effect of a cache miss depends on the program data flow → much harder to analyze.
+- Use system simulations — this is why you need to know how to write a `$`-simulator.
+- Collect cache miss profiles.
+- Cache misses are likely to be correlated — imagine an AI-based cache prefetcher! Is it possible to use ML to detect such correlations?
 
-## Directory Based Cache Coherency
+### Interactions with Software (Quicksort vs Radix Sort)
 
-* Snoopy cache protocol is not scalable.
-  * It relies on a global bus.
-* For larger systems with hundreds or thousands of processors:
-  * A centralized or distributed directory tracks which processors have copies of each cache line.
-  * When a processor wants to access a cache line, it consults the directory to determine the line's state and where other copies are.
-* Advantages:
-  * Scalability: more scalable than snoopy protocols for large systems.
-  * Reduced traffic: avoids broadcasts and lowers network contention.
-  * Flexibility: adaptable to different system architectures and memory organizations.
-* Disadvantages:
-  * Complexity.
-  * Potentially longer latency.
-  * Directory overhead, requiring more memory bits.
+- Figure (a): when the size of data is large, Radix sort needs fewer operations than Quicksort.
+- Figure (b): when the size of data is large, the runtime of Radix sort is not faster.
+- Figure (c): when the size of data is large, Radix sort suffers from more cache misses.
 
----
+> O(N log N) vs O(N): **Locality matters!** Quicksort has high locality.
 
-## Exclusive/Inclusive Caches
+## 17. Application of Caches
 
-* **Inclusive caches**, assuming L1/L2:
-  * Every line in L1 must be present in L2.
-* **Exclusive caches**:
-  * If a line `A` is in L1, it must **not** be present in L2.
-  * L1 and L2 are exclusive.
-
----
-
-## Advantages of Exclusive/Inclusive Caches
-
-* **Inclusive caches**, assuming L1/L2:
-  * In a multiprocessor architecture with private L1 caches, when a processor issues a write request to its L1, it must invalidate corresponding cache lines in other processors' L1 caches.
-  * With an inclusive L2 cache, the invalidation check can be performed in L2, which usually has more cycles available to manage coherence traffic.
-* **Exclusive caches**:
-  * Inclusion duplicates lines: L1 lines must be duplicated in L2.
-  * If L1 is 16KB and L2 is 64KB, then 25% of L2 cache space is wasted.
-* More modern processors use inclusive caches than exclusive caches.
-
----
-
-## Special Operations of Exclusive/Inclusive Caches
-
-* **Inclusive caches**, assuming L1/L2:
-  * If L2 evicts a line, it must invalidate the corresponding line in L1.
-* **Exclusive caches**:
-  * If L1 evicts a line, this line moves to L2.
-  * If both L1 and L2 miss, the new line moves from main memory and is placed in L1 only.
-  * If L1 misses but L2 hits, the L2 line **migrates** to L1.
-* Inclusive caches allow lower-level caches to have larger line sizes.
-* Exclusive caches usually have the same cache line size.
-
----
-
-## Operations of Inclusive Caches
-
-Cases in the PPT:
-
-1. Initial state.
-2. `X` miss in L1.
-3. `Y` miss in L1.
-4. `X` evicted from L1.
-5. `Y` evicted from L2.
-
-Key point: with inclusive caches, if L2 evicts a line that is also present in L1, L1 must be **back-invalidated**.
-
----
-
-## Operations of Exclusive Caches
-
-Cases in the PPT:
-
-1. Initial state.
-2. `X` miss in L1: `X` moves from memory to L1 directly.
-3. `Y` miss in L1.
-4. `X` evicted from L1: `X` must be placed in L2.
-
-Key point: with exclusive caches, a line should live in either L1 or L2, not both.
-
----
-
-## Interactions with Advanced CPUs
-
-* Out-of-order (OOO) CPUs can execute instructions during a cache miss.
-  * Independent instructions continue.
-  * With non-blocking caches, OOO can trigger multiple cache misses to overlap.
-* The effect of a cache miss depends on program data flow.
-  * Much harder to analyze.
-  * Use system simulations; this is why you need to know how to write `$`-simulator.
-  * Collect cache miss profiles.
-  * Cache misses are likely to be correlated. Imagine an AI-based cache prefetcher: is it possible to use ML to detect such correlations?
-
----
-
-## Interactions with Software
-
-* Figure **a** shows that when data size is large, Radix sort needs fewer operations than quicksort.
-* Figure **b** shows that when data size is large, Radix sort is not faster in runtime.
-* Figure **c** shows that when data size is large, Radix sort suffers from more cache misses.
-
-<img src="img/CA3060-6-MemHierarchy_17.png" style="zoom:25%;" />
-
----
-
-## Interactions with Software
-
-* Figure **a**: Radix sort needs fewer operations than quicksort for large data.
-* Figure **b**: Radix sort is not faster in runtime for large data.
-* Figure **c**: Radix sort suffers from more cache misses for large data.
-
-<img src="img/CA3060-6-MemHierarchy_20.png" style="zoom:25%;" />
-
-**Locality matters!!**
-
----
-
-## Application of Caches
-
-**Akamai** is a global content delivery network (CDN) provider that delivers content quickly and reliably to users. Due to rapid growth, they encountered a scale-up problem in the late 90's: network traffic jams caused serious performance impact for customers. How did they solve it?
-
-**Cache:** contents are cached at distribution stations.
-
-**GPU** tends to have a very large register file. For example, Nvidia 4090 has 144 SMs; each SM has 4 SPs, and each SP has 16K registers. The 16K registers are shared by multiple warps, each warp is a group of 32 threads. If 8 warps interleave, then `16K / 32 / 8 = 64`, meaning each thread can have only 64 registers. If you want more warps to interleave and more threads per warp, you need even more registers. With such a large register file, register access time increases. What should you do if access time increases to 10 clock cycles?
-
-**Cache:** use a cache to speed up register accesses.
-
-The register number is the address of each cache reference.
+- **Akamai** is a global content delivery network (CDN) provider that delivers content quickly and reliably to users. Due to rapid growth, they encountered a scale-up problem in the late 90s — the network traffic jam caused serious performance impact for customers. **Cache:** contents are cached at distribution stations.
+- **GPUs** tend to have a very large register file. For example, Nvidia 4090 has 144 SMs, each SM has 64K registers. With such a large register file, the register access time will increase. What should you do if the access time is increased to 10 clock cycles? **Cache:** use a cache to speed up register accesses! The register number used as operands in each instruction is the address of each cache reference.
