@@ -60,8 +60,6 @@
 
 **Branchless transforms** for unpredictable branches (e.g. balanced BST ≈ 50/50): compiler emits `slt + mask` (RV) or `cmov` (x86). Trade: 1 extra unconditional instr; no pipeline flush. RV32I has no `cmov` — uses `slt + and`.
 
-> Real-world: Google +0.5s → −20% traffic. Amazon +100 ms → −1% sales. HFT cares µs. Netflix encoding → CDN $M/yr.
-
 ## 2. Compiler Flag Reference
 
 | Flag | Meaning |
@@ -187,23 +185,7 @@ void sum_rows1(double *restrict a, double *restrict b, long n);
 
 > Quiz: `*a, *b` not aliased but compiler doesn't reg-allocate → **`restrict` + manual local copy**. ❌ NOT switching compilers, NOT just `-O3`.
 
-**Compiler diagnostics** to detect alias-blocked opts:
-
-```bash
-gcc   -O3 -fopt-info-missed=missed.txt   my_program.c
-clang -O3 -Rpass-missed='.*' -Rpass-analysis='.*'  my_program.c
-```
-
-**Function calls in loops**:
-
-```c
-for (i = 0; i < strlen(s); i++) ...    // QUADRATIC: strlen each iter
-// ↓ LINEAR (only if loop doesn't modify s)
-size_t n = strlen(s);
-for (i = 0; i < n; i++) ...
-```
-
-> If loop modifies `s`, hoisting `strlen` is **wrong** — even "pure" functions must be recalled.
+==**Pure-fn-in-loop trap**==: `for(i=0; i<strlen(s); i++)` is **quadratic** (`strlen` recomputed each iter). Hoist `n=strlen(s)` only when **loop does not modify `s`** — even "pure" fns must be re-called after writes.
 
 ## 6. Loop Optimizations
 
@@ -217,32 +199,12 @@ for (i = 0; i < n; i++) ...
 | more scheduling freedom                      | aliasing / dep constraints                |
 |                                              | small `n` → cleanup dominates             |
 
-```c
-// unroll-by-4
-for (i = 0; i + 4 < nelts; i += 4) {
-    A[i  ] = B[i  ]*k + C[i  ];
-    //...
-    A[i+3] = B[i+3]*k + C[i+3];
-}
-for (; i < nelts; i++) A[i] = B[i]*k + C[i];        // cleanup
-```
-
 > [!IMPORTANT]
-> ==**Loop unrolling ≠ locality opt**== — wins are branch overhead ↓ + ILP / SIMD ↑. Loop interchange / fusion / tiling are the locality opts.
+> ==**Loop unrolling ≠ locality opt**== — wins are branch overhead ↓ + ILP / SIMD ↑. Loop interchange / fusion / tiling are the locality opts. Unroll-by-`k` without a **cleanup tail** is wrong when `n % k ≠ 0`.
 
 ### 6.2 Scheduling (Compiler-Side)
 
-```c
-// Hoist loads above ops; cannot move across possible aliases
-for (i = 0; i+4 < n; i += 4) {
-    B0=B[i]; B1=B[i+1]; B2=B[i+2]; B3=B[i+3];   // batch loads
-    C0=C[i]; C1=C[i+1]; C2=C[i+2]; C3=C[i+3];
-    A[i] = B0*k+C0; A[i+1] = B1*k+C1;            // independent ops
-    A[i+2] = B2*k+C2; A[i+3] = B3*k+C3;
-}
-```
-
-> Trap: **incorrect** if `A` overlaps `B`/`C` (writes to A change values being read).
+Compiler hoists loads above ALU ops to expose ILP / fill load latency. ❌ **Cannot move a load above a store** if aliasing is possible — stores might change values being read.
 
 ## 7. CPE / Critical Path
 
@@ -260,13 +222,6 @@ With `k` independent accumulators: $CPE \ge \max(L/k,\ \text{issue\_limit},\ \te
 
 **`combine4` wins**: hoist `vec_length`; get data ptr once; accumulate in **local scalar** (no alias block); store `*dest` once at end.
 
-**CPE progression**:
-
-| Version    | `combine1` no opt | `-O1` | `-O3` | **`combine4`** | **+ unroll + k accs** |
-| ---------- | ----------------- | ----- | ----- | -------------- | --------------------- |
-| **Int +**  | 22.7              | 10.1  | 4.5   | **1.27**       | **0.81**              |
-| **FP +**   | 20.0              | 10.2  | 6.0   | **3.01**       | **1.51**              |
-| **FP ×**   | 20.2              | 11.1  | 7.8   | **5.01**       | **2.51**              |
 
 ## 8. Reduction & SIMD
 
