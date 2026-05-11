@@ -54,25 +54,6 @@
 
 Producer writes in WB; consumer reads in ID. With WB-first-half + ID-second-half trick → 2 bubbles.
 
-==**Quiz 2 sequence (no forwarding) → 9 bubbles**==:
-
-```asm
-1. LW S1, 8(S0)
-2. LW S2, 16(S0)
-3. SUB T4, S2, S1     ← 2 bubbles (RAW on S2/S1)
-4. AND T5, T4, T3     ← 2 bubbles (RAW on T4)
-5. SUB S4, T4, T3     ← 0 (T4 already bubbled by 4)
-6. ADD T6, S4, T4     ← 2 bubbles (RAW on S4)
-7. SW T6, 4(S7)       ← 2 bubbles (RAW on T6)
-8. LW S3, 24(S7)
-9. LW S1, 8(S7)
-10. LW S5, 32(S0)
-11. ADD T7, S3, S1    ← 1 bubble (RAW on S1, 1 cy apart)
-12. LW S6, 64(S0)
-```
-
-**With forwarding: 0**
-
 ### 2.2 Forwarding Equations
 
 ```verilog
@@ -238,4 +219,4 @@ if (a!=b) {...}      // B3 — predictable from B1, B2
 
 ==**Not useful in modern HW**==: BTB already gives target in IF; only helps direct branches (not `JALR`/returns); adds ID-stage adder cost.
 
-> Future focus: better prediction for **indirect branches + returns** (the hardest).
+> Future focus: better prediction for **indirect branches + returns** (the hardest).mip

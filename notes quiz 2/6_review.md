@@ -1,6 +1,4 @@
-# Lec 6: Memory Hierarchy & Caches
-
-## Exam Facts
+# Lec 6: Memory Hierarchy
 
 - ==**Memory hierarchy**==: small/fast/expensive near CPU; large/slow/cheap far → illusion of **fast + large + inexpensive**.
   - L0 **registers** ← compiler/programmer.
@@ -38,7 +36,7 @@
   - **Larger line helps**: spatial locality, tag overhead, compulsory; **hurts**: miss penalty, bandwidth, fewer lines.
 
 - ==**DM vs set-assoc**== (same C, B):
-  - **DM has lowest tag overhead + simplest replacement** ✅; 2-way has **more sets** than 4-way ✅
+  - **DM (E=1) has lowest tag overhead + simplest replacement** ✅; 2-way has **more sets** than 4-way ✅
   - Fully-assoc ≠ lowest miss (depends on replacement); DM = "1-way", fully-assoc = "1-set"
 
 - ==**Conflict miss trigger**==: addresses spaced by **multiple of cache size** map to same set. Fix: padding (must be **used**), alignment, code repositioning.
@@ -46,30 +44,26 @@
 - ==**Sorting locality**==: **Quicksort, Insertion, Bubble = high**; **Heapsort, Radix = poor**.
 
 - **VA/PA**: load/store → VA; physical cache → PA; TLB caches PTE; page table in **main memory**.
-  - ==**TLB miss may → page fault**==.
-  - **VIPT** (virt-idx, phys-tag) overlaps translation w/ cache access.
+  - ==**TLB miss may (<100 c)→ page fault (1m c)**==.
+  - **VIPT** (virt-idx, phys-tag) overlaps translation & cache access.
   - **Virtual-tagged cache** complicated by ==**synonyms/aliasing**== (2 VAs → 1 PA).
   - **TLB + victim cache**: usually **fully associative**.
 
 ## 1. SRAM vs DRAM
 
-| Metric    | **SRAM**              | **DRAM**             |
-| --------- | --------------------- | -------------------- |
-| cell      | 6–8 transistors       | 1T + 1C              |
-| refresh   | ❌                    | ✅ (every ~64 ms)    |
-| speed     | fast (~1 cy)          | slow (50–70 ns)      |
-| density   | low                   | high                 |
-| cost      | ~100×                 | 1×                   |
-| use       | **caches**, local mem | **main memory**      |
+| Metric   | cell            | refresh          | speed           | density | cost  | use                   |
+| -------- | --------------- | ---------------- | --------------- | ------- | ----- | --------------------- |
+| **SRAM** | 6–8 transistors | ❌                | fast (~1 cy)    | low     | ~100× | **caches**, local mem |
+| **DRAM** | 1T + 1C         | ✅ (every ~64 ms) | slow (50–70 ns) | high    | 1×    | **main memory**       |
 
 ==**DRAM read**==: RAS (row→Row Buffer) → CAS (col→data lines) → Refresh (write back, read is destructive).
 
 ==**Memory wall**== (CPU speed > DRAM):
 
-| Wall          | Reduction                                       | Hiding                                                        |
-| ------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| **Latency**   | caches, local mem, NUMA, PIM                    | multi-threading, hyper-threading, WARP interleaving           |
-| **Bandwidth** | HBM, multi-banks, interleaved mem, wider bus    | compression, blocking, fewer bytes (low-precision FP)         |
+| Wall          | Reduction                                    | Hiding                                                |
+| ------------- | -------------------------------------------- | ----------------------------------------------------- |
+| **Latency**   | caches, local mem, NUMA, PIM                 | multi-threading, hyper-threading,                     |
+| **Bandwidth** | HBM, multi-banks, interleaved mem, wider bus | compression, blocking, fewer bytes (low-precision FP) |
 
 ## 2. Cache Basics
 
@@ -83,7 +77,7 @@ set_index    = (addr >> b) & (S - 1)
 tag          = addr >> (b + s)
 ```
 
-==**Lookup**==: extract `set` → compare tag against valid ways → hit = (tag match) ∧ (valid=1) → block offset selects byte. Miss: pick victim; if dirty (WB), write back; fill new line; set valid+tag.
+==**Lookup**==: extract `s` → compare tag against valid ways → `hit = (tag match) ∧ (valid=1)` → block offset selects byte. Miss: pick victim; if dirty (WB), write back; fill new line; set valid+tag.
 
 ==**Cache-like structures**==:
 
@@ -98,35 +92,39 @@ tag          = addr >> (b + s)
 ### 2.1 Parameter Formulas
 
 $$
-\boxed{S = \frac{C}{B \cdot E}, \quad b = \log_2 B, \quad s = \log_2 S, \quad t = m - s - b}
+S = \frac{C}{B \cdot E}, \quad b = \log_2 B, \quad s = \log_2 S, \quad t = m - s - b
 $$
 
 | Symbol | `C`             | `B`              | `E`                  | `S`           | `m`              |
 | ------ | --------------- | ---------------- | -------------------- | ------------- | ---------------- |
-| **Meaning** | cache size (B) | block size (B) | associativity (ways) | # sets        | addr width (e.g. 32) |
+| **Meaning** | cache size (B) | block size (B) | associativity (ways) | # sets        | addr width ( 32) |
 
-==**Worked: 64 KB, 4-way, 32 B line, 32-bit**==:
-
-```text
-S = 65536 / (4*32) = 512 sets;  b = 5;  s = 9;  t = 32 - 9 - 5 = 18
-→ tag 18 | set 9 | offset 5
-```
-
-==**Worked: 16 KB, 64 B line, varying assoc**==:
-
-| Org           | DM  | 2-way | 4-way | 8-way | **FA**  |
-| ------------- | --- | ----- | ----- | ----- | ------- |
-| **# sets**    | 256 | 128   | 64    | 32    | **1**   |
-
-==**Total cache bits**==: `DataBits = C * 8`; `MetaBits ≈ S*E*(1 + t + d)` (`d=1` if dirty); add 2 bits MESI for multicore.
+> Example:
+>
+> **Worked: 64 KB, 4-way, 32 B line, 32-bit**:
+>
+> ```text
+> S = 65536 / (4*32) = 512 sets;  b = 5;  s = 9;  t = 32 - 9 - 5 = 18
+> → tag 18 | set 9 | offset 5
+> ```
+>
+> **Worked: 16 KB, 64 B line, varying assoc**:
+>
+> | Org        | DM   | 2-way | 4-way | 8-way | **FA** |
+> | ---------- | ---- | ----- | ----- | ----- | ------ |
+> | **# sets** | 256  | 128   | 64    | 32    | **1**  |
+>
+> **Total cache bits**: `DataBits = C * 8`; `MetaBits ≈ S*E*(1 + t + d)` (`d=1` if dirty); add 2 bits MESI for multicore.
 
 ### 2.2 Direct-Mapped Conflict
 
 ==**Conflict pattern**==: access `A, B, A, B, …` where `set(A) == set(B)`, `tag(A) ≠ tag(B)`.
 
-> ==Distance for conflict in DM = `B * S` = **cache size**==.
+> [!NOTE]
+>
+> Distance for conflict in DM = `B * S` = **cache size**.
 
-==**Worked**==: 4 KB DM, 32 B line → `S = 128`. Set repeats every $128 \times 32 = 4096 \text{ B}$.
+**Worked**: 4 KB DM, 32 B line → `S = 128`. Set repeats every $128 \times 32 = 4096 \text{ B}$.
 
 ==**Quiz example**==: 4 KB, 2-way, 32 B → `S = 64`, set repeats every 2 KB. More than 2 live blocks → conflicts.
 
