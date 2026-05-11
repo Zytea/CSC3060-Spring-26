@@ -24,7 +24,8 @@
 - **Untagged BHT**: simple, fast, cheap, low energy. **NOT** "good for high-perf" (uses tagged/correlated).
 - **2-bit FSM**: 85–95%; 1-bit BHT: 70–80%; correlated: 94–96%; tournament: 96–97%; **TAGE**: 97–99%.
   - **1-bit BHT mispredicts twice per inner loop** (last iter wrong + first iter next time wrong).
-- **Tree/list traversal**: ==**data hazards** (pointer load-use) **+ control hazards** (branch on data)==.
+- ==**Linked-list pointer chase**== (`while (p) p=p->next`): ==**data hazard only**== (load-use chain; no data-dependent branch).
+- ==**Binary-tree search**==: ==**data + control hazards**== (pointer load-use **+** branch on key compare).
 - **Compiler scheduling limits**: memory aliasing, unknown mem latency, scope (branches/calls/traps/volatile/IO).
 
 ## 1. Structural Hazards
@@ -227,7 +228,7 @@ if (a!=b) {...}      // B3 — predictable from B1, B2
 - ==**Indirect `JALR` for switch jump tables**== (target depends on data).
 - virtual calls / fn pointers.
 - returns when RAS mismatches (deep recursion / RAS overflow).
-- binary-tree / linked-list: data + control hazards.
+- binary-tree (data + control); linked-list = data only (no key compare).
 
 > ==**Switch codegen**==: **dense** → jump table (`JALR`, hard to predict target); **sparse** → branch chain (≈ if/else).
 
@@ -238,20 +239,3 @@ if (a!=b) {...}      // B3 — predictable from B1, B2
 ==**Not useful in modern HW**==: BTB already gives target in IF; only helps direct branches (not `JALR`/returns); adds ID-stage adder cost.
 
 > Future focus: better prediction for **indirect branches + returns** (the hardest).
-
-## 6. Quick Quiz Anchors
-
-| Q | Answer |
-|---|---|
-| binary-tree search → hazards? | **data + control** |
-| linked-list pointer chase | **data** |
-| split I/D cache reasons | structural avoidance + bandwidth (NOT hit rate) |
-| MIPS failed because | compatibility & scalability |
-| HW reducing data hazard | forwarding |
-| HW+SW data hazard fixes | forwarding + OoO + scheduling |
-| 5→20 stages effects | branch pen ↑, data pen ↑, CPI ↑, more pipeline regs |
-| Microarch state | **BHT, BTB, pipeline regs** (NOT FP regs, NOT PC) |
-| WB-propagated signals | `Rd, WRen, WBSel` (NOT `ALUCtrl`) |
-| comparator unit reason | avoid subtract-overflow compare bug |
-| return prediction | RAS |
-| post-incr load rejected | 2 write ports + breaks regularity |

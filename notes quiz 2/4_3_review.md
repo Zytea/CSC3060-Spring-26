@@ -47,6 +47,9 @@
 
 - ==**Pipeline-friendly RV ISA**==: fixed 32-bit + regular `rs1/rs2/rd` positions + load/store-only memory + simple ALU.
 
+- ==**Deep-pipe trap**== (5→20 stages ≠ 4× speedup): branch pen ↑, data pen ↑, CPI ↑, more pipeline reg OH; per-instr **latency unchanged**.
+  - **Bad for deep pipe**: frequent branch mispred, heavy data deps, frequent I-cache miss.
+
 - **Pipelining is everywhere**: DRAM, cache, FPU, GPU, network.
 
 ## 1. Five Stages & Pipeline Registers
