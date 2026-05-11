@@ -5,10 +5,11 @@
  ==**4 pipeline registers between the 5 stages**==; each register carries data + the **control signals destined for downstream stages**. Control is decoded **once in ID** and rides along — ==**WB-stage ctrl (`rd, RegWr, WBSel`) travels all the way to MEM/WB**==.
 
 - ==**Pipeline ↑ throughput, NOT latency**== (latency may even ↑ from reg OH).
+  
   - Patterson rule: $\displaystyle T_\text{between instr}^\text{pipe} = \dfrac{T_\text{between\ instr}^\text{nonpipe}}{N}$ 
   - Speedup vs SC: $\dfrac{n\,T_{long}}{(n+N-1)\,T_{stage}} \xrightarrow{n\to\infty} \dfrac{T_{long}}{T_{stage}} \le N$; ==**drain = $N-1$**==.
   - Speedup vs MC ≈ **average CPI** of MC.
-
+  
 - ==**4 pipeline registers**==, ==**`MEM/WB` has fewest fields**==:
 
   | Reg        | Carries                                                      |
