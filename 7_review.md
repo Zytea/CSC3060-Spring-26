@@ -2,16 +2,18 @@
 
 ## Exam Facts
 
-==**Linking**== = combine `.o` files + libraries into an ==**exe / `.so`**== via ==**`ld`**== (standard Unix linker). Linker does ==**symbol resolution + relocation + section merging + library handling**==. ==**NOT loading**== (that's the loader / dynamic linker). Two library models: ==**static (`.a`)**== — embedded at link-time; ==**shared (`.so`)**== — resolved at load/run-time via ==**GOT + PLT**==.
+==**Linking**== = combine `.o` files + libraries into an ==**exe / `.so`**== via ==**`ld`**== (standard Unix linker). Linker does ==**symbol resolution + relocation + section merging + library handling**==. 
+
+2 library models: ==**static (`.a`)**== — embedded at link-time; ==**shared (`.so`)**== — resolved at load/run-time via ==**GOT + PLT**==.
 
 - ==**Linking**==: combine `.o`s + libs → executable / `.so`. Done by the **linker**.
   - **Standard Unix linker**: ==**`ld`**==; `gcc` is a compiler **driver** that invokes it.
   - **ELF tools**: ==**`readelf`**== full details; `objdump` disasm + relocs; `nm` symbol list.
   - **Linker jobs**: symbol resolution + relocation + section merging + library handling (+ LTO, layout, page alignment).
-  - ==**NOT a linker job**== = ==**loading into memory**== (loader / dynamic linker).
+  - **NOT a linker job**: **loading into memory** (loader / dynamic linker).
   - Performance via linker: page alignment, **fn / code layout** for I-cache locality (hot caller/callee adjacent).
 
-- ==**3 object file kinds**==: ==**relocatable `.o`**==, ==**executable `a.out`**==, ==**shared `.so`**==. (`.a` is NOT a 4th — it's `.o`s + index.)
+- **3 object file kinds**: ==**relocatable `.o`**==, ==**executable `a.out`**==, ==**shared `.so`**==. (`.a` is NOT a 4th — it's `.o`s + index.)
 
 - **Benefits of linking**: modularity, separate compilation, library reuse, easier maintenance, time efficiency, space efficiency. ❌ NOT "simpler to build".
 
@@ -65,12 +67,12 @@ libc.a / libfoo.so                 ┘
 
 ## 2. Linker Symbols
 
-| Type                    | Examples                                                         |
-| ----------------------- | ---------------------------------------------------------------- |
-| **global defined here** | non-static fns, non-static globals                               |
-| **external reference**  | `printf`, `sum` declared but not defined here                    |
+| Type                    | Examples                                                     |
+| ----------------------- | ------------------------------------------------------------ |
+| **global defined here** | non-static fns, non-static globals                           |
+| **external reference**  | `printf`, `extern` declared but not defined here             |
 | **local linker symbol** | `static` fns, `static` file-scope globals, fn-scope `static` vars |
-| **NOT linker symbols**  | auto locals, params, register temps (stack temporaries)          |
+| **NOT linker symbols**  | auto locals, params, register temps (stack temporaries)      |
 
 **`.symtab` quiz pattern**:
 
@@ -116,7 +118,9 @@ int main(int argc, char *argv[]) {
 
 > `.a` is NOT a 4th kind — collection of `.o`s + index.
 
-> [!NOTE] ==**Trick quiz**==: "Which description does NOT apply to `.so` / `.a` / `.o`?" → ==**NONE**== — all three are well-defined per the table above.
+> [!NOTE] 
+>
+> ==**Trick quiz**==: "Which description does NOT apply to `.so` / `.a` / `.o`?" → ==**NONE**== — all three are well-defined per the table above.
 
 ## 4. Duplicate Symbol Resolution
 
