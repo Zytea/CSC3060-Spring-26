@@ -275,11 +275,29 @@ if (condition) {
 
 ### 11.5 Local Array Access via `fp`
 
-Locals usually at **negative offsets** from `fp`. Compute element-byte offset + frame layout. Example: `int A[100]` allocated at `[fp-400, fp-4)`; `A[5]` at `fp-400+5*4 = fp-380`:
+Locals usually at **negative offsets** from `fp`. Compute element-byte offset + frame layout.
+
+==**Worked: `int A[100]` local var, A[10] = b** (CSC3050 Quiz 1 #17)==:
+
+```c
+int f(int idx, int b) {
+    int A[100];        // 400 B, allocated at [fp-400, fp-4)
+    A[10] = b;          // store b (passed in a1) at A[0]+10*4 = fp-400+40 = fp-360
+}
+```
 
 ```asm
+sw a1, -360(fp)         # = sw a1, -360(s0)
+```
+
+==**Worked: `int A[100]; A[5] = ...`==:
+
+```asm
+# A[5] at fp - 400 + 5*4 = fp - 380
 lw  t0, -380(s0)
 ```
+
+> Rule: if local array starts at `fp - SIZE`, then `A[k]` is at `fp - SIZE + k*sizeof(elem)`.
 
 ## 12. Allocation Quiz Anchors
 

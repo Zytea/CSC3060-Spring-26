@@ -215,6 +215,17 @@ signed char c = -1;
 unsigned int u = c;     // c → int -1 (sign-extend) → unsigned 0xffffffff
 ```
 
+==**`char` sign-extension trap**==:
+
+```c
+char c = 0xff;          // signed char: c = -1 on most compilers
+unsigned int s = c;     // c promoted to int first → sign-extends to 0xFFFFFFFF
+                        // → then converted to unsigned = 0xFFFFFFFF
+if (s > 0x100)          // 0xFFFFFFFF > 0x100 → TRUE
+```
+
+> Fix: use `unsigned char c = 0xff;` → no sign extension → `s = 0x000000FF`.
+
 ### 4.3 Extension and Truncation
 
 | Op | Rule |
@@ -381,12 +392,14 @@ A decimal is exactly representable iff after reduction **denominator is $2^k$**.
 
 $$V=(-1)^s \cdot (1.f)_2 \cdot 2^{e-Bias}$$
 
-==**Subnormal**== (denormalized; **no hidden 1**, exponent `1-Bias`):
+==**Subnormal / Denormalized**== (numbers **too small to fit normal format**; `exp==0`, **no hidden 1**, effective exponent `1-Bias`):
 
 $$V=(-1)^s \cdot (0.f)_2 \cdot 2^{1-Bias}$$
 
 > [!NOTE]
-> Subnormal exp is `1-Bias`, **not** `0-Bias`, so values are continuous at the normal/subnormal boundary.
+> Subnormal exp is `1-Bias`, **not** `0-Bias`, so values are **continuous at the normal/subnormal boundary**. Also: denorm extends representable range toward 0 (gradual underflow).
+
+==**Quiz definition**== (CSC3050 Q4): "Denormalized numbers" = (1) FP numbers **too small to fit standard normalized format**; (4) **exponent = 0, hidden 1 excluded**. NOT "too large", NOT "not yet normalized".
 
 `float` exactly represents all integers from `0` through $2^{24}=16{,}777{,}216$. Above: `2^26=67M`, gap `ULP=2^{e-23}`; e.g., `123456789` rounds to `123456792`.
 
@@ -418,37 +431,44 @@ $$V=(-1)^s \cdot (0.f)_2 \cdot 2^{1-Bias}$$
 
 ### 6.4 Custom Minifloat Worked Template
 
-For `s|k exp|n frac`, bias $B=2^{k-1}-1$ (default).
+For `s|k exp|n frac`, **bias** $B=2^{k-1}-1$ (default, e.g. fp32: k=8 → B=127; minifloat k=4 → B=7).
 
-| Quantity | Formula |
-|---|---|
-| smallest +subnormal | $2^{-n} \cdot 2^{1-B}$ |
-| largest subnormal | $(1-2^{-n}) \cdot 2^{1-B}$ |
-| smallest +normal | $1.0 \cdot 2^{1-B}$ |
-| largest normal | $(2-2^{-n}) \cdot 2^{(2^k-2)-B}$ |
+==**Key formulas**==:
 
-Example `s|eeee|fff`, k=4, n=3, B=7:
+| Quantity | Formula | k=4,n=3 example |
+|---|---|---|
+| **bias** $B$ | $2^{k-1}-1$ | $7$ |
+| smallest +subnormal | $2^{-n} \cdot 2^{1-B}$ | $2^{-3}\cdot 2^{-6}=1/512$ |
+| largest subnormal | $(1-2^{-n}) \cdot 2^{1-B}$ | $7/8 \cdot 1/64=7/512$ |
+| smallest +normal | $1.0 \cdot 2^{1-B}$ | $1/64$ |
+| largest normal | $(2-2^{-n}) \cdot 2^{(2^k-2)-B}$ | $15/8 \cdot 128 = 240$ |
+| largest finite | same as largest normal | $240$ |
 
-| Bits | E | M | $2^E\cdot M$ | Decimal |
-|---|---:|---:|---|---|
-| `0 0000 000` | -6 | 0 | 0 | 0.0 |
-| `0 0000 001` | -6 | 1/8 | $2^{-6} \cdot 2^{-3}=2^{-9}$ | 1/512 ≈ 0.00195 |
-| `0 0000 111` | -6 | 7/8 | $7\cdot 2^{-9}$ | 7/512 (largest subnormal) |
-| `0 0001 000` | -6 | 1 | $2^{-6}$ | 1/64 (smallest normal) |
-| `0 0111 000` | 0 | 1 | 1 | 1.0 |
-| `0 1110 111` | 7 | 15/8 | $128 \cdot 15/8$ | 240 (largest normal) |
-| `0 1111 000` | — | — | — | +∞ |
+==**Worked: `s\|eeee\|fff`, k=4, n=3, B=7**==:
 
-==**FP halve / double bit-level**==:
+| Bits | Class | E | M | V |
+|---|---|---:|---:|---|
+| `0 0000 000` | +0 | — | 0 | 0.0 |
+| `0 0000 001` | smallest +denorm | -6 | 1/8 | 1/512 |
+| `0 0000 111` | largest denorm | -6 | 7/8 | 7/512 |
+| `0 0001 000` | smallest +normal | -6 | 1 | 1/64 |
+| `0 0111 000` | normal `1.0` | 0 | 1 | 1.0 |
+| `0 1110 111` | largest normal | 7 | 15/8 | 240 |
+| `0 1111 000` | +∞ | — | — | +∞ |
+| `0 1111 yyy` (y≠0) | NaN | — | — | NaN |
 
-| Case | Halve (÷2) |
-|---|---|
-| exp all 1 | unchanged (NaN/∞) |
-| normal, exp>1 | decrement exp |
-| exp==1 | becomes subnormal (shift mantissa right) |
-| subnormal/0 | shift frac right (apply rounding) |
+> Same template applies to other `(k, n)` minifloat sizes — substitute `B = 2^{k-1}-1` and recompute.
 
-Double: increment exp for normals; subnormal may renormalize when hidden bit appears.
+==**FP halve / double bit-level**== (Quiz CMU f04):
+
+| Case | **Halve** (÷2) | **Double** (×2) |
+|---|---|---|
+| `exp == max` (all 1) | unchanged (NaN / ±∞) | unchanged |
+| normalized, `exp > 1` | **decrement exp** | **increment exp**; if exp becomes max-1 → exp = max, frac = 0 (→ ±∞) |
+| normalized, `exp == 1` | becomes subnormal: shift `1.frac` right by 1 | increment exp (normal) |
+| subnormal (`exp == 0`) | shift `frac` right (apply rounding mode) | shift `frac` left; if hidden 1 appears in frac, becomes normal: `frac = frac & (2^n - 1); exp = 1` |
+| ±0 | unchanged | unchanged |
+
 
 ## 7. FP Rounding, Ops, Casts
 
@@ -467,15 +487,25 @@ Default = ==**round-to-nearest-even**== (ties to even):
 
 ### 7.2 FP Operation Traps
 
-| Claim | Truth |
-|---|---|
-| `(X+Y)+Z == X+(Y+Z)` | NOT always (associativity broken) |
-| `X+Y == Y+X` | usually yes (commutative) for finite normal |
-| `1/+0` | `+∞` |
-| `1/-0` | `-∞` |
-| `sqrt(-1)` | NaN |
-| `0.0 == -0.0` | true |
-| `NaN == NaN` | **false** |
+==**Assume FP `x, y, z` (float) and `d, e` (double); all finite normal (no NaN/inf)**==:
+
+| Claim | ∀? | Counter / Reason |
+|---|---|---|
+| `(X+Y)+Z == X+(Y+Z)` | no | `x=1, y=2^127, z=-2^127`: assoc broken near top |
+| `X+Y == Y+X` | yes | commutative for finite normal |
+| `X*Y == Y*X` | yes | commutative |
+| `(X+Y)*Z == X*Z + Y*Z` | no | `x=2^127, y=-2^127, z=2^127`: distributivity breaks |
+| `if X > 0 then X/2 > 0` | **no** | `x = 2^-149` (smallest subnormal) → `x/2` underflows to 0 |
+| `if X >= Y and Z <= 0 then X*Z <= Y*Z` | yes | non-positive flip preserves order for finite normal |
+| `if X > Y then (double)X > (double)Y` | yes | float→double is exact |
+| `if D > E then (float)D > (float)E` | **no** | `d=2^129, e=2^128`: both overflow to `+∞` (float max ≈ 2^128) → `+∞ > +∞` false |
+| `X + 1 > X` | **no** | `x = 2^127`: `x+1` rounds to `x` |
+| `1/+0` | — | `+∞` |
+| `1/-0` | — | `-∞` |
+| `sqrt(-1)` | — | NaN |
+| `0.0 == -0.0` | — | **true** (signed zeros compare equal) |
+| `NaN == NaN` | — | **false** (NaN never equals anything, even itself) |
+| `NaN != NaN` | — | **true** |
 
 > Demo: `(3.14 + 1e10) - 1e10 = 0.0` (3.14 lost to rounding); `3.14 + (1e10 - 1e10) = 3.14`.
 
@@ -537,6 +567,15 @@ gcc -O3 -march=native -mfma -ffp-contract=fast
 - **8-bit exp** (vs fp16's 5-bit) → **same range as fp32** → fewer overflow/underflow problems on gradients.
 - Fewer mantissa bits OK because AI is approximate.
 - Easier conversion to/from fp32.
+
+==**FP4 benefits**== (Nvidia Blackwell, 2025; Quiz CSC3050 #8):
+
+| Claim | True? |
+|---|---|
+| **2× computational throughput vs FP8** | ✓ (half the bits → twice as many per SIMD slot) |
+| **improved power efficiency** | ✓ (smaller datapath, less mem traffic) |
+| **reduced memory bandwidth for params/activations** | ✓ |
+| more accurate predictions | ✗ (less precision; only works because AI is robust) |
 
 ### 7.6 Saturation Arithmetic
 

@@ -268,6 +268,17 @@ For elem size `e`, line `B` → one line holds `B/e` contig elements.
 
 > Quiz CSC3050 final #3: `for j: for i: C[j][i] = A[j][i] + B[j][i]` (column scan in row-major) on 4 KB L1D → miss every access, **NO data spatial locality** at L1D.
 
+==**Mixed row+col scan**== (`int`, 32B line → 8 elems/line, large `N`, cache holds rows):
+
+```c
+// sum1: A row, B col — mixed
+sum += A[i][k] + B[k][i];    // A: 1/8 miss, B: ~100% miss → avg = 9/16
+// sum2: both row scans
+sum += A[i][k] + B[i][k];    // both: 1/8 miss → avg = 1/8
+```
+
+> Rule: **average miss rate of mixed accesses** = `(MR_A + MR_B) / 2` for one access of each per loop iter.
+
 ==**4 KB DM, 32 B line, `double A[1024], B[1024]`**==: A and B both stride by 4 KB → if line size is 32B, addresses A[i] and B[i] differ by 8 KB which is 2× cache size → both map to same set! → **conflict misses every iter**.
 
 ==**Streaming**==: `k` independent streams work well only if associativity ≥ k AND sets don't collide.
@@ -275,6 +286,23 @@ For elem size `e`, line `B` → one line holds `B/e` contig elements.
 > Trap: `arr[0][0]` may start near end of a cache line → first few accesses may cross to next line earlier than expected.
 
 > If the entire working set fits in cache and no conflicts → **only compulsory misses**.
+
+==**Mini cache trace** (illustrates the concept): 8-bit address, 64B DM cache, 8B blocks==:
+
+```text
+b = log2(8) = 3 (offset)
+S = 64/8 = 8 → s = 3 (index)
+t = 8 - 3 - 3 = 2 (tag)
+addr = [ tag(2b) | set(3b) | offset(3b) ]
+```
+
+| Load | Addr | tag/set | Hit? | Why |
+|---|---|---|---|---|
+| `0x43` | `01\|000\|011` | t=1,s=0 | M | compulsory |
+| `0x40` | `01\|000\|000` | t=1,s=0 | **H** | same line |
+| `0xb2` | `10\|110\|010` | t=2,s=6 | M | compulsory |
+| `0xb0` | `10\|110\|000` | t=2,s=6 | **H** | same line |
+| `0x07` | `00\|000\|111` | t=0,s=0 | M | tag≠1, conflict miss with `0x43` |
 
 ### 3.7 C Row-Major Iteration
 
@@ -630,43 +658,44 @@ Increasing associativity → diminishing returns:
 
 ## 11. Address Translation Side Points
 
-==**TLB**==: small SRAM cache of recent **PTEs** (page-table entries); maps VPN → PPN.
+> Scope note: CSC3060 only touches address translation as **side points** in lec 6; multi-level page tables, PDE/PTE walks, and TLB exam problems are CMU/CSAPP territory — **not core CSC3060 final material**. Keep this section brief.
+
+==**TLB**==: small SRAM cache of recent **PTEs**; maps VPN → PPN.
 
 ```text
-[VA: VPN | VPO]   →   [PA: PPN | PPO]
-                  (VPO == PPO; only VPN translates)
-
 TLB hit  → use cached PPN
 TLB miss → page-table walk in main memory
-PTE valid=0 → PAGE FAULT → OS swaps in or kills
+PTE valid=0 → PAGE FAULT → OS brings page from disk or kills process
 ```
 
 > [!NOTE]
 > **Normal cache miss** fetches from DRAM/lower cache. **Page fault** is the VM exception path **after translation fails**. ==**TLB miss may trigger page fault**== — chain effect.
 
-==**Page table location**==: **main memory** (NOT disk; NOT in CPU). Pointer in CSR (e.g., `satp`).
+==**Page table facts**== (CSC3050 final-level depth):
 
-==**PTE contains**==: physical page number + valid + permission bits + status (referenced/dirty).
+| Item | Answer |
+|---|---|
+| page table location | **main memory**, pointed to by a CPU register (e.g., `satp`) |
+| PTE contents | **physical page number + valid + permission + status bits** |
+| invalid/not-present PTE | may point to disk/swap; reference → page fault |
+| TLB purpose | avoid slow page-table walk on most accesses |
 
-==**TLB purpose**==: avoid slow page-table walk on most accesses (>99% hits typical).
-
-==**TLB / cache address splits**==:
+==**Address splits**== (just the formula, not deep walks):
 
 ```text
 VA  = [   VPN   |   VPO   ]
-PA  = [   PPN   |   PPO   ]   (VPO == PPO)
+PA  = [   PPN   |   PPO   ]     (VPO == PPO)
 TLBI = VPN mod #TLB_sets
 TLBT = VPN >> log2(#TLB_sets)
-PA cache lookup: [ tag | set index | block offset ]
+Physical cache lookup: [ cache tag | set index | block offset ]
+PA = (PPN << VPO_bits) | VPO
 ```
 
-==**Virtual-tagged cache**==: complicated by **synonyms / aliasing** (2 different VAs → 1 PA). Same data can sit in 2 lines.
+==**Virtual-address cache**== / **VIPT** (virtually indexed, physically tagged) can **avoid or overlap address-translation delay**.
 
-==**VIPT (virtually indexed, physically tagged)**==: **overlap address translation** with cache lookup → faster L1.
+==**Virtual-tagged caches**== are complicated by ==**synonyms/aliasing**==: two VAs → same PA (CSC3050 final #5).
 
-==**Quiz CSC3050 final #5**==: virtual address aliasing complicates **virtual-address-tagged cache**.
-
-==**No-tag mapping tables**== (CSC3050 final #6): **single-level page table** (VPN is the index, no tag needed).
+==**No-tag mapping tables**== (CSC3050 final #6): ==**single-level page table**== — VPN is the index, no tag bits needed (BHT also untagged but for different reasons).
 
 ## 12. Locality / Application Patterns
 

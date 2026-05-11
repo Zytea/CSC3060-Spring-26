@@ -52,7 +52,9 @@
 |---|---|
 | **minimize instructions** | CSE, DCE, strength reduction |
 | **minimize cycles** | reg alloc, scheduling, locality, redundant-load elim |
-| **avoid branches** | unrolling, inlining, branchless transforms, unswitching |
+| **avoid branches** | unrolling, inlining, **conditional move (`cmov`)**, branchless transforms, unswitching |
+
+==**Branchless transforms for unpredictable branches**==: for branches that are hard to predict (e.g., **balanced binary tree traversal**, ≈ 50/50 outcome), compiler may emit branchless code (`slt`+mask, or `cmov` on x86) to avoid misprediction penalty. Trade: one extra instr executes unconditionally; no pipeline flush. RV32I has no `cmov` in base, but `slt`+`and` patterns achieve the same.
 
 > Real-world: Google search +0.5s → -20% traffic. Amazon +100ms → -1% sales. HFT cares about microseconds. Netflix encoding %ages → CDN $millions/yr.
 
