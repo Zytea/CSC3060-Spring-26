@@ -82,10 +82,10 @@ $$
 
 ==**RISC vs CISC iron-law**==:
 
-| | Inst Count | CPI | Cycle Time |
-|---|---|---|---|
-| **RISC** | higher | lower | shorter |
-| **CISC** | lower | higher | longer (decode-heavy) |
+| Metric         | **IC** | **CPI** | **Cycle Time**       |
+| -------------- | ------ | ------- | -------------------- |
+| **RISC**       | higher | lower   | shorter              |
+| **CISC**       | lower  | higher  | longer (decode-heavy)|
 
 ==**Iron-law levers**==:
 
@@ -99,27 +99,20 @@ $$
 | CISC compactness | lower IC, often higher CPI/cycle |
 | calling convention | lower IC + memory ops at calls |
 
-==**Worked timing for 4 instrs `w(4),x(2),y(3),z(4)` short-cycles each**==:
+==**Worked timing**== for 4 instrs `w(4),x(2),y(3),z(4)` short-cycles each:
 
-| Design | Compute | Cycles |
-|---|---|---:|
-| single-cycle | 4 × (1 long = 4 short) | **16** |
-| multi-cycle | 4+2+3+4 | **13** |
-| pipeline | $N + \text{stages}-1 = 4+5-1$ ≈ | **7** (after fill) |
+| Design       | single-cycle  | multi-cycle | pipeline (5-stage)             |
+| ------------ | ------------- | ----------- | ------------------------------ |
+| **Cycles**   | $4 \times 4 = 16$ | $4+2+3+4 = 13$ | $N + \text{stages}-1 = 7$ |
 
 > Pipeline wins on throughput (≈ 1 instr/short-cycle steady state); multi-cycle reuses HW; single-cycle is simplest control.
 
 ## 5. Logic Design Basics
 
-| Element | Stores state? | Output depends on |
-|---|---|---|
-| ==**combinational**== | NO | current inputs only |
-| ==**sequential** (state)== | YES | stored state + inputs |
-
-| Type | Examples |
-|---|---|
-| Combinational | ALU, adder, mux, decoder, sign-extender |
-| Sequential | PC, regs, regfile, IMem/DMem (or caches), pipeline regs |
+| Element              | Stores state? | Output depends on        | Examples                                          |
+| -------------------- | ------------- | ------------------------ | ------------------------------------------------- |
+| ==**combinational**==| NO            | current inputs only      | ALU, adder, mux, decoder, sign-extender           |
+| ==**sequential**==   | YES           | stored state + inputs    | PC, regs, regfile, IMem/DMem, pipeline regs       |
 
 ==**HDL**==: hardware description languages (Verilog, SystemVerilog, VHDL, Chisel). Synthesizable into a netlist via design compilers (Synopsys/Cadence). Textbook uses HCL.
 
@@ -187,11 +180,9 @@ Fixed field positions: `opcode[6:0], rd[11:7], funct3[14:12], rs1[19:15], rs2[24
 
 ### 7.2 Register File Ports
 
-| Machine | Read / Write ports |
-|---|---|
-| **scalar RV32I** | **2R / 1W** |
-| 2-issue scalar integer | ~ 4R / 2W |
-| 2-issue FMA (FP, R4-type) | **6R / 2W** FP regfile |
+| Machine            | scalar RV32I | 2-issue scalar | 2-issue FMA (R4)       |
+| ------------------ | ------------ | -------------- | ---------------------- |
+| **Read / Write**   | **2R / 1W**  | ~4R / 2W       | **6R / 2W** (FP)       |
 
 > FMA needs 3 reads per instr (`rs1, rs2, rs3`), so 2-issue FMA = 6 reads.
 
@@ -245,12 +236,10 @@ Among `JALR`, `LW`, `SLL`, `LUI`: ==**`LW`** sets clock rate==.
 
 ## 10. Single-Cycle vs Multi-Cycle vs Pipeline
 
-| Design | Strength | Weakness |
-|---|---|---|
-| **single-cycle** | simplest, CPI=1 | long clock |
-| **multi-cycle** | shorter clock, HW reuse | CPI > 1 |
-| **pipeline** | high throughput | hazards, pipeline regs, fill/drain |
-| **superscalar** | CPI < 1 possible | many ports, scheduling, rename |
+| Design           | **single-cycle** | **multi-cycle**           | **pipeline**                   | **superscalar**                 |
+| ---------------- | ---------------- | ------------------------- | ------------------------------ | ------------------------------- |
+| **Strength**     | simplest, CPI=1  | shorter clock, HW reuse   | high throughput                | CPI < 1                         |
+| **Weakness**     | long clock       | CPI > 1                   | hazards, pipeline regs         | many ports, scheduling, rename  |
 
 ==**Quiz anchor**== (vs pipelined): single-cycle has **lower CPI (1)** + **simpler control logic**; pipelined has **higher throughput**.
 

@@ -38,10 +38,7 @@ $$
 > [!IMPORTANT]
 > Ideal speedup assumes balanced stages and ignores pipeline-reg overhead + hazards. Short instr sequences lose to fill/drain.
 
-==**Latency timing example**==:
-
-- Single-cycle `lw` = 800 ps.
-- Pipelined: 5 × 200 ps = 1000 ps for one `lw` (latency **worse**), but throughput = 1 instr/200 ps after fill (4× better than 1/800 ps).
+==**Latency trap**==: single-cycle `lw` = 800 ps; pipelined `lw` = 5 × 200 ps = **1000 ps** (latency **worse**), but throughput = 1 instr/200 ps after fill (4× better).
 
 ## 2. Pipelining: Latency vs Throughput
 
@@ -87,26 +84,21 @@ I4:                 IF  ID  EX  MEM WB
 
 ==**Pipeline clock**== set by `slowest stage + pipeline-reg overhead`.
 
-==**Example**==: assume per-stage time:
+==**Example**== (regfile R/W = 100 ps, IMem/ALU/DMem = 200 ps each):
 
-- regfile read/write: 100 ps each.
-- IMem / ALU / DMem: 200 ps each.
-
-| Design | Max clock |
-|---|---|
-| single-cycle (longest instr `lw` = 800 ps) | 1.25 GHz |
-| multi-cycle (longest stage 200 ps) | 5.0 GHz |
-| 5-stage pipeline (200 ps stage) | ≈ 5.0 GHz |
+| Design        | single-cycle (`lw` = 800 ps) | multi-cycle (200 ps stage) | 5-stage pipeline (200 ps stage) |
+| ------------- | ---------------------------- | -------------------------- | ------------------------------- |
+| **Max clock** | 1.25 GHz                     | 5.0 GHz                    | ≈ 5.0 GHz                       |
 
 ## 5. Single-Cycle vs Multi-Cycle vs Pipeline
 
-| Design | Latency | Throughput | Clock |
-|---|---|---|---|
-| single-cycle | 1 long cycle | 1/long | low |
-| multi-cycle | several short cycles | variable | high |
-| pipeline | 5 short stages | ≈ 1 / short cycle (after fill) | high |
+| Design             | **single-cycle** | **multi-cycle**       | **pipeline**                    |
+| ------------------ | ---------------- | --------------------- | ------------------------------- |
+| **Latency**        | 1 long cycle     | several short cycles  | 5 short stages (≥ single-cycle) |
+| **Throughput**     | 1/long           | variable              | ≈ 1 / short cycle (after fill)  |
+| **Clock**          | low              | high                  | high                            |
 
-> Quiz anchor: vs pipelined, single-cycle has **lower CPI (1)** + **simpler control logic** but **lower throughput + slower clock**. Quiz answer for "single-cycle vs pipelined" → **C, E** (simple control, lower CPI).
+> Quiz: vs pipelined, single-cycle has **lower CPI (1)** + **simpler control logic** but **lower throughput + slower clock**.
 
 ## 6. Pipeline-Oriented ISA Design (Why RISC-V Helps)
 

@@ -22,11 +22,11 @@
 - **Two weak symbols are allowed (legacy "common" model)**; Quiz 5 #16: incorrect rule = "two weak symbols are NOT allowed".
 - ==**Static library order matters**==: put `-lfoo` **after** the `.o`s that need it (`gcc main.o -lfoo`).
 - ==**Dynamic linking data structures**==: ==**GOT (Global Offset Table) + PLT (Procedure Linkage Table)**==. NOT JT, NOT SHT (Quiz 5 #12).
-- ==**GOT/PLT placement**== (Quiz 5 #14):
-  - **PLT in `.text` (executable code)** ✓
-  - **GOT in `.data` (writable, non-exec)** ✓
-  - **`.got.plt` in `.data`** ✓
-  - GOT in `.text` ✗ (would be non-writable).
+- ==**GOT/PLT placement**==:
+  - **PLT in `.text`** (executable code) ✅
+  - **GOT in `.data`** (writable, non-exec) ✅
+  - **`.got.plt` in `.data`** ✅
+  - GOT in `.text` ❌ (would be non-writable)
 - ==**Dynamic-link advantages**== (Quiz 5 #13): **memory savings + centralized security/bug-fix updates + fast build-time linking**. **NOT** "faster execution" (PLT/GOT add indirection).
 - ==**Where reloc info comes from**== (Quiz 5 #18): **compiler/assembler emits `.rel.text` + `.rel.data`**, linker consumes them. NOT linker, NOT loader, NOT dynamic linker.
 - **`.so` and `.a`**: `.so` for shared object; `.a` for archived static lib; `.o` for relocatable. `.a` = collection of `.o`s + index.
@@ -70,12 +70,12 @@ gcc -Og -o prog main.c sum.c
 
 ==**Two library models**==:
 
-| Static (`.a`) | Shared (`.so`) |
-|---|---|
-| copied **at link time** into exe | mapped **at load/run time** by dynamic linker |
-| larger exe, **no runtime dep** | smaller exe, **runtime dep on `.so`** |
-| update lib → must **relink** | ABI-compat update → users **don't relink** |
-| **pay-as-you-go**: only used members included | one copy in memory shared by all processes |
+|                  | **Static (`.a`)**             | **Shared (`.so`)**                       |
+| ---------------- | ----------------------------- | ---------------------------------------- |
+| **When linked**  | at link time, copied into exe | at load/run time, by dynamic linker      |
+| **Exe size**     | larger, no runtime dep        | smaller, runtime `.so` dep               |
+| **Lib update**   | must relink                   | ABI-compat → no relink                   |
+| **Memory**       | pay-as-you-go (only used)     | one copy shared by all processes         |
 
 ## 3. What Linkers Do
 
@@ -238,10 +238,10 @@ Linker uses `double` storage; `printf("%ld", x)` reinterprets bytes → **garbag
 
 | Files | Outcome |
 |---|---|
-| `int x; p1() {}` and `p1() {}` | **link error** (two strong `p1`) |
-| `int x; p1() {}` and `int x; p2() {}` | both refer to **same uninitialized int** (probably what user wants?) |
-| `int x; p1() {}` and `double x; p2() {}` | writes to `x` in `p2` may **overwrite y** (evil!) |
-| `int x = 7; p1() {}` and `int x; p2() {}` | both refer to **same initialized int** ✓ |
+| `int x; p1() {}` and `p1() {}` | ❌ **link error** (two strong `p1`) |
+| `int x; p1() {}` and `int x; p2() {}` | both refer to **same uninitialized int** |
+| `int x; p1() {}` and `double x; p2() {}` | writes to `x` in `p2` may **overwrite neighbors** (silent!) |
+| `int x = 7; p1() {}` and `int x; p2() {}` | both refer to **same initialized int** ✅ |
 
 ### 7.2 Recommendations
 
@@ -278,7 +278,7 @@ int main(void) { ... }
 
 ==**Compiler/assembler emits `.rel.text` + `.rel.data`**== because final addrs unknown. Linker consumes after layout.
 
-> Quiz 5 #18: "the **compiler or assembler** leaves reloc info in `.rel.text` and `.rel.data`" — answer **1** ✓.
+> Quiz: "the **compiler or assembler** leaves reloc info in `.rel.text` and `.rel.data`" ✅.
 
 ### 8.1 RISC-V Relocation Patterns
 
@@ -350,15 +350,7 @@ gcc main.o -L. -lvector -o prog
 
 `-lvector` searches `libvector.a` (or `.so`) along `-L` paths.
 
-==**Static vs shared comparison**==:
-
-| Static `.a` | Shared `.so` |
-|---|---|
-| **archive members copied** into exe at link time | **mapped + relocated** at load by dynamic linker |
-| **larger exe**, no runtime `.so` dep | **smaller exe**, `.so` runtime dep |
-| update lib → **must relink** | ABI-compat update → no relink |
-
-==**`.a` is "pay-as-you-go"**==: only members that resolve unresolved references are included.
+==**`.a` is "pay-as-you-go"**==: only members that resolve unresolved references are included. See §2 table for full static/shared comparison.
 
 ### 10.1 Static Linker Scan Algorithm
 
@@ -410,15 +402,7 @@ gcc main.o -lA -lB -lA    # repeat -lA to resolve back-references
 
 ## 11. Shared Libraries / Dynamic Linking
 
-==**Advantages**== (Quiz 5 #13):
-
-| | Why |
-|---|---|
-| **memory (RAM/disk) savings** | one copy of `.so` shared across processes |
-| **centralized security / bug-fix updates** | replace `.so`, all programs benefit (ABI-compat) |
-| **fast build-time linking** | linker doesn't copy archive members |
-
-==**NOT an advantage**==: faster execution (PLT/GOT add indirection).
+==**Advantages**==: **memory savings** ✅ (one `.so` shared across processes); **centralized security/bug-fix updates** ✅ (replace `.so`, all programs benefit); **fast build-time linking** ✅. **NOT** faster execution ❌ (PLT/GOT add indirection).
 
 ### 11.1 Load-Time Dynamic Linking
 
@@ -485,13 +469,11 @@ Later calls: GOT.plt[func] = real address → direct jump
 
 ### 12.3 Memory Placement (Quiz 5 #14)
 
-| Structure | Section | Writable? | Executable? |
-|---|---|---|---|
-| `.text` | code | **no** | **yes** |
-| **`.plt`** | **code stubs** | **no** | **yes** |
-| **`.got`** | data table | **yes** | **no** |
-| **`.got.plt`** | lazy func addr table | **yes** | **no** |
-| `.data` / `.bss` | writable data | yes | no |
+| Structure        | `.text` | **`.plt`**        | **`.got`** | **`.got.plt`**       | `.data` / `.bss` |
+| ---------------- | ------- | ----------------- | ---------- | -------------------- | ---------------- |
+| **Purpose**      | code    | code stubs        | data table | lazy func addr table | writable data    |
+| **Writable**     | ❌      | ❌                | ✅         | ✅                   | ✅               |
+| **Executable**   | ✅      | ✅                | ❌         | ❌                   | ❌               |
 
 > ==**PLT in `.text` (or `.plt`)**==; ==**GOT and `.got.plt` in `.data`-like writable region**==.
 

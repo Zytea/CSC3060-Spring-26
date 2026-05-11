@@ -190,22 +190,18 @@ $$
 
 ### 4.1 Resolution Stage → Flush Count
 
-| Branch resolved at | Bubbles |
-|---|---:|
-| MEM (textbook) | **3** |
-| **EX (class default)** | **2** |
-| ID (direct branch + early compare) | **1** |
-| IF (BTB+BHT correct) | **0** |
+| Resolved at      | **MEM** (textbook) | **EX** (class) | **ID** (early compare) | **IF** (BTB+BHT correct) |
+| ---------------- | ------------------ | -------------- | ---------------------- | ------------------------ |
+| **Bubbles**      | 3                  | **2**          | 1                      | 0                        |
 
 ==**Discrepancy textbook 3 vs class 2**==: textbook redirects fetch one stage later (after MEM); class assumes EX can resteer immediately. Quiz 2 #6d explanation.
 
-==**Worked penalty examples**==:
+==**Worked penalty anchors**==:
 
-| Case | Calc | Result |
+| Case | Calc | Slowdown |
 |---|---|---|
-| **A57**: 16 stages, 20% branch, 15-cycle penalty, NO pred | added CPI `0.2*15=3`; total CPI `1+3=4`; penalty `3/4` | **75%** ★ Quiz 2 #6 |
-| **Pentium 4**: 31 stages, 20% branch, 2% mispred, 30-cycle penalty | `0.2*0.02*30=0.12` added CPI; base 1 → 12% | **12%** ★ Quiz 3 #32 |
-| 5-stage, 20% branch, **50% taken**, MEM resolve (3-cycle penalty), no pred | `0.2*0.5*3=0.3` added CPI; ≈30% slowdown | 30% |
+| **A57** (16 stages, 20% br, 15-cycle pen, **no pred**) | added CPI $=0.2 \times 15=3$; total $1+3=4$; share $3/4$ | **75%** ★ |
+| **Pentium 4** (31 stages, 20% br, **2% mispred**, 30-cycle pen) | added CPI $=0.2 \times 0.02 \times 30 = 0.12$ | **12%** ★ |
 
 ## 5. Branch Prediction
 
@@ -248,22 +244,13 @@ outer:
 
 ==**2-bit saturating counter**== (FSM): only changes prediction on **two successive mispredictions**.
 
-```text
-States:  SNT (00) → WNT (01) → WT (10) → ST (11)
-Predict: NT       NT          T          T
+States `SNT (00) → WNT (01) → WT (10) → ST (11)`:
 
-      T→ST          T→ST
-       ↑             ↑
-SNT ←T─ WNT          WT ←T─ ST
-   →NT  →NT  T→         →NT  →NT  
-```
-
-| State | Predict | T → | NT → |
-|---|---|---|---|
-| SNT | NT | WNT | SNT |
-| WNT | NT | WT | SNT |
-| WT | T | ST | WNT |
-| ST | T | ST | WT |
+| State        | **SNT** | **WNT** | **WT** | **ST** |
+| ------------ | ------- | ------- | ------ | ------ |
+| **Predict**  | NT      | NT      | T      | T      |
+| **on T →**   | WNT     | WT      | ST     | ST     |
+| **on NT →**  | SNT     | SNT     | WNT    | WT     |
 
 ### 5.3 Untagged BHT
 

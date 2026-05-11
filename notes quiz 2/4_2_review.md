@@ -63,11 +63,10 @@ ALUSrcB = (I_ALU || Load || Store || JALR || LUI || AUIPC)
 
 ==**`ALUOp` examples**==:
 
-| `ALUOp` | Use | ALU op |
-|---|---|---|
-| `00` | load / store / JALR addr | ADD |
-| `01` | branch compare | SUB / compare |
-| `10` | R / I-ALU | decode by funct |
+| `ALUOp`     | `00`                     | `01`              | `10`            |
+| ----------- | ------------------------ | ----------------- | --------------- |
+| **Use**     | load / store / JALR addr | branch compare    | R / I-ALU       |
+| **ALU op**  | ADD                      | SUB / compare     | decode by funct |
 
 ### 3.1 `funct3` / `funct7` Decoding
 
@@ -121,52 +120,23 @@ PC → IMem → decode/regfile/imm-gen → ALU → DMem → WBmux → rd
 | `ALUSrcB` | `R[rs2]` or imm |
 | `WBSel` | ALU / mem / `PC+4` / imm |
 
-## 5. Worked Example: `sw x2, offset(x1)`
+## 5. Worked Examples
 
 ```text
-addr      = R[x1] + signext(S-imm)
-mem[addr] = R[x2]
+sw x2, offset(x1):   addr = R[x1]+signext(S-imm); mem[addr] = R[x2]
+beq x1, x2, imm  :   taken = (R[x1]==R[x2]); next PC = taken? PC+B-imm : PC+4
 ```
 
-| Signal | Value |
-|---|---|
-| `RegWr` | 0 (no `rd`) |
-| `MemWr` | 1 |
-| `MemRd` | 0 |
-| `ALUSrc` | 1 (imm) |
-| `ALUCtrl` | ADD |
-| `WBSel` | — (no WB) |
-| `PCSrc` | `PC+4` |
-
-## 6. Worked Example: `beq x1, x2, imm`
-
-```text
-taken    = (R[x1] == R[x2])
-next PC  = taken ? PC + B-imm : PC + 4
-```
-
-| Signal | Value |
-|---|---|
-| `RegWr` | 0 (no `rd`) |
-| `MemWr` | 0 |
-| `MemRd` | 0 |
-| `ALUSrc` | 0 (compare regs) |
-| `ALUCtrl` | SUB / equality compare |
-| `WBSel` | — |
-| `PCSrc` | branch result mux |
+| Signal     | `RegWr`     | `MemRd` | `MemWr` | `ALUSrc`         | `ALUCtrl`           | `WBSel` | `PCSrc`        |
+| ---------- | ----------- | ------- | ------- | ---------------- | ------------------- | ------- | -------------- |
+| **`sw`**   | 0 (no `rd`) | 0       | **1**   | 1 (imm)          | ADD                 | —       | `PC+4`         |
+| **`beq`**  | 0 (no `rd`) | 0       | 0       | 0 (compare regs) | SUB / equality cmp  | —       | branch-mux     |
 
 ## 7. Drawback of Single-Cycle Design
 
-Clock period must cover the **`lw` critical path**:
+Clock period must cover **`lw` critical path**: `PC → IMem → Regfile → ALU(addr) → DMem → WBmux → Regfile setup` + clk-to-Q + skew.
 
-```text
-PC → IMem → Regfile → ALU(addr) → DMem → WBmux → Regfile setup
-+ Clock-to-Q + clock skew
-```
-
-All shorter instrs (R-type, branch) **waste** the long clock.
-
-> Solution preview: split into pipeline stages (next chapter) — short clock + overlapped exec → much higher throughput.
+All shorter instrs (R-type, branch) **waste** the long clock. → Solution: pipeline stages (next chapter).
 
 ## 8. Summary of Single-Cycle RV
 

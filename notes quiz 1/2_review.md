@@ -308,7 +308,7 @@ $$
 
 <img src="assets\2.3.4.png" alt="ALU Divisor" style="zoom: 25%;" />
 
-**Init**: $\text{Remainder} = \text{Dividend}$, $\text{Divisor} <<= 31$, $\text{Quotient}=0$.
+**Init**: $\text{Remainder} = \text{Dividend}$, $\text{Divisor} <<= 32$, $\text{Quotient}=0$.
 
 1. $\text{Remainder} -= \text{Divisor}$
 2. $\begin{cases}\text{Quotient}=(\text{Quotient}\ll 1)+1,&\text{Remainder}\ge 0\\ \text{Remainder}+=\text{Divisor},\text{Quotient}\ll =1,&\text{Remainder}<0\end{cases}$

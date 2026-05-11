@@ -189,30 +189,13 @@ foo:
 
 ## 9. Caller or Callee Save? Cost Analysis
 
-Value `v` live across `m` calls:
+Value `v` live across $m$ calls:
 
-| Strategy | Mem ops |
-|---|---:|
-| **caller-saved** | `2m` (save+restore each call) |
-| **callee-saved** | `2` (one save at entry + one restore at exit, **if** modified) |
+| Strategy   | **caller-saved**            | **callee-saved**                                |
+| ---------- | --------------------------- | ----------------------------------------------- |
+| **Mem ops**| $2m$ (save/restore each call) | $2$ (save@entry + restore@exit, **if** modified) |
 
-==**Worked**==: `A()` calls `B`, `C`, `D` with one value `v` live across all three:
-
-```c
-$T1 = a*b;          // caller-saved option
-... = B(...);       // 1 save before, 1 restore after
-... = C(...);       // 1 save, 1 restore
-... = D(...);       // 1 save, 1 restore
-... = $T1;          // total: 6 mem ops
-
-$S1 = a*b;          // callee-saved option
-... = B(...);
-... = C(...);       // no per-call save
-... = D(...);
-... = $S1;          // total: 2 mem ops (save at A's entry + restore at exit)
-```
-
-> **Conclusion**: callee-saved wins when value persists across multiple calls. Caller-saved wins for short-lived temps.
+==**Worked**==: `A()` calls `B`, `C`, `D`, one value `v` live across all three → caller-saved costs `6` mem ops (2 per call), callee-saved costs `2` (1 save@entry + 1 restore@exit). Callee-saved wins when value persists across multiple calls; caller-saved wins for short-lived temps.
 
 > [!IMPORTANT]
 > ==`A` calls `B`, regs `s1, t0, a1` all live across call==:
@@ -277,12 +260,12 @@ if (condition) {
 
 Locals usually at **negative offsets** from `fp`. Compute element-byte offset + frame layout.
 
-==**Worked: `int A[100]` local var, A[10] = b** (CSC3050 Quiz 1 #17)==:
+==**Worked: `int A[100]` local var, A[10] = b**==:
 
 ```c
 int f(int idx, int b) {
     int A[100];        // 400 B, allocated at [fp-400, fp-4)
-    A[10] = b;          // store b (passed in a1) at A[0]+10*4 = fp-400+40 = fp-360
+    A[10] = b;          // store b (in a1) at A[0]+10*4 = fp-400+40 = fp-360
 }
 ```
 
@@ -290,28 +273,19 @@ int f(int idx, int b) {
 sw a1, -360(fp)         # = sw a1, -360(s0)
 ```
 
-==**Worked: `int A[100]; A[5] = ...`==:
-
-```asm
-# A[5] at fp - 400 + 5*4 = fp - 380
-lw  t0, -380(s0)
-```
-
-> Rule: if local array starts at `fp - SIZE`, then `A[k]` is at `fp - SIZE + k*sizeof(elem)`.
+> Rule: local array at `fp - SIZE` → `A[k]` at `fp - SIZE + k*sizeof(elem)`.
 
 ## 12. Allocation Quiz Anchors
 
 | Ask | Answer |
 |---|---|
-| in which cases consider **caller-saved**? | **leaf routines, expression temporaries** (Quiz 3 #12 NOT-answer set) |
-| in which cases consider **callee-saved**? | **temporary live across multiple calls, local variables** (Quiz 3 #12 = B, E) |
-| in which cases consider **caller-saved** alloc (Quiz 2 #2)? | **temp across multiple calls** (only if cold), **local scalars** (only short-lived) — actual answer **A, C** depends on quiz wording |
-| `A` calls `B`, live `s1,t0,a1` → A saves what? | **`t0, a1`** |
-| local array under `fp` | locals at **negative offsets** from `fp`; compute elem byte offset + frame layout |
-| stack alignment requirement | **16 B** (RV Linux ABI) |
-| return value reg | `a0` (with `a1` for wider return) |
-| direct call instr | `jal ra, label` |
-| return instr | `jalr x0, ra, 0` (`ret`) |
+| caller-saved best for | **leaf routines, expression temps, values across rare/cold calls** |
+| callee-saved best for | **values live across multiple calls, local scalars used long** |
+| `A` calls `B`, live `s1,t0,a1` → A saves what? | **`t0, a1`** (`s1` is B's responsibility) |
+| local array under `fp` | locals at **negative offsets** from `fp` |
+| stack alignment | **16 B** (RV Linux ABI) |
+| return value reg | `a0` (`a0/a1` for wider return) |
+| direct call / return | `jal ra, label` / `jalr x0, ra, 0` (`ret`) |
 
 ## 13. Summary
 

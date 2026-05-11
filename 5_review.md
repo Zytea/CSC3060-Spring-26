@@ -74,8 +74,7 @@
 | `-mtune=native` | local CPU scheduling tuning |
 | `-fprofile-generate` / `-fprofile-use` | PGO: collect runtime profile → use it |
 
-> Quiz 5 #4: cross-module procedure inlining → **`-O3 -flto`** ✓.
-> Quiz 5 #8: embedded with severe memory limits → **`-Os`** ✓.
+> Quiz: cross-module procedure inlining → **`-O3 -flto`** ✅. Embedded with severe memory limits → **`-Os`** ✅.
 
 ## 3. Why Compiler Optimization Is Hard
 
@@ -133,16 +132,13 @@ x = elt->x;  y = elt->y;
 norm[i] = x*x + y*y;
 ```
 
-==**FP CSE caveat**==: `(a+b+c+d)` and `(a+d+b+c)` are CSE only for types where **reassoc is legal**:
+==**FP CSE caveat**==: `(a+b+c+d)` ≡ `(a+d+b+c)` only when **reassoc is legal**:
 
-| Data type | CSE legal? | Why |
-|---|---|---|
-| `long long` | ✓ | int wraps mod $2^w$, exact |
-| `char` | ✓ | int (promoted) |
-| `float` | ✗ | non-associative FP rounding |
-| `double` | ✗ | non-associative FP rounding |
+| Data type     | `long long`         | `char`        | `float` | `double` |
+| ------------- | ------------------- | ------------- | ------- | -------- |
+| **CSE legal** | ✅ (mod $2^w$ exact) | ✅ (promoted) | ❌ (FP non-assoc) | ❌ (FP non-assoc) |
 
-> Quiz 5 #21 → answer: **`long long` and `char`**.
+> Quiz answer: **`long long` and `char`**.
 
 ### 4.5 LICM (Loop Invariant Code Motion)
 
@@ -360,12 +356,9 @@ sum0 → sum1 → sum2 → sum3 → ...
 
 One accumulator critical path:
 
-| OP latency | Min CPE |
-|---|---|
-| `+` (int) | 1 |
-| `*` (int) | 3-5 |
-| `+` (FP) | 3-4 |
-| `*` (FP) | 4-5 |
+| OP          | `+` (int) | `*` (int) | `+` (FP) | `*` (FP) |
+| ----------- | --------- | --------- | -------- | -------- |
+| **Min CPE** | 1         | 3-5       | 3-4      | 4-5      |
 
 ==**With `k` independent accumulators**==:
 
@@ -386,13 +379,11 @@ $$
 
 ==**CPE progression**==:
 
-| Version | Int + | FP + | FP × |
-|---|---:|---:|---:|
-| `combine1` (no opt) | 22.7 | 20.0 | 20.2 |
-| `combine1` `-O1` | 10.1 | 10.2 | 11.1 |
-| `combine1` `-O3` | 4.5 | 6.0 | 7.8 |
-| **`combine4`** | **1.27** | **3.01** | **5.01** |
-| **+ unroll + k accs** | **0.81** | **1.51** | **2.51** |
+| Version              | `combine1` no opt | `-O1` | `-O3` | **`combine4`** | **+ unroll + k accs** |
+| -------------------- | ----------------- | ----- | ----- | -------------- | --------------------- |
+| **Int +**            | 22.7              | 10.1  | 4.5   | **1.27**       | **0.81**              |
+| **FP +**             | 20.0              | 10.2  | 6.0   | **3.01**       | **1.51**              |
+| **FP ×**             | 20.2              | 11.1  | 7.8   | **5.01**       | **2.51**              |
 
 ## 8. Reduction & SIMD
 

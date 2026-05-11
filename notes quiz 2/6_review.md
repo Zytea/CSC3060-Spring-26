@@ -42,8 +42,8 @@
 - ==**Set index uses middle bits**==: block-offset consumes low bits; middle bits spread nearby sequential blocks across sets. MSB indexing would map nearby addresses to same set too often → wastes spatial locality.
 - **TLB and victim cache are usually fully associative**.
 - **Direct-mapped vs set-assoc** (same C, B):
-  - **DM has lowest tag overhead + simplest replacement** ✓
-  - 2-way has **more sets** than 4-way ✓
+  - **DM has lowest tag overhead + simplest replacement** ✅
+  - 2-way has **more sets** than 4-way ✅
   - Fully-assoc does **NOT** automatically have lowest miss rate (depends on replacement)
   - DM = "1-way" (NOT "1-set"); fully-assoc = "1-set".
 - ==**Conflict miss trigger**==: addresses spaced by multiple of cache size map to same set. Fix: padding, alignment, code repositioning (but compiler may remove unused dummies — must actually use them).
@@ -115,14 +115,6 @@
 
 > Quiz 2 #3 (Q3a): **memory wall** = the growing gap between processor speed and main memory speed.
 
-==**Hierarchy management split**== (Quiz 2 #3c):
-
-| Layer | Manager |
-|---|---|
-| Registers / local memory | **compiler / programmer** |
-| Cache | **hardware** |
-| Main memory | **HW + OS** combo (VM, page table walk) |
-
 ## 3. Cache Basics
 
 ### 3.1 Cache Line / Set / Lookup
@@ -150,11 +142,11 @@ addr = [    tag    |  set index  |  block offset  ]
 
 | Structure | What it caches | Tagged? |
 |---|---|---|
-| L1/L2/L3 | data/instruction lines | ✓ |
-| **TLB** | recent PTE translations | ✓ (usually fully assoc) |
-| **BTB** | branch target PCs | ✓ partially tagged |
-| **BHT/PHT** | branch direction history | **untagged** |
-| single-level page table | VPN-indexed PTE array | no tag (VPN is index) |
+| L1/L2/L3 | data/instruction lines | ✅ |
+| **TLB** | recent PTE translations | ✅ (usually fully assoc) |
+| **BTB** | branch target PCs | ✅ partially tagged |
+| **BHT/PHT** | branch direction history | ❌ **untagged** |
+| single-level page table | VPN-indexed PTE array | ❌ (VPN is index) |
 
 > CSC3050 anchor: **BTB, TLB, L3 cache, branch prediction table** are all cache-like. **BHT/PHT may have no tag bits** because direction bits are tiny and IF needs fast/cheap access.
 
@@ -350,14 +342,14 @@ for (j=0; j<C; j++)
 
 | Claim | Truth |
 |---|---|
-| fully-assoc = 1-way | **false** (it's **1-set**, all lines in one set) |
-| DM = 1-set | **false** (it's **1-way**, multiple sets) |
-| 2-way has more sets than 4-way | **true** |
-| DM always faster hit than set-assoc | **false as "always"**; usually simpler/faster, but not guaranteed |
-| **DM has lowest tag overhead** | **true** ✓ |
-| **DM has simplest replacement** | **true** ✓ (no choice — only one line per set) |
-| fully-assoc has more lines | **false** (line count = C/B, same) |
-| fully-assoc always has lowest miss rate | **false** (depends on replacement policy; real-world LRU could be worse than DM in pathological cases) |
+| fully-assoc = 1-way | ❌ (it's **1-set**, all lines in one set) |
+| DM = 1-set | ❌ (it's **1-way**, multiple sets) |
+| 2-way has more sets than 4-way | ✅ |
+| DM always faster hit than set-assoc | ❌ as "always"; usually simpler/faster, not guaranteed |
+| **DM has lowest tag overhead** | ✅ |
+| **DM has simplest replacement** | ✅ (no choice — only one line per set) |
+| fully-assoc has more lines | ❌ (line count = C/B, same) |
+| fully-assoc always has lowest miss rate | ❌ (depends on replacement; LRU can lose to DM in pathological cases) |
 
 ==**Larger block trade-offs**==:
 
@@ -390,12 +382,12 @@ for (j=0; j<C; j++)
 | ==**write-allocate**== | fetch line, then write | likely reuse (most data) |
 | ==**no-write-allocate / write-no-allocate**== | bypass cache; write straight to memory | streaming writes |
 
-==**no-write-allocate use cases**== (Quiz 4 #26):
+==**no-write-allocate use cases**==:
 
-- ==**`memcpy(a, b, n)` with large n**== (won't reread soon).
-- ==**`memset(a, b, n)` with large n**== (initialization).
-- ==**database logs**== (write-only).
-- (NOT: local var writes; struct member updates → those should be write-allocate.)
+- ==**`memcpy(a, b, n)` with large n**== ✅ (won't reread soon)
+- ==**`memset(a, b, n)` with large n**== ✅ (initialization)
+- ==**database logs**== ✅ (write-only)
+- local var writes / struct member updates ❌ (need write-allocate)
 
 > **Trace implication**: under no-write-allocate, write miss does **NOT** install line. Subsequent read can still miss.
 
@@ -407,12 +399,12 @@ for (j=0; j<C; j++)
 - can ignore write-back/write-through complexity.
 - still has tag + valid bit (for finding lines).
 
-==**JIT / instruction patching / self-modifying code**== (Quiz 4 #32): need to evict stale instrs. Solutions:
+==**JIT / instruction patching / self-modifying code**==: need to evict stale instrs. Solutions:
 
-1. **Flush I-cache** (purge all old instrs) ✓
-2. **Invalidate** affected I-lines ✓
-3. **Maintain I/D coherence** (D-cache writes also update I-cache copies) ✓
-4. (NOT just "flush D-cache" — that's not enough.)
+1. **Flush I-cache** (purge old) ✅
+2. **Invalidate** affected I-lines ✅
+3. **Maintain I/D coherence** (D-cache writes update I-cache copies) ✅
+4. flush D-cache alone ❌ (insufficient)
 
 ## 6. Cache Performance
 
@@ -591,22 +583,12 @@ Increasing associativity → diminishing returns:
 | L2 | 50–80% (of L1 misses) |
 | L3 | 20–40% (of L2 misses) |
 
-==**Worked: 4 GHz CPU, base CPI=1, miss/instr=2%, mem=100ns**== (no L2):
+==**Worked: 4 GHz, base CPI=1, miss/instr=2%, mem=100ns**==:
 
-- Penalty = 100ns × 4 = **400 cycles**.
-- CPI = 1 + 0.02 × 400 = **9**.
+- No L2: mem penalty = 400 cy → CPI = $1 + 0.02 \times 400 = 9$.
+- With L2 (5ns hit, 20% L2-miss to mem): CPI = $1 + 0.02 \times (20 + 0.2 \times 400) = 3$ → **3× speedup**.
 
-==**Add L2** (5ns hit, 50% L2 miss to mem)==:
-
-- L1 miss penalty = 5ns × 4 + 0.5 × 400 = 20 + 200 = 220 cycles? Actually: L1 miss → AMAT_L2 = 20 + 0.5 × 400 = 220 cycles.
-- CPI = 1 + 0.02 × 220 = 5.4. Or per slide: CPI = 1 + 0.02 × (20 + 0.2 × 400) = 1 + 2 = **3**, ratio 3× over no-L2.
-
-==**Multi-level true facts**== (Quiz 4 #13):
-
-- **L3 reduces memory traffic** ✓
-- **L1 → fast hit time** ✓
-- **L3 shared by cores** ✓
-- **L2 → balance speed + capacity** ✓
+==**Multi-level true facts**==: **L3 reduces memory traffic** ✅; **L1 → fast hit time** ✅; **L3 shared by cores** ✅; **L2 → balance speed + capacity** ✅.
 
 ==**L3 write-through**==: nonsensical (would create huge memory traffic at the wrong layer).
 
@@ -785,27 +767,26 @@ PA = (PPN << VPO_bits) | VPO
 
 | Q | Answer |
 |---|---|
-| 32-bit memory all 0 → which possible? | int 0 ✓; FP +0.0 ✓; **denorm? NO (denorm has nonzero frac)**; chars NULx4 ✓ |
+| 32-bit all-0 → possible? | int 0 ✅; FP +0.0 ✅; chars NULx4 ✅; **denorm ❌** (nonzero frac) |
 | memory wall | gap CPU vs DRAM |
 | storage NOT in cache line | **set number** |
 | layer managed by compiler/programmer | **registers + local memory** |
-| L3 shared by all cores in multicore? | **YES** |
-| 5% D-MR, 50% load/store, MP=100, base CPI=1 | **CPI = 3.5** (CSC3050) |
-| 5% D-MR, 40% load/store, MP=100, base=1 | **CPI = 3** (CSC3060) |
+| L3 shared by all cores | ✅ |
+| 5% D-MR, 50% load/store, MP=100, base=1 | **CPI = 3.5** |
+| 5% D-MR, 40% load/store, MP=100, base=1 | **CPI = 3** |
 | 64KB 4-way 32B line 32-bit | tag 18, set 9, offset 5 |
 | L1D hit latency modern | **3-4 cycles** |
 | modern L1D config | **4-way + write-back + write-allocate** |
 | true LRU data structure | **stack** |
 | upper bound on replacement | **Belady** |
-| direct-mapped: lowest tag overhead | **TRUE** |
+| DM: lowest tag overhead | ✅ |
 | coherence solution choices | shared cache OR snoopy on private |
 | DRAM in modern GPU | **HBM** |
-| caches occupy most chip area | TRUE |
+| caches occupy most chip area | ✅ |
 | sorting w/ high data locality | Quicksort, Insertion, Bubble |
 | TLB miss may → | **page fault** |
 | page table location | **main memory** |
-| cache-like structures | BTB, TLB, L3, branch prediction table |
-| branch prediction table no tags? | **BHT/PHT can be untagged** |
+| cache-like structures | BTB, TLB, L3, branch pred table |
 | no-tag mapping table | **single-level page table** |
-| caches usually fully assoc | **TLB, victim cache** |
+| fully-assoc caches | **TLB, victim cache** |
 | address aliasing complicates | **virtual-address-tagged cache** |

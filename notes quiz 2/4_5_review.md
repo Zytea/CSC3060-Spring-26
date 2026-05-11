@@ -60,15 +60,7 @@ add  t1, t0, t2
 
 ==**Any legal schedule**== = topological sort of the DAG: every predecessor scheduled before successor.
 
-==**Schedule count**==:
-
-| Pattern | # legal schedules |
-|---|---:|
-| chain of 50 dependent | **1** |
-| 50 independent | **50!** (huge) |
-| typical mix | use heuristics |
-
-> Quiz 3 #27: a basic block with 50 instrs → best case 1 schedule (full chain), worst case 50! → use heuristics, not exhaustive search.
+==**Schedule count**==: 50 dependent chain → **1** schedule; 50 independent → **50!**; typical mix → heuristics, not exhaustive search.
 
 ==**MIPS history**==: "Microprocessor without Interlocked Pipeline Stages" — relied on **compiler-only** hazard avoidance (NOPs inserted if needed). Failed due to **compatibility & scalability** (Quiz 3 #11). Modern CPUs all have HW interlocks.
 
@@ -149,17 +141,11 @@ sw x6, 0(x2)    # cannot swap if x1 may equal x2
 
 ## 5. Operation Latency = Arc Weights
 
-| Operation | Latency |
-|---|---:|
-| int ALU | 1 |
-| **load (hit)** | **2-3** |
-| int multiply | 3-5 |
-| FADD | 3-4 |
-| FMUL | 4-5 |
-| FMA / FMAC | 5-6 |
-| **int divide** | **~32** |
+| Op          | int ALU | **load (hit)** | int mul | FADD | FMUL | FMA   | **int div** |
+| ----------- | ------- | -------------- | ------- | ---- | ---- | ----- | ----------- |
+| **Latency** | 1       | **2-3**        | 3-5     | 3-4  | 4-5  | 5-6   | **~32**     |
 
-> Hardest to pipeline: **integer divide** (Quiz 3 #7).
+> Hardest to pipeline: **integer divide**.
 
 ## 6. Critical Path & Maximum Delay
 
@@ -229,17 +215,7 @@ int CP(int n) {
 
 > Rule: **don't let critical path stall** — if its node would stall, fill with side work first.
 
-## 9. Schedule Counts and Quiz Patterns
-
-| Pattern | Bubbles |
-|---|---:|
-| ALU → ALU with forwarding | 0 |
-| **load → use with forwarding** | **1** |
-| no forwarding, producer → close consumer | 2-3 |
-| branch resolved EX | 2 |
-| branch resolved MEM | 3 |
-
-## 10. Hardware vs Software Hazard Mitigation
+## 9. Hardware vs Software Hazard Mitigation
 
 | Technique | Who | Hazard |
 |---|---|---|
@@ -255,7 +231,7 @@ int CP(int n) {
 
 > **Deeper pipeline is NOT a mitigation** — it makes data + control penalties worse.
 
-## 11. Memory-Scheduling Restrictions
+## 10. Memory-Scheduling Restrictions
 
 > Search trigger words: **alias, unknown latency, store-load, volatile, call**.
 
@@ -266,7 +242,7 @@ register RAW/WAR/WAW → build DAG, can be reordered subject to edges
 memory ops → KEEP original order unless non-aliasing PROVEN
 ```
 
-## 12. RAW vs WAR/WAW Release Timing
+## 11. RAW vs WAR/WAW Release Timing
 
 | Edge | Successor ready when |
 |---|---|
@@ -275,7 +251,7 @@ memory ops → KEEP original order unless non-aliasing PROVEN
 
 > ==WAR / WAW edges do NOT necessarily create bubbles== (they're just order constraints). Only RAW with latency creates real wait.
 
-## 13. Quiz 2 Reordering Example
+## 12. Quiz 2 Reordering Example
 
 Original (load-use heavy):
 

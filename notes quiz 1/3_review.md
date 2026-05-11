@@ -4,64 +4,57 @@
 
 - ==**ISA**==: software-visible contract: instructions, regs, memory model, exceptions, ABI-visible behavior. Computer architecture = SW/HW interface.
 - ==**RISC-V**==: open, modular, **load/store**, mostly **fixed 32b** instructions; ISA does **not** require caches.
-- **Modular naming**: `RV{32/64/128}{I/E}{M,A,F,D,C,V,...}`; **base must be `I` or `E`**; `RV32EM` ✓, `RV32IM` ✓; `RV32MI`/`RV32ME` ✗.
-- **`RV32E`**: embedded base, **16 GPRs**. **`RV32I`**: **32 GPRs `x0-x31`**, each 32b, 32b address space (4 GiB).
-- ==**"32" in RV32I**== = **GPR/address width** (4 GiB addressable). NOT "32 registers"; NOT "32-bit instruction length"; NOT "32 instructions".
-- **Fixed length**: without `C`, all RV base instrs are **32b**; **`C` extension** adds 16b compressed instrs and is the *only* extension that breaks fixed length.
-- **Low-cost / mobile RV core**: add **`C` compressed extension** first if code size / I-cache / memory footprint matters.
-- ==**RVV (`V`)**==: vector extension; **vector-length agnostic (VLA)** so one binary runs efficiently on different vector lengths; compiler allocates vector regs and vector loads/stores expose memory patterns.
+  - **Modular naming**: `RV{32/64/128}{I/E}{M,A,F,D,C,V,...}`; **base must be `I` or `E`**; 
+  - **`RV32E`**: embedded base, **16 GPRs**. 
+  - ==**"32" in RV32I**== = **GPR/address width** (4 GiB addressable). NOT "32-bit instruction length"
+  - **Low-cost / mobile RV core**: add `C` first if code size / I-cache / memory footprint matters.
+  - ==**RVV (`V`)**==: vector extension; **vector-length agnostic (VLA)** so one binary runs efficiently on **different vector lengths**; compiler allocates vector regs and vector loads/stores expose memory patterns.
+
 - ==**RV32I architectural state**==: **32 GPRs `x0-x31` + PC + CSRs**. **RV64IFD**: + FP regs. **RV64IFV**: + FP + vector regs.
 - **Microarchitectural state** (regenerable, NOT saved on interrupt): pipeline regs, BHT, BTB, L1I/L1D caches.
-- **All-zero 32b word** as RV instr → opcode `0000000` is **not allocated** → **illegal instruction** (traps).
-- **`0x00000033`** = RV32I `add x0,x0,x0` (no architectural effect); also int `51`, ASCII `'3'`+NULs.
-- **Scalar RV32I regfile**: ==**2R / 1W**==. **2-issue scalar**: ~4R/2W. **2-issue FMA FP**: 6R/2W.
-- **Set `x2 = 0`**: `add x2,x0,x0` ✓ ; `xor x2,x2,x2` ✓; `addi x2,x2,0` keeps old value ✗; `or x2,x2,x2` keeps old ✗.
-- **No `rd` field**: ==**branches and stores**== (B/S types).
-- ==**Reach**==: branch B-type ≈ ±4 KiB; `JAL` ≈ ±1 MiB; `AUIPC+JALR` ≈ ±2 GiB PC-rel; reg+`JALR` = full 4 GiB address space.
-- **Return idiom**: `jalr x0, ra, 0` (= `ret`); class quizzes infer this as procedure return.
-- **B/J immediates** have implicit `bit0=0`; offset in **2-byte units** (compatible with `C` ext 16b instrs).
-- **Rejected memory forms**: no `LW rd, (rs1+rs2)` (no scaled index); no post-increment load. Reasons: regularity break, extra reg ports, harder hazards/precise exceptions.
-- **No `LWU` in RV32I**: `LW` already fills all 32b of a GPR; zero/sign-ext only matters when `XLEN > 32` (RV64).
-- **RV64I-only**: `LD`, `SD`, `LWU`, `ADDW`, `SLLW`, `SLLIW`, `SRAIW`, `SRLIW`, `SUBW`. **`LDU` is NOT an RV64I instr**. These are not valid RV32I base instrs.
-- **`SLLI/SRLI/SRAI` in RV32**: `shamt = imm[4:0]` (5 bits). `SLLI X5,X6,35` ✗ in RV32 (>31).
-- **Imm widths supported in RV32I**: **12-bit** (I/S/B; B's bit0 implicit) and **20-bit** (U/J; J's bit0 implicit). To load 32b const: pseudo-`li` or `lui+addi`; need adjustment if low 12b has high bit set.
-- ==**ABI**==: ISA + OS + calling convention. Defines arg/return regs, caller/callee-save split, stack/frame conventions; **NOT** variable names or "legal C data types".
+  - **RV64I-only**: `LD`, `SD`, `LWU`, `ADDW`, `SLLW`, `SLLIW`, `SRAIW`, `SRLIW`, `SUBW`. **`LDU` is NOT an RV64I instr**. 
+  - **Scalar RV32I regfile**: ==**2R / 1W**==. **2-issue scalar**: ~4R/2W. **2-issue FMA FP**: 6R/2W.
+  - **No `rd` field**: ==**branches and stores**== (B/S types).
+  - ==**Reach**==: branch B-type $12b|0\approx \pm 4\,\text{KiB}$; `JAL` $20b|0\approx \pm 1\,\text{MB}$; `AUIPC+JALR` $32b\approx \pm 2\,\text{GB}$ PC-rel; reg+`JALR` = full $4 GB$ (thus offset in **2-byte units** for  `C`)
+  - **Return idiom**: `jalr x0, ra, 0` (= `ret`); procedure return.
+  - **Rejected memory forms**: no `LW rd, (rs1+rs2)` (no scaled index); no post-increment load. Reasons: regularity break, extra reg ports, harder hazards/precise exceptions.
+  - **`SLLI/SRLI/SRAI` in RV32**: `shamt = imm[4:0]` (5b, 31). `SLLI X5,X6,35` ❌ .
+  - **Imm widths in RV32I**: **12b** (I/S/B) and **20b** (U/J). To load 32b const: pseudo-`li` or `lui+addi`; need adjustment ← low 12b has high bit set (signed extension❌ ).
+
+- ==**ABI**==:==ISA + OS + calling convention==. Defines arg/return regs, caller/callee-save split, stack/frame conventions; **NOT** variable names or "legal C data types".
 - ==**Hart**==: hardware thread with own architectural state (PC, GPRs, CSRs); a multicore chip can host multiple harts.
-- **`x0` always 0**: clear, copy (`add rd,x0,rs`), compare (`beq rs,x0,L`), discard result, mem hint (`lw x0,0(rs)`).
-- **No `BLE`/`BGT`**: regularity — swap operands of `BLT`/`BGE`.
-- **Bounds-check trick**: `bgeu idx, len, out` catches both `idx<0` (huge unsigned) and `idx≥len` in one instr.
+  - **`x0` always 0**: clear, copy (`add rd,x0,rs`), compare (`beq rs,x0,L`), discard result, mem hint (`lw x0,0(rs)`).
+  - **No `BLE`/`BGT`**: regularity — swap operands of `BLT`/`BGE`.
+  - **Bounds-check trick**: `bgeu idx, len, out` catches both `idx<0` (huge unsigned) and `idx≥len`.
+
 - **Natural alignment**: object size N at addr multiple of N. Avoids cache-line / page crossing → no double-miss / double-fault / extra HW.
-- **RISC-V Linux ABI stack alignment**: ==**16 bytes**==.
-- **Struct rules**: field offset = mult of field align; total size padded to mult of max field align; **fields cannot be reordered** (locals can).
+  - **RISC-V Linux ABI stack alignment**: ==**$16B$**==. RV32E: $4B$
+  - **Struct rules**: $$
+  \text{field offset} = N \times \text{field align}
+$$
+; $\text{total size} = N \times \text {max field align}$; **fields cannot be reordered** (locals can).
+
 - **R4-type FMA**: `rd = rs1*rs2 + rs3` — only R4 instr in RV ISA. Could be redesigned with 3 ops as `rd = rs1*rs2 + rd` (rd as src+dst), but **breaks regularity**.
 
 ## 1. Assembly Language Instructions
 
 ### 1.1 CISC vs RISC
 
-| | CISC | RISC / RISC-V |
-|---|---|---|
-| instr length | variable | fixed 32b base, optional 16b `C` |
-| addressing modes | many | few (load/store only) |
-| memory ops | many instrs touch memory | only `LW/SW`-class |
-| pipeline / decode | harder | easier |
-| examples | x86 (1978), VAX, IBM 360 | **RISC-V (2010)**, MIPS, SPARC, ARM (1985), PowerPC |
+| Feature           | instr length                     | addressing modes      | memory ops               | pipeline / decode |
+| ----------------- | -------------------------------- | --------------------- | ------------------------ | ----------------- |
+| **CISC**          | variable                         | many                  | many instrs touch memory | harder            |
+| **RISC / RISC-V** | fixed 32b base, optional 16b `C` | few (load/store only) | only `LW/SW`-class       | easier            |
 
 ==**Iron Law**==:
-
 $$
-CPU\ Time = Instruction\ Count \times CPI \times Clock\ Cycle\ Time
+\text{CPU\ Time} = \text{Instruction Count} \times CPI \times \text{Clock Cycle Time}
 $$
 
-| Lever | Mainly improves |
-|---|---|
-| RISC simplicity | CPI / cycle time (often raises IC) |
-| CISC compactness | IC (often raises CPI / cycle time) |
-| SIMD/vector/RVV | **IC** (many elements per instr) |
-| pipeline | **cycle time** (overlapped stages) |
-| superscalar / OoO / pred / cache | **CPI** |
+| Metric              | RISC simplicity          | CISC compactness         | SIMD/vector/RVV                   | Pipeline        | Superscalar / OoO / Pred / Cache |
+| ------------------- | ------------------------ | ------------------------ | --------------------------------- | --------------- | -------------------------------- |
+| **Mainly improves** | CPI↓ / cycle time↓ (IC↑) | IC↓ (CPI↑ / cycle time↑) | **IC↓** (many elements per instr) | **cycle time↓** | **CPI↓**                         |
 
-Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-style μops internally.
+> Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-style μops internally.
 
 ### 1.2 RISC Design Principles
 
@@ -70,44 +63,32 @@ Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-
 3. ==**Make the common case fast**== — operands from regs (load/store), allow imm.
 4. ==**Good design demands compromise**== — balance instr formats vs operand count.
 
-> Judge an ISA by **compiler/codegen quality + HW cost**, not by whether one human-written instr looks convenient.
+> Judge an ISA by **compiler/codegen quality + HW cost**, not by human-written.
 
 ### 1.3 Bases and Extensions
 
-| Part | Meaning |
-|---|---|
-| **`I`** | base integer, 32 GPRs |
-| **`E`** | embedded base, 16 GPRs |
-| `M` | integer multiply/divide |
-| `A` | atomic memory ops |
-| `F` / `D` | single / double FP |
-| **`C`** | **compressed 16b instrs** (the *only* ext that breaks fixed-length 32b) |
-| `V` | vector / RVV; **VLA** for portability across vector-register widths |
+| **`I`**           | **`E`**                | `M`                | `A`                            | `F` / `D` | **`C`**        | `V`                                                   |
+| ----------------- | ---------------------- | ------------------ | ------------------------------ | --------- | -------------- | ----------------------------------------------------- |
+| base int, 32 GPRs | embedded base, 16 GPRs | integer $\times /$ | atomic memory ops (Multi-core) | FP16/32   | **16b instrs** | **VLA** for portability across vector-register widths |
 
 ## 2. RV32I Instructions and Architecture State
 
 ### 2.1 RV32I Instruction Set (Base, no `M`)
 
-| Category | Instrs |
-|---|---|
-| R ALU | `ADD SUB AND OR XOR SLT SLTU SLL SRL SRA` |
-| I ALU | `ADDI SLTI SLTIU ANDI ORI XORI SLLI SRLI SRAI` |
-| Loads | `LB LH LW LBU LHU` |
-| Stores | `SB SH SW` |
-| Branches | `BEQ BNE BLT BGE BLTU BGEU` |
-| Jumps | `JAL JALR` |
-| Upper imm | `LUI AUIPC` |
-| System / CSR | `ECALL EBREAK CSRRW CSRRS CSRRC` |
-
-> RV32IM = RV32I + `M`. Running `mul` on plain RV32I → **illegal-instr exception**; handler may abort or **emulate** in SW.
+| Category | Instrs | Opcode |
+|---|---|---|
+| R | `ADD SUB AND OR XOR SLT SLTU SLL SRL SRA` | `0110011` |
+| I | `ADDI SLTI SLTIU ANDI ORI XORI SLLI SRLI SRAI` | `0010011` |
+| I Load | `LB LH LW LBU LHU` | `0000011` |
+| S | `SB SH SW` | `0100011` |
+| B | `BEQ BNE BLT BGE BLTU BGEU` | `1100011` |
+| J | `JAL (1101111) JALR (I, 1100111)` | ← |
+| U imm | `LUI (0110111) AUIPC (0010111)` | ← |
+| I CSR | `ECALL EBREAK CSRRW CSRRS CSRRC` | `1110011` |
 
 ### 2.2 Architectural State
 
-| ISA | State |
-|---|---|
-| **RV32I** | `x0-x31`, **PC**, CSRs |
-| **RV64IFD** | + 32 FP regs |
-| **RV64IFV** | + 32 vector regs |
+**RV32I**: `x0-x31`, **PC**, CSRs; **RV64IFD**: + 32 FP regs; **RV64IFV**: + 32 vector regs.
 
 - `x0` hardwired to 0: clear, copy, compare, discard, memory hint (`lw x0,0(x1)` to test access).
 - CSRs: `cycle`, `instret`, `hartid`, `mepc`, `mcause`, `mtvec`, `mstatus`.
@@ -120,27 +101,11 @@ Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-
 | `x0-x31`, PC, CSRs (RV32I) | architectural | yes |
 | FP / vector regs (when ISA includes them) | architectural | yes |
 | BHT, BTB, pipeline regs, L1I/L1D | **microarchitectural** | **no** (regenerable) |
-| Overflow/underflow flags | **not** in RV32I (no condition codes) | n/a |
-
-### 2.3 ABI Snapshot
-
-| x-reg | ABI | Role | Saver |
-|---|---|---|---|
-| `x0` | `zero` | hardwired 0 | — |
-| `x1` | `ra` | return address | **caller** |
-| `x2` | `sp` | stack pointer (16B aligned) | **callee** |
-| `x3` | `gp` | global pointer | platform |
-| `x4` | `tp` | thread pointer | platform |
-| `x5-x7` | `t0-t2` | temps | caller |
-| `x8` | `s0/fp` | saved / frame ptr | callee |
-| `x9` | `s1` | saved | callee |
-| `x10-x17` | `a0-a7` | args; `a0/a1` returns | caller |
-| `x18-x27` | `s2-s11` | saved | callee |
-| `x28-x31` | `t3-t6` | temps | caller |
+| Overflow/underflow flags | **not** in RV32I | n/a |
 
 ## 3. Instruction Encoding Formats
 
-### 3.1 Format Overview (32b, opcode in `[6:0]`)
+### 3.1 Format Overview
 
 ```text
 31           25 24       20 19       15 14   12 11        7 6           0
@@ -159,71 +124,47 @@ Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-
 └─────────────────────────┴───────────────────┴───────────┴─────────────┘
 ```
 
-==**Regular field positions**== (regularity → start regfile read before full decode):
-
-| Field | Bits |
-|---|---|
-| `opcode` | `[6:0]` |
-| `rd` | `[11:7]` |
-| `funct3` | `[14:12]` |
-| `rs1` | `[19:15]` |
-| `rs2` | `[24:20]` |
-
-==**Opcode quick map**==:
-
-| Opcode | Type | Instrs |
-|---|---|---|
-| `0110011` | R | `ADD/SUB/AND/OR/XOR/SLT/SLTU/SLL/SRL/SRA` |
-| `0010011` | I-ALU | `ADDI/SLTI/…/SLLI/SRLI/SRAI` |
-| `0000011` | I-Load | `LB/LH/LW/LBU/LHU` |
-| `1100111` | I-JALR | `JALR` |
-| `0100011` | S | `SB/SH/SW` |
-| `1100011` | B | `BEQ/BNE/BLT/BGE/BLTU/BGEU` |
-| `0110111` | U | `LUI` |
-| `0010111` | U | `AUIPC` |
-| `1101111` | J | `JAL` |
-| `1110011` | I-SYS | `ECALL/EBREAK/CSRRW/CSRRS/CSRRC` |
+==**Regular field positions**== (regularity → start rs1/rs2 read before full decode):
 
 > Opcode all-`0000000` is **NOT allocated** → all-zero 32b instr is **illegal** in RV32I.
 
-==**Worked decode**==: instruction `0x00000013` (the canonical NOP)
+> Example:
+>
+> ```text
+> 0x00000013 = 0000 0000 0000 | 00000 | 000 | 00000 | 0010011
+>               imm[11:0]=0   | rs1=x0| f3=0| rd=x0 | opcode=I-ALU
+> → ADDI x0, x0, 0     (writes to x0 = no effect = NOP)
+> ```
+>
+> ```text
+> 0x00208093 = 0000 0000 0010 | 00001 | 000 | 00001 | 0010011
+>               imm=2          | rs1=x1| f3=0| rd=x1 | opcode=I-ALU
+> → ADDI x1, x1, 2
+> ```
+>
 
-```text
-0x00000013 = 0000 0000 0000 | 00000 | 000 | 00000 | 0010011
-              imm[11:0]=0   | rs1=x0| f3=0| rd=x0 | opcode=I-ALU
-→ ADDI x0, x0, 0     (writes to x0 = no effect = NOP)
+### 3.2 R-Type `rd = rs1 op rs2`
+
+```
+31           25 24       20 19       15 14   12 11        7 6           0
+│   funct7    │    rs2    │    rs1    │funct3 │    rd     │   opcode    │ 
 ```
 
-==**Worked decode**==: `0x00208093`
+| Field        | `ADD`   | `SUB`         | `SLL`   | `SLT`   | `SLTU`  | `XOR`   | `SRL`   | `SRA`         | `OR`    | `AND`   |
+| ------------ | ------- | ------------- | ------- | ------- | ------- | ------- | ------- | ------------- | ------- | ------- |
+| **`funct3`** | `000`   | `000`         | `001`   | `010`   | `011`   | `100`   | `101`   | `101`         | `110`   | `111`   |
+| **`funct7`** | `0...0` | **`0100000`** | `0...0` | `0...0` | `0...0` | `0...0` | `0...0` | **`0100000`** | `0...0` | `0...0` |
 
-```text
-0x00208093 = 0000 0000 0010 | 00001 | 000 | 00001 | 0010011
-              imm=2          | rs1=x1| f3=0| rd=x1 | opcode=I-ALU
-→ ADDI x1, x1, 2
+> Quiz: `funct7[5]` distinguishes `ADD 0/SUB 1` and `SRL 0/SRA 1`; rest of `funct7` is 0 → trap inputs to ALU control.
+
+### 3.3 I-Type 
+
+```
+31                      20 19       15 14   12 11        7 6            0
+│        imm[11:0]        │    rs1    │funct3 │    rd     │   opcode    │ 
 ```
 
-### 3.2 R-Type
-
-`rd = rs1 op rs2`, opcode `0110011`.
-
-| Instr | `funct3` | `funct7` |
-|---|---|---|
-| `ADD` | `000` | `0000000` |
-| `SUB` | `000` | **`0100000`** |
-| `SLL` | `001` | `0000000` |
-| `SLT` | `010` | `0000000` |
-| `SLTU` | `011` | `0000000` |
-| `XOR` | `100` | `0000000` |
-| `SRL` | `101` | `0000000` |
-| `SRA` | `101` | **`0100000`** |
-| `OR` | `110` | `0000000` |
-| `AND` | `111` | `0000000` |
-
-> Quiz: `funct7[5]` distinguishes `ADD/SUB` and `SRL/SRA`; rest of `funct7` is 0 → trap inputs to ALU control.
-
-### 3.3 I-Type
-
-`I-imm = signext(inst[31:20])` (12b signed, range `-2048..+2047`).
+`I-imm = signext(inst[31:20])`  (12b signed, range `-2048..+2047`).
 
 | Class | Behavior | Opcode |
 |---|---|---|
@@ -237,17 +178,18 @@ Modern x86: variable-length CISC at ISA level, but decoders translate into RISC-
 
 ==**Loads**==:
 
-| Instr | Load | Sign-ext? |
-|---|---|---|
-| `LB` | byte | sign |
-| `LH` | half | sign |
-| `LW` | word | n/a (fills 32b GPR) |
-| `LBU` | byte | zero |
-| `LHU` | half | zero |
+| Instr      | `LB`     | `LH`     | `LW`       | `LBU` | `LHU` |
+| ---------- | -------- | -------- | ---------- | ----- | ----- |
+| **Extend** | **sign** | **sign** | (fill 32b) | zero  | zero  |
 
-> No `LWU` in RV32I — `LW` already fills the GPR. Only matters in RV64I (where `LWU` zero-extends to 64b).
+> No `LWU` in RV32I — `LW` already fills the GPR. Only matters in RV64I (`LWU` zero-extends to 64b).
 
 ### 3.4 S-Type (Stores)
+
+```
+31                      20 19       15 14   12 11        7 6            0
+│  imm[11:5]  │    rs2    │    rs1    │funct3 │ imm[4:0]  │   opcode    │
+```
 
 `S-imm = signext({inst[31:25], inst[11:7]})` — 12b signed split. Opcode `0100011`.
 
@@ -259,9 +201,12 @@ mem[rs1 + S-imm] = rs2
 
 ### 3.5 B-Type (Branches)
 
-$$
-B\text{-imm} = signext(\{inst[31], inst[7], inst[30:25], inst[11:8], 0\})
-$$
+```
+31                      20 19       15 14   12 11        7 6            0
+│imm[12|10:5] │    rs2    │    rs1    │funct3 │imm[4:1|11]│   opcode    │
+```
+
+`B-imm = signext({inst[31], inst[7], inst[30:25], inst[11:8], 0})`
 
 - 13-bit signed byte offset with **implicit bit0=0** → reach ≈ **±4 KiB**. Opcode `1100011`.
 - No `rd`. Compare `rs1` and `rs2`; PC = taken ? PC+B-imm : PC+4.
@@ -274,15 +219,14 @@ $$
 
 > [!IMPORTANT]
 > S-type imm is **base-relative byte offset** (rs1+imm). B-type imm is **PC-relative** with implicit low `0`, has **no `rd`**, and offset is in **2-byte units** (so `C` ext compressed 16b instrs are reachable).
+>
+> ==**No `BGT/BLE`**==: regularity. 
 
-==**No `BGT/BLE`**==: regularity. Swap operands:
-
-```asm
-# if x > y → y < x
-blt y, x, L
-# if x ≤ y → y ≥ x
-bge y, x, L
-```
+> [!NOTE]
+>
+> **S vs B Imm**: **rearrangement keeps `funct3, rs1, rs2` in fixed positions** so decode + regfile read are the same. Tradeoff: imm bits scattered, but HW just reroutes wires (no cost).
+>
+> Same idea: **U vs J Imm**both 20b, but J reorders bits to keep regularity.
 
 ==**Bounds check trick**== (single instr catches both negative and over):
 
@@ -293,6 +237,11 @@ bgeu x5, x6, out_of_bounds   # signed-neg becomes huge unsigned, also catches id
 
 ### 3.6 U-Type (`LUI`, `AUIPC`)
 
+```
+31                                          12 11        7 6            0
+│                 imm[31:12]                  │    rd     │   opcode    │
+```
+
 | Instr | Opcode | Behavior |
 |---|---|---|
 | `LUI rd, imm20` | `0110111` | `rd = imm20 << 12` (load upper imm) |
@@ -300,9 +249,12 @@ bgeu x5, x6, out_of_bounds   # signed-neg becomes huge unsigned, also catches id
 
 ### 3.7 J-Type and JALR
 
-$$
-J\text{-imm} = signext(\{inst[31], inst[19:12], inst[20], inst[30:21], 0\})
-$$
+```
+31                      20 19               12 11        7 6            0
+│     imm[20|10:1|11]     │    imm[19:12]     │    rd     │   opcode    │
+```
+
+`J-imm = signext({inst[31], inst[19:12], inst[20], inst[30:21], 0})`
 
 - `JAL rd, imm`: J-type, opcode `1101111`. `rd = PC+4; PC = PC + J-imm`. Reach ≈ **±1 MiB** (21b signed, bit0=0).
 - `JALR rd, rs1, imm`: I-type, opcode `1100111` (`funct3=000`). `rd = PC+4; PC = (rs1+imm12) & ~1`. Reach: full 32b address space via reg.
@@ -320,23 +272,11 @@ jalr ra, rs1, 0      # indirect call (function pointer)
 
 ==**Reach quick facts**==:
 
-| Mechanism | Reach |
-|---|---|
-| Branch B-type | ≈ ±4 KiB |
-| `JAL` | ≈ ±1 MiB |
-| `AUIPC + JALR` | ≈ ±2 GiB PC-rel |
-| reg-based `JALR` | full 4 GiB address space |
+| Mechanism    | Branch B-type        | `JAL`                | `AUIPC + JALR`              | reg-based `JALR` |
+| ------------ | -------------------- | -------------------- | --------------------------- | ---------------- |
+| **Reach**    | $\approx \pm 4$ KiB  | $\approx \pm 1$ MiB  | $\approx \pm 2$ GiB PC-rel  | full 4 GiB       |
 
-> Quiz Q5 (Sec II): "Jump instrs can be used for function calls" ✓ (rd=ra). "JALR has larger jump range than JAL" ✓ (full 32b vs ±1 MiB). "Jump instrs are UJ type" — only `JAL` is J-type; `JALR` is **I-type**.
-
-### 3.8 S-type vs B-type Imm Encoding (Why Different?)
-
-S-type imm = `{inst[31:25] | inst[11:7]}` (low 12b, contig).
-B-type imm = `{inst[31] | inst[7] | inst[30:25] | inst[11:8] | 0}` (rearranged, bit0=0 implicit).
-
-The **rearrangement keeps `funct3, rs1, rs2` in fixed positions** so decode + regfile read are the same. Trade: imm bits scattered, but HW just reroutes wires (no extra cost).
-
-Same idea: U-type vs J-type both 20b, but J reorders bits to keep regularity.
+> Quiz: "Jump can be used for function calls" ✅ (rd=ra). "JALR has larger jump range than JAL" ✅ (full 32b vs ±1 MiB). "Jump instrs are UJ type" ❌ — only `JAL` is J-type; `JALR` is **I-type**.
 
 ## 4. Data Alignment and Layout
 
@@ -344,12 +284,9 @@ Same idea: U-type vs J-type both 20b, but J reorders bits to keep regularity.
 
 ==**Natural alignment**==: object of size N starts at addr multiple of N.
 
-| Type LP64 | Size = Align |
-|---|---:|
-| `char` | 1 |
-| `short` | 2 |
-| `int` / `float` | 4 |
-| `long` / `double` / pointer | 8 |
+| Type (LP64)        | `char` | `short` | `int` / `float` | `long` / `double` / pointer |
+| ------------------ | ------ | ------- | --------------- | --------------------------- |
+| **Size = Align**   | 1      | 2       | 4               | 8                           |
 
 ==**Why required**==:
 - avoid **cache-line crossing** (would need 2 accesses).
@@ -361,42 +298,25 @@ Same idea: U-type vs J-type both 20b, but J reorders bits to keep regularity.
 
 ### 4.2 Struct Padding Rules
 
-1. **Field offset** = multiple of field's align.
-2. **Total struct size** = multiple of **max field align** (trailing pad).
-3. **Compiler cannot reorder struct fields** (C standard guarantees order); **independent locals can** be reordered.
-4. **Reordering large→small** often shrinks padding.
+$$
+\text{field offset} = N \times \text{field align}; \quad \text{total size} = N \times \text {max field align}
+$$
 
-C row-major array address:
+1. **Compiler cannot reorder struct fields** (C standard guarantees order); **independent locals can** be reordered.
+2. **Reordering large→small** often shrinks padding.
 
-```text
-int A[R][C];      &A[i][j]    = base + (i*C + j) * 4
-T   A[R][C][D];   &A[i][j][k] = base + ((i*C + j)*D + k) * sizeof(T)
+```c
+T   A[R][C][D];   &A[i][j][k] = base + (D*(C*i + j) + k) * sizeof(T)
 ```
 
 ### 4.3 Worked Struct Quiz Pattern
 
 ```c
 struct S1 { int white; long count; char c; long red; int green; char d; int blue; }
-A[1000];
+// field offset = (4+4) + 8 + (1+7) + 8 + 4 + (1+3) + 4 + trail 4 = 48
+struct S1 A[1000]; // offset = base + 48 * i
+A[10].blue = 0;    // offset = base + 48 * 10 + 40
 ```
-
-LP64 layout (`char=1, int=4, long=8`):
-
-| Field | Offset | Size | Pad after |
-|---|---:|---:|---:|
-| `white` | 0 | 4 | 4 |
-| `count` | 8 | 8 | 0 |
-| `c` | 16 | 1 | 7 |
-| `red` | 24 | 8 | 0 |
-| `green` | 32 | 4 | 0 |
-| `d` | 36 | 1 | 3 |
-| `blue` | 40 | 4 | **4 trailing** |
-
-**Total size = 48 B** (multiple of 8 = max align).
-
-==**`A[10].blue = 0` on RV64IFD**==:
-- offset = `10 * 48 + 40 = 520`
-- assume `&A[0]` in `x1` → ==**`sw x0, 520(x1)`**==.
 
 ## 5. Codegen Patterns
 
@@ -412,9 +332,7 @@ Assume RV32I: unsigned `a` in `a0`, signed `b` in `a1`, signed `c` in `a2`.
 | `a%128` | `andi t0, a0, 0x7f` | low 7 bits |
 | `pow(2,a)` | `addi t0,x0,1; sll t0,t0,a0` | `1 << a` |
 | `a = (b >= c)` | `slt a0,a1,a2; xori a0,a0,1` | invert "<" |
-| `b * c` (no `M`) | shift-and-add loop (see 5.1) | software emulation |
-
-### 5.1 Software Multiply Without `M`
+| `b * c` (no `M`) | shift-and-add loop | software emulation |
 
 ```asm
 # a0 = b * c, b in a1, c in a2
@@ -429,7 +347,33 @@ skip:
     bnez a2, loop
 ```
 
-### 5.2 Loading 32-bit Constants
+```asm
+# unsigned division
+# a1 = dividend, a2 = divisor, a0 = quotient, a3 = remainder
+    beq  a2, x0, div_zero
+    addi a0, x0, 0      # q = 0
+    addi a3, x0, 0      # r = 0
+    addi t1, x0, 32
+loop:
+    srli t0, a1, 31     # next dividend bit
+    slli a1, a1, 1      # consume bit
+    slli a3, a3, 1      # r <<= 1
+    or   a3, a3, t0     # r |= next bit
+    slli a0, a0, 1      # q <<= 1
+    bltu a3, a2, skip   # if r < divisor, q bit = 0
+    sub  a3, a3, a2     # r -= divisor
+    addi a0, a0, 1      # q bit = 1
+skip:
+    addi t1, t1, -1
+    bne  t1, x0, loop
+    jal  x0, done
+div_zero:
+    addi a0, x0, -1     # DIVU quotient on /0
+    add  a3, a1, x0     # remainder = dividend
+done:
+```
+
+### 5.1 Loading 32-bit Constants
 
 ==**Pseudo `li`**== (preferred when assembler available):
 
@@ -447,48 +391,75 @@ addi x1, x1, 0x678
 # 0x12345800  (low 12b sign bit set: must adjust upper)
 lui  x1, 0x12346         # NOT 0x12345!
 addi x1, x1, -0x800      # sign-extends to 0xFFFFF800
-# result: 0x12346 << 12 + 0xFFFFF800 = 0x12345800 ✓
 ```
 
 > Why adjust: `addi` imm is **signed 12b**. If low 12b ≥ 0x800, it sign-extends negative; `lui` upper must be incremented to compensate.
 
 ==**Common pseudo-instr expansions**==:
 
-| Pseudo | Expansion |
-|---|---|
-| `mv rd, rs` | `addi rd, rs, 0` |
-| `j label` | `jal x0, label` |
-| `ret` | `jalr x0, ra, 0` |
-| `jr rs` | `jalr x0, rs, 0` |
-| `call label` | `auipc ra, hi20; jalr ra, lo12(ra)` (far call) |
-| `li rd, imm` | `addi` if 12b; else `lui+addi` (adjust if low12 sign bit) |
-| `bgt rs,rt,L` | `blt rt,rs,L` |
-| `ble rs,rt,L` | `bge rt,rs,L` |
-| `nop` | `addi x0,x0,0` |
-| `not rd,rs` | `xori rd,rs,-1` |
-| `neg rd,rs` | `sub rd,x0,rs` |
-
+<table border="1" style="border-collapse: collapse; width: 100%;">
+  <thead>
+    <tr style="background-color: #f2f2f2;">
+      <th style="padding: 10px; text-align: left;">Pseudo</th>
+      <th style="padding: 10px; text-align: left;">Expansion</th>
+      <th style="padding: 10px; text-align: left;">Pseudo</th>
+      <th style="padding: 10px; text-align: left;">Expansion</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 10px;"><code>mv rd, rs</code></td>
+      <td style="padding: 10px;"><code>addi rd, rs, 0</code></td>
+      <td style="padding: 10px;"><code>j label</code></td>
+      <td style="padding: 10px;"><code>jal x0, label</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"><code>ret</code></td>
+      <td style="padding: 10px;"><code>jalr x0, ra, 0</code></td>
+      <td style="padding: 10px;"><code>jr rs</code></td>
+      <td style="padding: 10px;"><code>jalr x0, rs, 0</code></td>
+    </tr>
+    <!-- 这里的两行不并排，独占一行 -->
+    <tr>
+      <td style="padding: 10px;"><code>call label</code></td>
+      <td colspan="3" style="padding: 10px;"><code>auipc ra, hi20; jalr ra, lo12(ra)</code> (far call)</td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"><code>li rd, imm</code></td>
+      <td colspan="3" style="padding: 10px;"><code>addi</code> if 12b; else <code>lui+addi</code> (adjust if low12 sign bit)</td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"><code>bgt rs,rt,L</code></td>
+      <td style="padding: 10px;"><code>blt rt,rs,L</code></td>
+      <td style="padding: 10px;"><code>ble rs,rt,L</code></td>
+      <td style="padding: 10px;"><code>bge rt,rs,L</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"><code>nop</code></td>
+      <td style="padding: 10px;"><code>addi x0,x0,0</code></td>
+      <td style="padding: 10px;"><code>not rd,rs</code></td>
+      <td style="padding: 10px;"><code>xori rd,rs,-1</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"><code>neg rd,rs</code></td>
+      <td style="padding: 10px;"><code>sub rd,x0,rs</code></td>
+      <td style="padding: 10px;"></td>
+      <td style="padding: 10px;"></td>
+    </tr>
+  </tbody>
+</table>
 ==**Pop-quiz anchors**==:
 
 | Question | Answer |
 |---|---|
-| imm widths in RV32I | **12b** (I/S/B with implicit bit0=0) and **20b** (U/J with implicit bit0=0 for J) |
-| set `x2 = 0` | `add x2,x0,x0` ✓; `xor x2,x2,x2` ✓; `addi x2,x2,0`/`or x2,x2,x2` ✗ (keeps old) |
+| imm widths in RV32I | **12b** (I/S/B, B's bit0=0) and **20b** (U/J, J's bit0=0) |
+| set `x2 = 0` | `add x2,x0,x0` ✅; `xor x2,x2,x2` ✅; `addi x2,x2,0`/`or x2,x2,x2` ❌ |
 | no `rd` | branches, stores |
 | RV32I means | load/store, 3-operand, RISC, 32b GPR/address |
 | return | `jalr x0, ra, 0` |
 | direct call | `jal ra, offset` |
 
-### 5.3 C-to-RV Translation Examples
-
-```c
-int x = A[i];     // A is int[]
-```
-```asm
-slli t0, i, 2       # t0 = i * 4
-add  t0, t0, base   # t0 = &A[0] + i*4
-lw   x, 0(t0)
-```
+### 5.2 C-to-RV Translation Examples
 
 ==**Bounds check pattern**==:
 
@@ -505,11 +476,9 @@ lw   x, 0(t0)
 ```asm
 # extract low 10 bits (= A % 1024)
 andi rd, A, 0x3FF      # 0x3FF = 0b 0...0 1111111111
-
 # clear low 10 bits
 li   t0, 0xFFFFFC00
 and  rd, A, t0
-
 # set bit 2 and 3
 ori  rd, A, 0xC        # 0xC = 0b 1100
 ```
@@ -586,13 +555,11 @@ exception → save mepc/mcause/mstatus.mpp → jump to mtvec handler
          → mret: PC←mepc, restore privilege/enables
 ```
 
-CSRs:
-
 | CSR | Use |
 |---|---|
 | `mepc` | exception PC (return target) |
-| `mcause` | cause code |
-| `mtvec` | trap vector base |
+| `mcause` | interrupt bit + cause code |
+| `mtvec` | trap vector base = base address + mode |
 | `mstatus` | mode + interrupt enables |
 | `mscratch` | scratch swap (often holds kernel sp) |
 | `cycle`, `instret` | perf counters (read-only at user mode) |
@@ -612,4 +579,4 @@ CSRs:
 | `x/d addr` | memory at addr in decimal |
 | `x/x addr` | memory at addr in hex |
 
-==**Bomb Lab pattern**==: infer correct phase inputs from executable/assembly; not brute force; not portable across arbitrary RV platforms.
+==**Bomb Lab pattern**==: infer correct phase inputs from executable/asm; not brute force; not portable across arbitrary RV platforms.
