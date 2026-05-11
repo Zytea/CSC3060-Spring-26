@@ -2,6 +2,8 @@
 
 ## Exam Facts
 
+==**12 control signals**== (RV32I single-cycle datapath, `BrEq/BrLT` are BranchComp **outputs**; rest are Control-logic outputs):
+
 <table>
   <thead>
     <tr>
@@ -14,90 +16,94 @@
   <tbody>
     <tr>
       <td>PCSrc</td>
-      <td><code>0</code>: PC+4, <code>1</code>: branch/target</td>
+      <td><code>0</code>: PC+4, <code>1</code>: branch/jump target</td>
       <td>ImmSel</td>
       <td><code>0</code>: I, <code>1</code>: S, <code>2</code>: B, <code>3</code>: U, <code>4</code>: J</td>
     </tr>
     <tr>
       <td>RegWr</td>
-      <td>Write</td>
+      <td><code>1</code>: write rd; <code>0</code>: store/branch</td>
+      <td>MemRW</td>
+      <td><code>0</code> (default) / <code>1</code> (stores)</td>
+    </tr>
+    <tr>
       <td>BrUn</td>
-      <td>unsigned, 0=signed</td>
-    </tr>
-    <tr>
+      <td><code>0</code>: signed, <code>1</code>: unsigned cmp</td>
       <td>BrEq</td>
-      <td>rs1==rs2</td>
+      <td>output: rs1==rs2</td>
+    </tr>
+    <tr>
       <td>BrLT</td>
-      <td>rs1&lt;rs2</td>
-    </tr>
-    <tr>
+      <td>output: rs1&lt;rs2</td>
       <td>Asel</td>
-      <td>0=rs1, 1=PC</td>
+      <td><code>0</code>: rs1, <code>1</code>: PC</td>
+    </tr>
+    <tr>
       <td>Bsel</td>
-      <td>0=rs2, 1=imm</td>
-    </tr>
-    <tr>
+      <td><code>0</code>: rs2, <code>1</code>: imm</td>
       <td>ALUOp</td>
-      <td><code>0</code>: SL, <code>1</code>: branch, <code>2</code>: R/I-type</td>
-      <td>ALUSrc</td>
-      <td><code>0</code>: ADD, <code>1</code>: SUB, <code>2</code>: AND, <code>3</code>: OR, <code>4</code>: SLT</td>
+      <td><code>00</code>: ADD (L/S/JALR addr), <code>01</code>: SUB (branch), <code>10</code>: decode by funct</td>
     </tr>
     <tr>
-      <td>MemWr</td>
-      <td>Write</td>
+      <td>ALUSel</td>
+      <td><code>ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU</code></td>
       <td>WBSel</td>
-      <td>0=mem, 1=alu, 2=pc+4</td>
+      <td><code>0</code>: mem (ld), <code>1</code>: ALU (R/I/U), <code>2</code>: PC+4 (JAL/JALR)</td>
     </tr>
   </tbody>
 </table>
 
-- ==**Control**==: maps `opcode + funct3 + funct7 + branch-result` to **mux selects + write enables**.
-  - **7 Core signals**: ==**`PCSrc`, `RegWr`, `MemRd`, `MemWr`, `ALUSrc`, `WBSel`, `ALUCtrl`**==.
-  - ==**`RegWr=0`**==: **stores + branches** (also default for trap).
-  - ==**`MemRd=1`**== only for **loads**; ==**`MemWr=1`**== only for **stores**.
-  - **`ALUSrc`** (B-mux): `0` for R/branches (`rs2`); `1` for I-ALU/load/store/JALR/LUI/AUIPC (imm).
-  - **`WBSel`**: load → mem; ALU/I/U → ALU; JAL/JALR → `PC+4`; LUI/AUIPC → imm/ALU.
-- ==**`ALUCtrl`**== = `ALUOp + funct3 + funct7[5]`. **Hardest control signal to generate**.
-  - **`funct7[5]`**: distinguishes `ADD 0/SUB 1` (R) and `SRL 0/SRA 1` (R or I shift).
-- ==**Next-PC sources (RV32I)**==: `PC+4`, `PC+imm` (branch/JAL), `(rs1+imm)&~1` (JALR), trap vector (`mtvec`). **NOT** memory indirection.
-- **WB-stage signals propagated**: `rd`, `RegWr/WRen`, `WBSel`. **NOT** `ALUCtrl` (used in EX, dies after).
+> [!NOTE]
+>
+> - ==**PCSrc (RV32I)**==: `PC+4`, `PC+imm` (branch/JAL), `(rs1+imm)&~1` (JALR), trap vector (`mtvec`). **NOT** memory indirection.
+> - **`Asel`**: `0=rs1` for R/I-ALU/load/store/JALR; `1=PC` for branch/JAL/AUIPC (ALU computes `PC+imm` target).
+>
+> - **`Bsel`**: `0=rs2` only for **R-type/branch-compare-input-side N/A**; `1=imm` for I-ALU/load/store/branch-target/JALR/LUI/AUIPC.
+> - ==**`ALUSel`**== = `f(ALUOp, funct3, funct7[5])`. **Hardest signal to generate**.
+>   - **`funct7[5]`**: distinguishes `ADD 0 / SUB 1` (R) and `SRL 0 / SRA 1` (R or I shift).
+
+
+- ==**Control**==: maps `opcode + funct3 + funct7 + BrEq/BrLT` to **mux selects + write enables**.
+- 
+- **WB-stage signals propagated**: `rd`, `RegWr`, `WBSel`. **NOT** `ALUSel` (dies after EX).
 
 ## 1. Per-Instruction Control Table
+
+| Instr      | `ImmSel` | `RegWr` | `Asel` | `Bsel` | `ALUSel` | `MemRW` | `WBSel`  | `PCSrc`         |
+| ---------- | -------- | ------- | ------ | ------ | -------- | ------- | -------- | --------------- |
+| **R-ALU**  | —        | 1       | 0      | 0      | funct    | 0       | 1 (ALU)  | 0               |
+| **I-ALU**  | I        | 1       | 0      | 1      | funct    | 0       | 1 (ALU)  | 0               |
+| **Load**   | I        | 1       | 0      | 1      | ADD      | 0       | 0 (mem)  | 0               |
+| **Store**  | S        | **0**   | 0      | 1      | ADD      | **1**   | ×        | 0               |
+| **Branch** | B        | **0**   | **1**  | 1      | ADD      | 0       | ×        | `BrEq/BrLT` mux |
+| **JAL**    | J        | 1       | 1      | 1      | ADD      | 0       | 2 (PC+4) | 1               |
+| **JALR**   | I        | 1       | 0      | 1      | ADD      | 0       | 2 (PC+4) | 1 (ALU&~1)      |
+| **LUI**    | U        | 1       | ×      | 1      | B-pass   | 0       | 1        | 0               |
+| **AUIPC**  | U        | 1       | 1      | 1      | ADD      | 0       | 1        | 0               |
 
 ==**Fast expressions**==:
 
 ```text
-PCSrc   = BranchTaken || JAL || JALR
-RegWr   = !(Branch || Store)
-MemRd   = Load
-MemWr   = Store
-ALUSrcB = I_ALU || Load || Store || JALR || LUI || AUIPC
+RegWr  = !(Branch || Store)
+MemRW  = Store ? W : R
+Bsel   = !R-type        # only R uses rs2 as ALU B-input
+Asel   = Branch || JAL || AUIPC      # PC+imm targets
+PCSrc  = (Branch && taken) || JAL || JALR
 ```
 
-| Instr                   | `RegWr` | `MemRd` | `MemWr` | `ALUSrc` | `WBSel`    | Next PC                     |
-| ----------------------- | ------- | ------- | ------- | -------- | ---------- | --------------------------- |
-| **R-ALU** (`add,sub,…`) | 1       | 0       | 0       | 0        | ALU        | `PC+4`                      |
-| **I-ALU** (`addi,…`)    | 1       | 0       | 0       | 1        | ALU        | `PC+4`                      |
-| **Load** (`lw,lb,…`)    | 1       | **1**   | 0       | 1        | Memory     | `PC+4`                      |
-| **Store** (`sw,sb,…`)   | **0**   | 0       | **1**   | 1        | —          | `PC+4`                      |
-| **Branch** (`beq,…`)    | **0**   | 0       | 0       | 0        | —          | target if taken else `PC+4` |
-| **JAL**                 | 1       | 0       | 0       | x        | `PC+4`     | `PC + J-imm`                |
-| **JALR**                | 1       | 0       | 0       | 1        | `PC+4`     | `(rs1+I-imm) & ~1`          |
-| **LUI / AUIPC**         | 1       | 0       | 0       | 1        | imm / ALU  | `PC+4`                      |
-
-> Quiz: `add x1,x2,x3` (`0000000_rs2_rs1_000_rd_0110011`) → `RegWr=1, ALUSrc=0, WBSel=ALU, PCSrc=PC+4`.
-
 > [!IMPORTANT]
-> Next-fetch in RV32I = `PC+4`, `PC+imm`, `rs1+imm`. **Memory indirection ❌** (no jump target loaded from memory).
+> Next-fetch in RV32I = `PC+4`, `PC+imm`, `rs1+imm`. **Memory indirection ❌**.
 
 ## 2. ALU Control
 
-==**`ALUOp`**==:
+==**`ALUOp` → `ALUSel`**==:
 
 | `ALUOp`     | `00`                     | `01`              | `10`            |
 | ----------- | ------------------------ | ----------------- | --------------- |
-| **Use**     | load / store / JALR addr | branch compare    | R / I-ALU       |
-| **ALU op**  | ADD                      | SUB / compare     | decode by funct |
+| **Use**     | load / store / JALR addr | branch (ALU off)  | R / I-ALU       |
+| **ALUSel**  | ADD                      | (don't care)      | decode by funct |
+
+> Branch comparison runs in **BranchComp** (not ALU); ALU is free for `PC+imm` target.
 
 ==**`funct3` / `funct7[5]` decoding**==:
 
@@ -109,17 +115,17 @@ ALUSrcB = I_ALU || Load || Store || JALR || LUI || AUIPC
 ```verilog
 always_comb begin
   case (alu_op)
-    2'b00 : alu_control = ALU_ADD;       // load/store/JALR
-    2'b01 : alu_control = ALU_SUB;       // branch
+    2'b00 : alu_sel = ALU_ADD;            // load/store/JALR addr
+    2'b01 : alu_sel = ALU_ADD;            // branch target = PC+imm
     2'b10 : case (funct3)
-        3'b000: alu_control = funct7_5 ? ALU_SUB : ALU_ADD;
-        3'b001: alu_control = ALU_SLL;
-        3'b010: alu_control = ALU_SLT;
-        3'b011: alu_control = ALU_SLTU;
-        3'b100: alu_control = ALU_XOR;
-        3'b101: alu_control = funct7_5 ? ALU_SRA : ALU_SRL;
-        3'b110: alu_control = ALU_OR;
-        3'b111: alu_control = ALU_AND;
+        3'b000: alu_sel = funct7_5 ? ALU_SUB : ALU_ADD;
+        3'b001: alu_sel = ALU_SLL;
+        3'b010: alu_sel = ALU_SLT;
+        3'b011: alu_sel = ALU_SLTU;
+        3'b100: alu_sel = ALU_XOR;
+        3'b101: alu_sel = funct7_5 ? ALU_SRA : ALU_SRL;
+        3'b110: alu_sel = ALU_OR;
+        3'b111: alu_sel = ALU_AND;
       endcase
   endcase
 end
@@ -127,62 +133,37 @@ end
 
 ## 3. Single-Cycle Datapath
 
-```text
-PC → IMem → decode/regfile/imm-gen → ALU → DMem → WBmux → rd
-            \_______________ branch/jump PC mux ____________/
-```
+<img src="assets/CA3060-4-2-Control_2.png" alt="RV32I single-cycle datapath" style="zoom:50%;" />
 
-Three muxes: `PCSrc` (`PC+4` / `PC+imm` / `(rs1+imm)&~1`); `ALUSrcB` (`R[rs2]` / imm); `WBSel` (ALU / mem / `PC+4` / imm).
+==**Components**==: PC + next-PC mux, IMem, ==**2R/1W regfile**==, ImmGen, **BranchComp** (outputs `BrEq, BrLT`), ALU, DMem, `PC+4` adder, A-mux (`Asel`), B-mux (`Bsel`), WB mux.
+
+==**4 key muxes**==:
+
+| Mux              | Sel       | Choices                                   |
+| ---------------- | --------- | ----------------------------------------- |
+| ==**PC-mux**==   | `PCSrc`   | `PC+4` (0) or branch/jump target (1)      |
+| ==**A-input**==  | `Asel`    | `R[rs1]` (0) or `PC` (1)                  |
+| ==**B-input**==  | `Bsel`    | `R[rs2]` (0) or imm (1)                   |
+| ==**WB-input**== | `WBSel`   | mem (0), ALU (1), `PC+4` (2)              |
 
 ## 4. Worked Examples
 
 ```text
-sw x2, offset(x1):   addr = R[x1]+signext(S-imm); mem[addr] = R[x2]
-beq x1, x2, imm  :   taken = (R[x1]==R[x2]); next PC = taken? PC+B-imm : PC+4
+sw  x2, off(x1):   addr = R[x1]+S-imm;     mem[addr] = R[x2]
+beq x1, x2, imm:   target = PC + B-imm;    if R[x1]==R[x2] take, else PC+4
 ```
 
-| Signal     | `RegWr`     | `MemRd` | `MemWr` | `ALUSrc`         | `ALUCtrl`           | `WBSel` | `PCSrc`        |
-| ---------- | ----------- | ------- | ------- | ---------------- | ------------------- | ------- | -------------- |
-| **`sw`**   | 0 (no `rd`) | 0       | **1**   | 1 (imm)          | ADD                 | —       | `PC+4`         |
-| **`beq`**  | 0 (no `rd`) | 0       | 0       | 0 (compare regs) | SUB / equality cmp  | —       | branch-mux     |
+| Instr     | `ImmSel` | `RegWr` | `Asel`  | `Bsel`  | `ALUSel` | `MemRW` | `WBSel` | `BrUn` | `PCSrc`        |
+| --------- | -------- | ------- | ------- | ------- | -------- | ------- | ------- | ------ | -------------- |
+| **`sw`**  | S        | 0       | 0 (rs1) | 1 (imm) | ADD      | **W**   | ×       | ×      | 0              |
+| **`beq`** | B        | 0       | 1 (PC)  | 1 (imm) | ADD      | R       | ×       | ×      | `BrEq ? 1 : 0` |
 
+> ALU computes **address** for `sw` and **branch target** for `beq`; BranchComp does the actual `rs1==rs2` test.
 
+## 5. Single-Cycle Drawback
 
+Clock = `lw` critical path: `PC → IMem → Regfile → ALU(addr) → DMem → WBmux → Regfile setup` + clk-to-Q + skew. Shorter instrs (R, branch) **waste** the long clock. → Solution: pipeline stages.
 
+> ==**RISC-V regularity simplifies control**==: fixed instr size, regular field positions, 12b/20b imm only, reg/imm operands only.
 
-| Signal    | Meaning                               |
-| --------- | ------------------------------------- |
-| `RegWr`   | enable write to `rd`                  |
-| `MemRd`   | DMem read (Load)                      |
-| `MemWr`   | DMem write (Store)                    |
-| `ALUSrc`  | ALU op B: 0=R[rs2], 1=imm             |
-| `ALUCtrl` | ALU op (`ALUOp + funct3 + funct7[5]`) |
-| `WBSel`   | WB mux: ALU / mem / PC+4 / imm        |
-| `PCSrc`   | next-PC: PC+4 / PC+imm / (rs1+imm)&~1 |
-
-==**Components**==: PC + next-PC mux, IMem/I-cache, ==**2R/1W regfile**==, imm-gen, ALU, DMem/D-cache, `PC+4` + `PC+imm` adders, WB mux.
-
-==**Three MUX selects**==:
-
-| Mux               | Choices                                                |
-| ----------------- | ------------------------------------------------------ |
-| ==**`PCSrc`**==   | `PC+4`, `PC+imm` (branch/JAL), `(rs1+imm)&~1` (JALR)   |
-| ==**`ALUSrcB`**== | `R[rs2]` (R/branch) or imm (I/load/store/JALR)         |
-| ==**`WBSel`**==   | ALU result, memory, `PC+4` (JAL/JALR), imm (LUI/AUIPC) |
-
-## 6. Branch Datapath
-
-==**`beq rs1, rs2, imm`**==: read regs; compare; taken → `PC + B-imm`, else `PC+4`.
-
-==**Why 2 adders in EX**==: `PC+4` (always) + `PC + B-imm` (branch target); ALU busy comparing.
-
-> [!IMPORTANT]
-> ==**Branch comparator vs ALU subtract**==:
->
-> 1. **avoid subtract-overflow compare bug**;
-> 2. comparator **faster** than full subtractor;
-> 3. frees ALU for addr/ALU in same cycle.
->
-> NOT "comparison cannot trap" (irrelevant — RV doesn't trap on int overflow).
-
-> Equality (`beq/bne`) via subtract-then-zero is safe (XOR=0 means equal).
+> Branch datapath details (comparator vs ALU subtract, why 2 adders) → [4_1_review.md §6](4_1_review.md).
