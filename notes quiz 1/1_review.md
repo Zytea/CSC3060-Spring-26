@@ -127,8 +127,6 @@ Bus answers three questions:
 | what is transferred? | address / data / read-write-control signal |
 | who gets bus now? | arbitration |
 
-### 3.2 Running `hello`
-
 ```mermaid
 graph LR
     A[Keyboard input] --> B(Shell user program)
@@ -166,7 +164,7 @@ graph LR
 | ==spatial== | neighbors used soon | array scan, sequential fetch |
 
 > [!IMPORTANT]
-> Memory hierarchy gives the illusion of **fast + large + inexpensive** memory. ("Fast/large/cheap" is the right answer; "the memory space is all yours" is the wrong distractor.)
+> Memory hierarchy gives the illusion of **fast + large + inexpensive** memory. ("the memory space is all yours" is the wrong distractor.)
 
 ## 5. OS Manages Hardware
 
@@ -239,8 +237,6 @@ graph LR
 ## 6. Important Themes
 
 ### 6.1 Amdahl's Law
-
-If $\alpha$ of old time is improved by factor $k$:
 
 $$
 T_{new}=(1-\alpha)T_{old}+\frac{\alpha T_{old}}{k}; \quad

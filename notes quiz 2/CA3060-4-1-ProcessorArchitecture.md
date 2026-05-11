@@ -82,7 +82,7 @@ Fetch → Decode → Execute
 
 ## ==CPU Time = Inst count X CPI X Clock cycle time==
 
-![](img%5CCA3060-4-1-ProcessorArchitecture_1.png)
+![](assets%5CCA3060-4-1-ProcessorArchitecture_1.png)
 
 ---
 
@@ -164,11 +164,11 @@ Logic components that contain state are also called sequential element, because 
 
 ### 3.3.1 Logic Gates
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_2.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_2.png" style="zoom:50%;" />
 
 ### 3.3.2 Combinational Elements
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_3.png" style="zoom:50%;" alt="v"/>
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_3.png" style="zoom:50%;" alt="v"/>
 
 Logic gates and combinational circuits are always active: if the inputs change, the outputs also change after some delay.
 
@@ -176,7 +176,7 @@ The propagation delay of a combinational circuit is determined by the delay of t
 
 ### 3.3.3 Word-Level Combinational Circuits
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_7.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_7.png" style="zoom: 50%;" />
 
 ## 3.4 Sequential Elements
 
@@ -184,9 +184,9 @@ The propagation delay of a combinational circuit is determined by the delay of t
   * Use a clock signal to determine when to update the stored value
   * Edge-triggered: **update when Clk changes from 0 to 1**
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_8.png" style="zoom: 67%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_8.png" style="zoom: 67%;" />
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_6.png" style="zoom: 67%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_6.png" style="zoom: 67%;" />
 
 **For general purpose register updates, WRITE is 0 for what RV instructions?**
 
@@ -199,15 +199,15 @@ The propagation delay of a combinational circuit is determined by the delay of t
   * Input from state elements, output to state element
   * Longest delay determines clock period
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_9.png" style="zoom: 33%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_9.png" style="zoom: 33%;" />
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_10.png" style="zoom:33%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_10.png" style="zoom:33%;" />
 
 *enable read and write in a same clock*
 
 ## 3.5 Abstract View of RV32I Subset
 
-![](img%5CCA3060-4-1-ProcessorArchitecture_11.png)
+![](assets%5CCA3060-4-1-ProcessorArchitecture_11.png)
 
 Key components: PC → Instruction Memory → Registers → ALU → Data Memory
 
@@ -236,7 +236,7 @@ Three MUX decisions to make:
 
 * Subset of RISC-V instructions are 32 bits long with 4 formats
 
-![](img%5CCA3060-4-1-ProcessorArchitecture_13.png)
+![](assets%5CCA3060-4-1-ProcessorArchitecture_13.png)
 
 * The different fields are:
   * opcode: Operation of the instruction
@@ -248,7 +248,7 @@ Three MUX decisions to make:
 
 All start by fetching the instruction, reading registers, then use ALU => simplicity and regularity help
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_16.png" style="zoom:67%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_16.png" style="zoom:67%;" />
 
 ### ==Regularity in RISC-V Instruction Format==
 
@@ -278,7 +278,7 @@ Immediate values are placed in the high bits of the instructions (branch and sto
   * Add and sub register or extended immediate (ALU)
   * Add 4 or extended immediate to PC
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_18.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_18.png" style="zoom: 50%;" />
 
 * Register: Similar to the D Flip Flop except
   
@@ -291,7 +291,7 @@ Immediate values are placed in the high bits of the instructions (branch and sto
 
 ### Storage Element - Register File
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_19.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_19.png" style="zoom: 50%;" />
 
 * Register is selected by
   * Rs1 selects the register to put on busA (data)
@@ -307,7 +307,7 @@ Immediate values are placed in the high bits of the instructions (branch and sto
 
 ### Storage Element - Memory
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_20.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_20.png" style="zoom: 50%;" />
 
 * Word is selected by
   * Address selects the word to put on Data Out
@@ -315,7 +315,7 @@ Immediate values are placed in the high bits of the instructions (branch and sto
 
 ## Step 3a  - Datapath Assembly
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_21.png" style="zoom: 33%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_21.png" style="zoom: 33%;" />
 
 * Instruction fetch unit: common operations
   * Fetch the instruction: `mem[PC]`
@@ -325,7 +325,7 @@ Immediate values are placed in the high bits of the instructions (branch and sto
 
 beq rs1, rs2, imm12
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_12.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_12.png" style="zoom:50%;" />
 
 Why do we need two adders? Is one enough?
 
@@ -347,7 +347,7 @@ One way to handle this correctly is to use **a true comparison operation** inste
   * Ra, Rb, Rw come from instruction’s rs1, rs2, and rd fields
   * ALU and RegWrite: control logic after decode
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_22.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_22.png" style="zoom:50%;" />
 
 ---
 
@@ -374,7 +374,7 @@ Instruction fields: `rs1` (base), `rd` (dest), `rs2` (store data), `imm12` (12-b
 
 ### A Single Cycle Data Path
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_15.png" style="zoom: 50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_15.png" style="zoom: 50%;" />
 
 ### Limitations of a Single-Cycle Implementation
 
@@ -400,5 +400,5 @@ Multi-cycle implementation is one step between single-cycle implementation and p
 
 ## Step 4 - Control Points and Signals
 
-<img src="img%5CCA3060-4-1-ProcessorArchitecture_23.png" style="zoom:50%;" />
+<img src="assets%5CCA3060-4-1-ProcessorArchitecture_23.png" style="zoom:50%;" />
 

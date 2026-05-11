@@ -1,6 +1,6 @@
 # 4.2: Control
 
-![](img%5CCA3060-4-2-Control_0.png)
+![](assets%5CCA3060-4-2-Control_0.png)
 
 ## ==High Level Control Signal Expressions==
 
@@ -55,15 +55,15 @@ end
 
 ## A More Complete RV32I Single Cycle Data Path
 
-![](img%5CCA3060-4-2-Control_2.png)
+![](assets%5CCA3060-4-2-Control_2.png)
 
 ## Example: SW X2, offset(X1)
 
-![](img%5CCA3060-4-2-Control_5.png)
+![](assets%5CCA3060-4-2-Control_5.png)
 
 ## Example: BEQ X1,X2, immediate
 
-![](img%5CCA3060-4-2-Control_6.png)
+![](assets%5CCA3060-4-2-Control_6.png)
 
 > The processor consists of two parts: **Data Path** and **Control**.
 

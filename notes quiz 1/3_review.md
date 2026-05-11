@@ -29,10 +29,8 @@
 
 - **Natural alignment**: object size N at addr multiple of N. Avoids cache-line / page crossing → no double-miss / double-fault / extra HW.
   - **RISC-V Linux ABI stack alignment**: ==**$16B$**==. RV32E: $4B$
-  - **Struct rules**: $$
-  \text{field offset} = N \times \text{field align}
-$$
-; $\text{total size} = N \times \text {max field align}$; **fields cannot be reordered** (locals can).
+  - **Struct rules**: $$\text{field offset} = N \times \text{field align}$$
+  ; $\text{total size} = N \times \text {max field align}$; **fields cannot be reordered** (locals can).
 
 - **R4-type FMA**: `rd = rs1*rs2 + rs3` — only R4 instr in RV ISA. Could be redesigned with 3 ops as `rd = rs1*rs2 + rd` (rd as src+dst), but **breaks regularity**.
 
@@ -49,7 +47,6 @@ $$
 $$
 \text{CPU\ Time} = \text{Instruction Count} \times CPI \times \text{Clock Cycle Time}
 $$
-
 | Metric              | RISC simplicity          | CISC compactness         | SIMD/vector/RVV                   | Pipeline        | Superscalar / OoO / Pred / Cache |
 | ------------------- | ------------------------ | ------------------------ | --------------------------------- | --------------- | -------------------------------- |
 | **Mainly improves** | CPI↓ / cycle time↓ (IC↑) | IC↓ (CPI↑ / cycle time↑) | **IC↓** (many elements per instr) | **cycle time↓** | **CPI↓**                         |
@@ -297,7 +294,6 @@ jalr ra, rs1, 0      # indirect call (function pointer)
 > Cache lines: typically 64 B (also 32, 128). Pages: 4 KiB+.
 
 ### 4.2 Struct Padding Rules
-
 $$
 \text{field offset} = N \times \text{field align}; \quad \text{total size} = N \times \text {max field align}
 $$

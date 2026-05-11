@@ -3,143 +3,85 @@
 ## Exam Facts
 
 - ==**Code scheduling**==: reorder independent instrs to fill pipeline bubbles **without changing program meaning**.
-- ==**Legal schedule**== = any **topological sort** of the dependence DAG (every node before its successors).
-- ==**Dependence DAG**==: node = instr; edge = required order; weight = latency / order delay.
-- **Three reg dependences**: ==**RAW, WAR, WAW**==. **RAW = TRUE dependence** (real); WAR/WAW = name/order, removable by **register renaming**.
-- **RAR is NOT a hazard**.
-- ==**Memory scheduling limits**==: **aliasing unknown** + **memory latency unknown**.
-- **Cannot reorder** load/store unless addresses **proven non-aliasing**.
-- **Worst-case schedule count**: chain of N dependent instrs → 1 schedule; N independent instrs → N! schedules → exhaustive search infeasible → use heuristics.
-- ==**MIPS** ("Microprocessor without Interlocked Pipeline Stages")== relied on compiler-only scheduling. **Failed due to compatibility & scalability**.
-- ==**Critical path**==: longest weighted path in DAG. Schedule critical-path nodes **early**.
-- **Maximum Delay**: $MD(n) = \max_{n \to c}(weight(n,c) + MD(c))$; leaf = own latency or 0.
-- **List scheduling heuristics** (in order):
-  1. avoid stall **now**.
-  2. larger MD (protect critical path).
-  3. original order.
-  4. more children.
-  5. final use of a reg.
-- ==**Compiler limits**==: **memory aliasing**, unknown mem latency, scope shrunk by branches/calls/traps/volatile.
-- ==**HW vs SW hazard mitigation split**==:
-  - **HW**: forwarding/interlock/OoO/branch-prediction/split-cache/more-ports.
-  - **SW**: instruction scheduling, branch layout, `restrict`, local copies, code repositioning.
-- ==**Bubble counts**==:
-  - ALU→ALU with forwarding: **0**
-  - load→use with forwarding: **1**
-  - producer→close consumer no forwarding: **2-3**
-  - branch resolved in EX: **2**
-  - branch resolved in MEM: **3**
-- **Reordering across unknown stores**: **NOT allowed** unless aliasing proven safe (e.g., distinct stack offsets, `restrict`, non-overlapping arrays).
-- **Deeper pipeline**: NOT a hazard mitigation; **worsens** data + control penalties.
-- **WAR/WAW release timing**: weight 0 (order-only); RAW: weight = producer latency (must wait).
+  - ==**Legal schedule**== = any **topological sort** of dependence DAG (every node before successors).
+  - ==**DAG**==: node = instr; edge = required order; weight = latency (RAW) / 0 (WAR, WAW order-only).
+  - ==**Schedule count**==: 50 dependent chain → **1**; 50 independent → **50!** → use heuristics.
 
-## 1. Why Rearrange Code Sequence?
+- ==**Three reg dependences**==:
+  - **RAW** = TRUE dep (real); weight = producer latency; **cannot remove**.
+  - **WAR/WAW** = name/order; weight = 0; **removable by renaming**.
+  - **RAR** ❌ not a hazard.
 
-==**Goal**==: reduce pipeline bubbles + expose **ILP**, without changing observable behavior.
+- ==**Memory scheduling**==:
+  - **Cannot reorder** load/store unless **non-aliasing proven** (distinct stack offsets, `restrict`, non-overlap arrays, no `volatile`/IO/call/trap).
+  - Limits: **memory aliasing**, **unknown mem latency**, scope (branches/calls/traps/volatile).
 
-==**Load-use stall, no fix**==:
+- ==**Critical path**==: longest weighted path; schedule its nodes **early**.
+  - $MD(n) = \max_{n \to c}(\text{weight}(n,c) + MD(c))$; leaf = own latency or 0.
 
-```asm
-lw  t0, 0(a0)
-add t1, t0, t2     # 1-cycle bubble (load-use)
-```
+- ==**List scheduling heuristics**== (in order):
+  1. avoid **stall now**;
+  2. larger MD (protect critical path);
+  3. original order;
+  4. more children;
+  5. final use of a reg (reduce live range).
 
-==**With independent work moved between**==:
+- ==**Bubble counts**==: ALU→ALU fwd: **0**; load→use fwd: **1**; no-fwd: **2-3**; branch in EX: **2**; branch in MEM: **3**.
+
+- ==**HW vs SW split**==:
+  - **HW**: forwarding/interlock/OoO/branch-pred/split-cache/more-ports.
+  - **SW**: scheduling, branch layout, `restrict`, local copies, code repositioning.
+  - **Deeper pipeline ❌** is NOT a mitigation; worsens data + control penalties.
+
+- ==**MIPS history**==: "no Interlocked Pipeline Stages" → compiler-only NOPs. Failed: **compatibility & scalability**.
+
+## 1. Why Rearrange?
+
+==**Goal**==: reduce bubbles + expose **ILP**, without changing observable behavior.
 
 ```asm
+# Before — 1 load-use bubble:
 lw  t0, 0(a0)
-addi s0, s0, 1     # fills the bubble
+add t1, t0, t2
+
+# After — bubble filled with independent op:
+lw  t0, 0(a0)
+addi s0, s0, 1
 add  t1, t0, t2
 ```
 
-## 2. Dependence DAG
+## 2. Dependence Detection
 
-==**Node**== = instruction.
-==**Edge**== `A → B` = `B` requires `A`'s result or order.
-==**Weight**== = latency (RAW) or 0 (WAR/WAW order-only).
+| Edge        | Add when                       | Latency / weight       |
+| ----------- | ------------------------------ | ---------------------- |
+| **RAW**     | prev writer → current reader   | producer latency       |
+| WAR         | prev reader → current writer   | 0 (order-only)         |
+| WAW         | prev writer → current writer   | 0 (order-only)         |
 
-==**Any legal schedule**== = topological sort of the DAG: every predecessor scheduled before successor.
-
-==**Schedule count**==: 50 dependent chain → **1** schedule; 50 independent → **50!**; typical mix → heuristics, not exhaustive search.
-
-==**MIPS history**==: "Microprocessor without Interlocked Pipeline Stages" — relied on **compiler-only** hazard avoidance (NOPs inserted if needed). Failed due to **compatibility & scalability** (Quiz 3 #11). Modern CPUs all have HW interlocks.
-
-## 3. Three Register Data Dependences
-
-### 3.1 RAW: Read After Write (TRUE dependence)
+> Skip `x0` as destination (no real dep).
 
 ```asm
-lw   p1, a            # write p1
-add  p3, p1, p2       # read p1 ← TRUE dep
+# RAW (TRUE): cannot remove
+lw   p1, a;    add p3, p1, p2    # add needs lw's value
+
+# WAR / WAW: removable by renaming
+sw  p6, 0(p5);  lw p6, c          # WAR: rename p6
+lw p1, a;      lw p1, c            # WAW: rename p1
 ```
 
-`add` needs `lw`'s value. **Cannot remove**; weight = producer latency.
-
-### 3.2 WAR: Write After Read (anti-dep)
-
-```asm
-sw  p6, 0(p5)         # read p6
-lw  p6, c             # write p6 ← must wait for read
-```
-
-==**Order/name dependence**==: later write must not occur before earlier read. **Removable by renaming** (rename one of the `p6`s).
-
-### 3.3 WAW: Write After Write (output-dep)
-
-```asm
-lw p1, a              # write p1
-...                   # (something using p1 at end? no)
-lw p1, c              # final write to p1
-```
-
-Later write defines final reg state. **Removable by renaming**.
-
-### 3.4 Detection Summary
-
-| Edge | Add when | Latency / weight |
-|---|---|---|
-| **RAW** | prev writer → current reader | producer latency |
-| WAR | prev reader → current writer | 0 (order-only) |
-| WAW | prev writer → current writer | 0 (order-only) |
-
-> Skip `x0` as destination (always 0; no real dep).
-
-> ==Renaming removes WAR + WAW; **RAW can NOT be removed** without changing the computation==.
-
-## 4. Memory Dependence / Aliasing
-
-==**Cannot reorder**== unless safety proven:
+## 3. Memory Aliasing
 
 ```asm
 sw x5, 0(x1)
-lw x6, 0(x2)    # cannot move BEFORE store if x1 may equal x2
+lw x6, 0(x2)    # ❌ cannot move before store if x1 may == x2
+sw x6, 0(x2)    # ❌ cannot swap stores if x1 may == x2
 ```
 
-```asm
-sw x5, 0(x1)
-sw x6, 0(x2)    # cannot swap if x1 may equal x2
-```
+==**Safe evidence**==: distinct stack offsets, `restrict`, proven non-overlapping arrays, no `volatile`/IO/call/trap.
 
-==**Safe evidence**==:
+> Unknown aliasing → DAG must include conservative **memory-order edges** (load–store, store–store).
 
-- distinct stack offsets (`-4(fp)` vs `-8(fp)`).
-- ==**`restrict`**== keyword.
-- proven non-overlapping arrays.
-- no `volatile` / I/O / call / trap concerns.
-
-> When aliasing is unknown, the DAG must include **conservative memory-order edges** (load–store, store–store).
-
-==**Compiler scheduling difficulty**==:
-
-| Limit | Why |
-|---|---|
-| memory aliasing | pointer/index values often unknown at compile time |
-| memory latency | depends on cache hit/miss |
-| speculative load/store may trap | page fault, alignment |
-| shared resources | DRAM bus, interconnect |
-| `volatile` (kernel) | order must be preserved |
-
-## 5. Operation Latency = Arc Weights
+## 4. Operation Latency (Arc Weights)
 
 | Op          | int ALU | **load (hit)** | int mul | FADD | FMUL | FMA   | **int div** |
 | ----------- | ------- | -------------- | ------- | ---- | ---- | ----- | ----------- |
@@ -147,146 +89,105 @@ sw x6, 0(x2)    # cannot swap if x1 may equal x2
 
 > Hardest to pipeline: **integer divide**.
 
-## 6. Critical Path & Maximum Delay
-
-==**Critical path**== = longest weighted path; schedule its nodes early.
-
-==**Compute MD via reverse topological sort**==:
+## 5. Critical Path & MD
 
 $$
 MD(n) = \begin{cases}
-0 \text{ or } latency(n), & n\ has\ no\ successors \\
-\max_{n \to c}(weight(n, c) + MD(c)), & otherwise
+0 \text{ or } latency(n), & \text{no successors} \\
+\max_{n \to c}(\text{weight}(n, c) + MD(c)), & \text{otherwise}
 \end{cases}
 $$
 
-> Be consistent: if node latency is in the edge, leaf MD = 0; if MD includes own latency, leaf MD = latency.
+> Convention: if node latency in edge weight, leaf MD = 0; if MD includes own latency, leaf MD = latency.
 
 ```cpp
-// Reverse topological computation, O(N + E)
-int CP(int n) {
+int CP(int n) {                       // reverse topo, O(N+E)
     if (visited[n]) return MD[n];
     visited[n] = true;
-    int latency = inst[n].latency;
-    if (succ[n].empty()) return MD[n] = latency;
+    int lat = inst[n].latency;
+    if (succ[n].empty()) return MD[n] = lat;
     int maxRAW = 0, maxOrder = 0;
     for (auto& e : succ[n]) {
         int s = CP(e.target);
         if (e.type == RAW) maxRAW = max(maxRAW, s);
         else                maxOrder = max(maxOrder, s);
     }
-    return MD[n] = max(latency + maxRAW, maxOrder);
+    return MD[n] = max(lat + maxRAW, maxOrder);
 }
 ```
 
-## 7. List Scheduling Algorithm
+## 6. List Scheduling
 
 ```text
-1. Build dependence DAG.
-2. Compute MD (priority) per node.
-3. Ready list = nodes whose preds are scheduled AND latency satisfied.
-4. Each cycle, pick best ready node by heuristics.
-5. Issue it; update ready list (release succs whose order/latency satisfied).
+1. Build DAG.
+2. Compute MD per node.
+3. Ready list = preds scheduled AND latency satisfied.
+4. Each cycle, pick best ready by heuristics.
+5. Issue; update ready list.
 ```
 
-==**Tie-break heuristics**== (apply in order):
+==**Tie-break order**==: (1) no stall now, (2) larger MD, (3) original order, (4) more children, (5) final reg use.
 
-1. ==**no stall now**== → avoid bubble.
-2. ==**larger MD**== → protect critical path.
-3. **original order** → simple, predictable.
-4. **more children** → unlock work.
-5. **final use of a reg** → reduce live range.
+> Trap: if a ready arith op would stall (waiting load/mul), pick **another independent ready op** — fill bubble.
 
-> Trap: if a ready arithmetic op would stall (waiting for load/mul to finish), pick another **independent ready** op instead — fill the bubble.
+==**Worked DAG step**== (loads=2 cy, mul=3 cy, add=1 cy):
 
-## 8. Worked Scheduling Pattern
+| Step | Ready list  | Pick                   | Reason                                                        |
+| ---- | ----------- | ---------------------- | ------------------------------------------------------------- |
+| 1    | {1, 2, 9}   | **1** (`lw $pr1, a`)   | tied MD=7, original order first                               |
+| 2    | {2, 9}      | **2** (`lw $pr2, b`)   | MD=7, no stall                                                |
+| 3    | {3, 5, 9}   | **9** (`lw $pr7, d`)   | 3 & 5 await 1 & 2 (2-cy load); pick 9 to fill                 |
+| 4    | {3, 5}      | **3** (`add $pr3`)     | 1's result ready; MD(3)=5 > MD(5)=3                           |
+| 5    | {4, 5}      | **4** (`mul $pr4`)     | MD(4)=4 > MD(5)=3                                             |
+| 6    | {6, 10, 5}  | **5**                  | 6 waits 3 cy for mul; pick 5                                  |
+| 7    | {6, 10, 8}  | **8**                  | 6, 10 wait; fill with 8                                       |
 
-==**Class 11-instr DAG example**== (loads have 2-cycle latency; mul = 3 cycles; add = 1 cycle):
+## 7. HW vs SW Hazard Mitigation
 
-| Step | Ready list | Pick | Reason |
-|---|---|---|---|
-| 1 | {1, 2, 9} | **1** (`lw $pr1, a`) | tied MD=7, original order first |
-| 2 | {2, 9} | **2** (`lw $pr2, b`) | MD=7, no stall |
-| 3 | {3, 5, 9} | **9** (`lw $pr7, d`) | 3 & 5 depend on 1 & 2 (2-cycle load latency); pick 9 to fill |
-| 4 | {3, 5} | **3** (`add $pr3,...`) | now 1's result ready; MD(3)=5 > MD(5)=3 |
-| 5 | {4, 5} | **4** (`mul $pr4,...`) | MD(4)=4 > MD(5)=3 |
-| 6 | {6, 10, 5} | **5** | 4 just issued, 6 waits 3 cycles for mul; pick 5 |
-| 7 | {6, 10, 8} | **8** | 6, 10 wait; fill with 8 |
+| Technique                       | Who                  | Hazard            |
+| ------------------------------- | -------------------- | ----------------- |
+| forwarding / bypassing          | **HW**               | data RAW          |
+| interlock / stall               | HW                   | data / structural |
+| split I/D cache, more ports     | HW                   | structural        |
+| BHT / BTB / RAS                 | HW                   | control           |
+| **OoO**                         | HW                   | data / resource   |
+| **register renaming**           | HW                   | WAR / WAW         |
+| **instruction scheduling**      | **compiler**         | data / structural |
+| branch layout / static predict  | compiler             | control           |
+| **`restrict`, local copies**    | programmer/compiler  | aliasing          |
 
-> Rule: **don't let critical path stall** — if its node would stall, fill with side work first.
+> **Deeper pipeline ❌** — worsens data + control penalties.
 
-## 9. Hardware vs Software Hazard Mitigation
+## 8. RAW vs WAR/WAW Release Timing
 
-| Technique | Who | Hazard |
-|---|---|---|
-| forwarding / bypassing | **HW** | data RAW |
-| interlock / stall | HW | data / structural |
-| split I/D cache, more ports | HW | structural |
-| BHT / BTB / RAS | HW | control |
-| **OoO (out-of-order)** | HW | data / resource |
-| **register renaming** | HW | WAR / WAW |
-| **instruction scheduling** | **compiler** | data / structural |
-| branch layout / static predict | compiler | control |
-| **`restrict`, local copies** | programmer/compiler | aliasing |
+| Edge          | Successor ready when                                            |
+| ------------- | --------------------------------------------------------------- |
+| **RAW**       | producer's latency satisfied (result available)                 |
+| WAR / WAW     | order-only — successor ready as soon as pred **issued**         |
 
-> **Deeper pipeline is NOT a mitigation** — it makes data + control penalties worse.
+> ==WAR/WAW edges don't create bubbles== (order constraints only). Only RAW with latency creates real wait.
 
-## 10. Memory-Scheduling Restrictions
+## 9. Quiz 2 Reordering Example
 
-> Search trigger words: **alias, unknown latency, store-load, volatile, call**.
-
-==**Exam rule of thumb**==:
-
-```text
-register RAW/WAR/WAW → build DAG, can be reordered subject to edges
-memory ops → KEEP original order unless non-aliasing PROVEN
-```
-
-## 11. RAW vs WAR/WAW Release Timing
-
-| Edge | Successor ready when |
-|---|---|
-| **RAW** | producer's latency satisfied (i.e., result available) |
-| WAR / WAW | order-only — successor ready as soon as predecessor is **issued** |
-
-> ==WAR / WAW edges do NOT necessarily create bubbles== (they're just order constraints). Only RAW with latency creates real wait.
-
-## 12. Quiz 2 Reordering Example
-
-Original (load-use heavy):
-
-```text
-1. LW S1, 8(S0)
-2. LW S2, 16(S0)
-3. SUB T4, S2, S1     ← stall on S2
-4. AND T5, T4, T3     ← stall on T4
-5. SUB S4, T4, T3
-6. ADD T6, S4, T4     ← stall on S4
-7. SW T6, 4(S7)
-8. LW S3, 24(S7)
-9. LW S1, 8(S7)
-10. LW S5, 32(S0)
-11. ADD T7, S3, S1    ← stall on S1
-12. LW S6, 64(S0)
-```
+Original (load-use heavy) — see [4_4_review.md §2.1](4_4_review.md).
 
 ==**Reorder reducing bubbles**== (fill load-use gaps with independent loads):
 
 ```text
-1. LW S1, 8(S0)
-2. LW S2, 16(S0)
-8. LW S3, 24(S7)         # ← moved up; fills load-use gap before instr 3
-9. LW S8, 8(S7)          # ← renamed to avoid clobber of S1 needed at instr 11
-3. SUB T4, S2, S1
-10. LW S5, 32(S0)        # ← independent load
-11. ADD T7, S3, S8       # ← uses renamed S8
-4. AND T5, T4, T3
-5. SUB S4, T4, T3
+1.  LW S1, 8(S0)
+2.  LW S2, 16(S0)
+8.  LW S3, 24(S7)         # moved up; fills load-use before instr 3
+9.  LW S8, 8(S7)          # renamed S1→S8 (S1 needed at instr 11)
+3.  SUB T4, S2, S1
+10. LW S5, 32(S0)
+11. ADD T7, S3, S8        # uses renamed S8
+4.  AND T5, T4, T3
+5.  SUB S4, T4, T3
 12. LW S6, 64(S0)
-6. ADD T6, S4, T4
-7. SW T6, 4(S7)
+6.  ADD T6, S4, T4
+7.  SW T6, 4(S7)
 ```
 
 > [!IMPORTANT]
-> **Cannot move loads 10/12 before instr 7's store** unless `S0+32`, `S0+64`, `S7+4` proven non-aliasing.
-> Renaming `S1 → S8` for instr 9/11 is allowed because the new `S1` would clobber the original used at instr 3.
+> ❌ Cannot move loads 10/12 before instr 7's store unless `S0+32`, `S0+64`, `S7+4` proven non-aliasing.
+> ✅ Renaming `S1 → S8` allowed: new `S1` from instr 9 would clobber the original used at instr 3.
