@@ -75,13 +75,13 @@ libc.a / libfoo.so                 ┘
 **`.symtab` quiz pattern**:
 
 ```c
-int incr = 1;                // global ★
-static int foo(int a) {      // local linker ★
-    int b = a + incr;        // a, b NOT linker symbols
+int incr = 1;                // global → .symtab
+static int foo(int a) {      // file-scope static → .symtab (local linker symbol)
+    int b = a + incr;        // a, b NOT linker symbols (stack temps)
     return b;
 }
 int main(int argc, char *argv[]) {
-    printf("%d\n", foo(5));  // main = global ★; printf = external ref ★
+    printf("%d\n", foo(5));  // main = global → .symtab; printf = external ref → .symtab
 }
 ```
 

@@ -2,16 +2,18 @@
 
 ## Exam Facts
 
-==**Performance = IC × CPI × cycle-time**==. Lever it at multiple levels: ==**algorithm**== (programmer), ==**data layout + annotations**== (programmer: `restrict`, AoS→SoA), ==**compiler flags**== (`-O2/-O3/-flto/-march`), ==**μarch awareness**== (cache locality + ILP via multi-acc / unrolling / SIMD). ==**Compiler cannot change algorithm**== and ==**must preserve observable behavior**==, so semantic limits (aliasing, FP non-assoc, side effects, separate compilation) block many transforms — programmer hints (`restrict`, local copies, `-ffast-math`, `-flto`) unlock them.
+==**Performance = IC × CPI × cycle-time**==. 
 
-- ==**Optimization levers**==: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
+- Lever it at 4 levels: ==**algorithm**== (programmer), ==**data layout + annotations**== (programmer: `restrict`, AoS→SoA), ==**compiler flags**== (`-O2/-O3/-flto/-march`), ==**μarch awareness**== (cache locality + ILP via multi-acc / unrolling / SIMD). 
+
+- ==**Compiler cannot change algorithm**== and ==**must preserve observable behavior**==, so semantic limits (aliasing, FP non-assoc, side effects, separate compilation) block many transforms — programmer hints (`restrict`,  `-ffast-math`, local copies, `-flto`) unlock them.
 
 - ==**Compiler flags**==:
   - `-O0` debug; `-O1` basic safe.
-  - **`-O2`** ★ default — safe + stable + small bloat.
+  - **`-O2`** — recommended default; safe + stable + small bloat.
   - `-O3` aggressive (unrolling, vectorization, inlining); may bloat.
   - **`-O4`** = `-O3 -flto` (LTO). `-Ofast` = `-O3 -ffast-math` (may break strict FP).
-  - **`-Os`** ★ for embedded / size-constrained.
+  - **`-Os`** — for embedded / size-constrained.
   - **`-flto`** = link-time / whole-program; enables cross-module inlining.
   - `-march=native` / `-mtune=native` = local CPU ISA / scheduling.
   - `-fprofile-generate` / `-fprofile-use` = PGO.
@@ -48,7 +50,7 @@
 | Lever            | Example                            | Goal                  | Optimizations                        |
 | ---------------- | ---------------------------------- | --------------------- | ------------------------------------ |
 | algorithm        | $O(n^2) \to O(n \log n)$           | **min instructions**  | CSE, DCE, strength reduction         |
-| data layout      | linked list → array; AoS → SoA     | **min cycles**        | reg alloc, scheduling, locality      |
+| data layout      | linked list → array; AoS → SoA     | **min CPI** | reg alloc, scheduling, locality      |
 | compiler         | `-O2`, `-O3`, `-flto`, PGO         | **avoid branches**    | unrolling, inlining, `cmov`, slt+mask |
 | μarch awareness  | cache, branch pred, ILP            |                       |                                      |
 | ISA              | SIMD / vector / FMA                |                       |                                      |
@@ -66,7 +68,7 @@
 |---|---|
 | `-O0` | no opt; fast compile; debug-friendly |
 | `-O` / `-O1` | basic safe opts |
-| **`-O2`** | ★ default: high opt, stable, small bloat |
+| **`-O2`** | recommended default; high opt, stable, small bloat |
 | `-O3` | aggressive: unrolling, vectorization, inlining |
 | **`-O4`** | class note: `-O3 -flto` |
 | `-Ofast` | `-O3 -ffast-math`; may break strict FP |
@@ -104,23 +106,19 @@ Must preserve **observable behavior**:
 ```c
 // Constant folding
 long mask = 0xFF << 8;             // → 0xFF00
-size_t n = strlen("Harry Bovik");  // → 11
 
 // DCE
-if (0) puts("never");      // dead
-x = 23; x = 42;            // → x = 42
+if (0) puts("never");      x = 23; x = 42;            
 
 // CSE
 norm[i] = v[i].x*v[i].x + v[i].y*v[i].y;
 // ↓
-elt = &v[i]; x = elt->x; y = elt->y;
-norm[i] = x*x + y*y;
+elt = &v[i]; x = elt->x; y = elt->y; norm[i] = x*x + y*y;
 
 // LICM
 for (j=0; j<n; j++)  a[n*i + j] = b[j];
 // ↓
-int ni = n*i;
-for (j=0; j<n; j++)  a[ni + j] = b[j];
+int ni = n*i; for (j=0; j<n; j++)  a[ni + j] = b[j];
 ```
 
 **FP CSE caveat**: `(a+b+c+d) ≡ (a+d+b+c)` only when reassoc is legal:
@@ -172,8 +170,7 @@ void sum_rows1(double *a, double *b, long n) {
     for (long i = 0; i < n; i++) {
         b[i] = 0;
         for (long j = 0; j < n; j++) b[i] += a[i*n + j];  // reloads b[i] every iter
-    }
-}
+    }}
 ```
 
 **Fixes**:
@@ -182,7 +179,7 @@ void sum_rows1(double *a, double *b, long n) {
 // (1) Local accumulator
 double val = 0;
 for (long j = 0; j < n; j++) val += a[i*n + j];
-b[i] = val;                                            // single store
+b[i] = val; // single store
 
 // (2) restrict keyword
 void sum_rows1(double *restrict a, double *restrict b, long n);
@@ -224,8 +221,7 @@ for (i = 0; i < n; i++) ...
 // unroll-by-4
 for (i = 0; i + 4 < nelts; i += 4) {
     A[i  ] = B[i  ]*k + C[i  ];
-    A[i+1] = B[i+1]*k + C[i+1];
-    A[i+2] = B[i+2]*k + C[i+2];
+    //...
     A[i+3] = B[i+3]*k + C[i+3];
 }
 for (; i < nelts; i++) A[i] = B[i]*k + C[i];        // cleanup
