@@ -2,64 +2,61 @@
 
 ## Exam Facts
 
-- ==**Optimization levers**==: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
+- **Optimization levers**: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
 
-- ==**Compiler flags**==:
+- **Compiler flags**:
   - `-O0` debug; `-O1` basic safe.
   - **`-O2`** ★ default — safe + stable + small bloat.
   - `-O3` aggressive (unrolling, vectorization, inlining); may bloat.
-  - **`-O4`** = **`-O3 -flto`** (LTO). `-Ofast` = `-O3 -ffast-math` (may break strict FP).
-  - **`-Os`** ★ for **embedded** / size-constrained.
-  - **`-flto`** = link-time / whole-program. `-march=native` / `-mtune=native` = local CPU ISA/scheduling.
+  - **`-O4`** = `-O3 -flto` (LTO). `-Ofast` = `-O3 -ffast-math` (may break strict FP).
+  - **`-Os`** ★ for embedded / size-constrained.
+  - **`-flto`** = link-time / whole-program; enables cross-module inlining.
+  - `-march=native` / `-mtune=native` = local CPU ISA / scheduling.
   - `-fprofile-generate` / `-fprofile-use` = PGO.
-  - ==**Cross-module inlining**==: **`-O3 -flto`** ✅; ==**embedded**== → **`-Os`** ✅.
 
-- ==**Semantic limits**==: pointer **aliasing**, FP non-assoc, `volatile`/atomics, fn side effects, exceptions, separate compilation.
+- **Semantic limits** (why compilers can't optimize freely): ==**pointer aliasing**==, **FP non-associativity**, `volatile`/atomics, fn side effects, exceptions, separate compilation.
 
-- ==**Basic optimizations**==: **constant folding, DCE, CSE, LICM, strength reduction, inlining, register allocation, scheduling**.
+- ==**Basic compiler optimizations**==: constant folding, **DCE**, **CSE**, **LICM**, **strength reduction**, inlining, register allocation, scheduling.
   - **CFG** = control flow; **DFG** = value flow; **DDG** = scheduling deps.
   - ==**Cascading DCE**==: one constant kills branch → calls → loop → **1000× speedup** possible.
 
-- ==**Loop unrolling**==: reduces branch+index overhead, exposes ILP/SIMD. **NOT a locality opt** ❌.
-  - ==**Locality opts**==: loop **interchange / fusion / tiling**.
-  - Without **cleanup loop**, unroll-by-k is **incorrect** when `n` not mult of `k`.
+- **Loop unrolling**: reduces branch+index overhead, exposes ILP/SIMD. ==**NOT a locality opt**== ❌.
+  - **Locality opts**: loop interchange / fusion / tiling.
+  - Without a **cleanup loop**, unroll-by-`k` is wrong when `n` not a multiple of `k`.
 
-- ==**`switch` vs `if-else`**==: **dense** → jump table (indirect `JALR`, hard target prediction); **sparse** → branch chain (≈ if/else).
+- **`switch` codegen**: dense → jump table (indirect `JALR`, hard to predict); sparse → branch chain (≈ `if-else`).
 
-- ==**Procedure layout / I-cache**==: `A() → B()` far apart → thrash. Fix: **inline** OR **linker layout adjacent**.
+- **Inlining**: small fns, constant args, called once, inside loop. ❌ recursive, deep call graph, many call sites.
+  - Also improves **I-cache locality** (hot caller/callee stop ping-ponging).
 
-- ==**Inline candidates**==: small fns, constant args, called once, inside loop. **NOT** recursive, deep call graph, many call sites.
+- ==**CPE**== (Cycles Per Element): $\text{total} = CPE \times n + \text{overhead}$; ==**CPE = slope**==, NOT total cycles.
+  - **1-acc reduction**: $CPE \ge \text{latency}(OP)$.
+  - **k indep accumulators**: $CPE \ge \max(L/k,\ \text{issue limit},\ \text{bw limit})$.
 
-- ==**CPE**== = cycles/element; $\text{total} = CPE \times n + \text{overhead}$. ==**CPE = slope**==, NOT total.
-  - **1-acc reduction**: $\text{CPE} \ge \text{latency}(OP)$.
-  - **k indep accs**: $\text{CPE} \ge \max(L/k, \text{issue\_limit}, \text{bw\_limit})$.
+- **Non-aliased `*a, *b` but compiler keeps reloading**: use **`restrict`** OR **manual local copy**. ❌ NOT switching compiler / `-O3` alone.
 
-- ==**Non-aliasing `*a, *b`** but compiler won't reg-allocate==: use **`restrict`** OR **manual local copies**. NOT switching compilers, NOT `-O3` alone.
+- **FP CSE** `(a+b+c+d) ≡ (a+d+b+c)`: legal for `long long`/`char` ✅; **`float`/`double` ❌** (FP non-assoc).
 
-- ==**FP CSE `(a+b+c+d) ≡ (a+d+b+c)`**==: legal for `long long`/`char` ✅; **`float`/`double` ❌** (FP non-assoc).
+- **Compiler diagnostics**: "data dependence" / "cannot vectorize" / "cannot reorder mem ops" → aliasing blocks reorder. Use `restrict` / local copy.
 
-- ==**Compiler diagnostics**==: "data dependence" / "cannot vectorize" / "cannot reorder mem ops" → **alias blocks**. Use `restrict` or copy.
-
-- **Latency-bound**: account query, linked-list/tree search. **Bandwidth-bound**: large matmul, streaming.
-
-- **Modern CPU**: front-end (fetch/decode/branch-pred) + execution (parallel FUs, OoO) + regfile + D-cache. OoO issues μops on ready inputs + free FUs.
+- **Latency-bound vs bandwidth-bound**: latency-bound = account query, linked-list / tree search. Bandwidth-bound = large matmul, streaming.
 
 ## 1. Program Optimization
 
-| Lever            | Example                            | Goal                     | Optimizations                        |
-| ---------------- | ---------------------------------- | ------------------------ | ------------------------------------ |
-| algorithm        | $O(n^2) \to O(n \log n)$           | **min instructions**     | CSE, DCE, strength reduction         |
-| data layout      | linked list → array; AoS → SoA     | **min cycles**           | reg alloc, scheduling, locality      |
-| compiler         | `-O2`, `-O3`, `-flto`, PGO         | **avoid branches**       | unrolling, inlining, `cmov`, slt+mask |
-| μarch awareness  | cache, branch pred, ILP            |                          |                                      |
-| ISA              | SIMD/vector/FMA                    |                          |                                      |
-| annotations      | `restrict`, alignment, `const`     |                          |                                      |
+| Lever            | Example                            | Goal                  | Optimizations                        |
+| ---------------- | ---------------------------------- | --------------------- | ------------------------------------ |
+| algorithm        | $O(n^2) \to O(n \log n)$           | **min instructions**  | CSE, DCE, strength reduction         |
+| data layout      | linked list → array; AoS → SoA     | **min cycles**        | reg alloc, scheduling, locality      |
+| compiler         | `-O2`, `-O3`, `-flto`, PGO         | **avoid branches**    | unrolling, inlining, `cmov`, slt+mask |
+| μarch awareness  | cache, branch pred, ILP            |                       |                                      |
+| ISA              | SIMD / vector / FMA                |                       |                                      |
+| annotations      | `restrict`, alignment, `const`     |                       |                                      |
 
 > Optimize from **measurement / profiling**, not guesswork.
 
-==**Branchless transforms for unpredictable branches**== (e.g., balanced BST traversal ≈ 50/50): compiler emits `slt`+mask (RV) or `cmov` (x86). Trade: 1 extra unconditional instr; no pipeline flush. RV32I has no `cmov`, uses `slt`+`and`.
+**Branchless transforms** for unpredictable branches (e.g. balanced BST ≈ 50/50): compiler emits `slt + mask` (RV) or `cmov` (x86). Trade: 1 extra unconditional instr; no pipeline flush. RV32I has no `cmov` — uses `slt + and`.
 
-> Real-world: Google +0.5s → -20% traffic. Amazon +100ms → -1% sales. HFT cares µs. Netflix encoding → CDN $M/yr.
+> Real-world: Google +0.5s → −20% traffic. Amazon +100 ms → −1% sales. HFT cares µs. Netflix encoding → CDN $M/yr.
 
 ## 2. Compiler Flag Reference
 
@@ -81,12 +78,12 @@
 Must preserve **observable behavior**:
 
 - ==**pointer aliasing**== (most common blocker);
-- ==**FP non-associativity**==;
-- ==**fn calls may have side effects**==;
-- `volatile`, atomics, I/O; possible traps; separate compilation (without `-flto`);
-- no algorithm/domain knowledge; optimal scheduling/reg alloc is **NP-hard**.
+- **FP non-associativity**;
+- fn calls may have side effects;
+- `volatile`, atomics, I/O, possible traps; separate compilation (without `-flto`);
+- no algorithm/domain knowledge; optimal reg alloc / scheduling is **NP-hard**.
 
-> Compilers can't change algorithm. AI-assisted compilers: heuristic tuning, phase ordering, autotuning.
+> Compilers cannot change algorithm. AI-assisted compilers: heuristic tuning, phase ordering, autotuning.
 
 ## 4. Basic Compiler Optimizations
 
@@ -95,10 +92,10 @@ Must preserve **observable behavior**:
 | Scope                  | Examples                              |
 | ---------------------- | ------------------------------------- |
 | local block            | constant folding, local CSE, DCE      |
-| function/global CFG    | LICM, global CSE, register allocation |
+| function / global CFG  | LICM, global CSE, register allocation |
 | whole-program          | LTO, interprocedural inlining         |
 
-==**CFG**== = control-flow paths. ==**DFG**== = value flow. ==**DDG**== = scheduling order ([4_5](notes%20quiz%202/4_5_review.md)).
+==**CFG**== = control-flow paths. ==**DFG**== = value flow. ==**DDG**== = scheduling order (→ [4_5](notes%20quiz%202/4_5_review.md)).
 
 ### 4.2 Constant Fold / DCE / CSE / LICM / Strength
 
@@ -124,9 +121,7 @@ int ni = n*i;
 for (j=0; j<n; j++)  a[ni + j] = b[j];
 ```
 
-==**Cascading DCE**==: one constant → branch dead → calls dead → loop dead → **1000× speedup** possible.
-
-==**FP CSE caveat**==: `(a+b+c+d) ≡ (a+d+b+c)` only when reassoc legal:
+**FP CSE caveat**: `(a+b+c+d) ≡ (a+d+b+c)` only when reassoc is legal:
 
 | Data type     | `long long`            | `char`        | `float`           | `double`          |
 | ------------- | ---------------------- | ------------- | ----------------- | ----------------- |
@@ -138,37 +133,37 @@ for (j=0; j<n; j++)  a[ni + j] = b[j];
 | --------------------- | ---------------------------------------------------- |
 | `i * 4`               | `i << 2`                                             |
 | loop `i * n`          | maintain pointer / running index                     |
-| **unsigned `/2^k`**   | logical right shift                                  |
-| **signed `/2^k`**     | bias for negative: `(x<0 ? x+(1<<k)-1 : x) >> k`     |
+| unsigned `/ 2^k`      | logical right shift                                  |
+| signed `/ 2^k`        | bias for negative: `(x<0 ? x+(1<<k)-1 : x) >> k`     |
 
 > LICM valid only if no aliasing change / side effect / trap difference.
 
 ### 4.3 Inlining
 
-| Good candidate         | Why                                       | Bad candidate    |
-| ---------------------- | ----------------------------------------- | ---------------- |
-| **small procedures**   | low size cost, big call-overhead win      | recursive        |
-| **constant arguments** | enables further DCE/CSE                   | deep call graph  |
-| **inside loop**        | save call overhead × N iters              | many call sites  |
-| **called once**        | no code duplication                       | large cold fns   |
+| Good candidate     | Why                                      | Bad candidate    |
+| ------------------ | ---------------------------------------- | ---------------- |
+| **small procedures**| low size cost, big call-overhead win    | recursive        |
+| **constant arguments**| enables further DCE / CSE             | deep call graph  |
+| **inside loop**    | save call overhead × N iters             | many call sites  |
+| **called once**    | no code duplication                      | large cold fns   |
 
-==**Call overhead**==: arg setup, `jal/ret`, save/restore live regs, frame setup. Inlining removes all + unlocks more opts. Also improves **I-cache locality** (hot caller/callee no longer ping-pong).
+**Call overhead**: arg setup, `jal/ret`, save/restore live regs, frame setup. Inlining removes all + unlocks more opts. Also improves I-cache locality (hot caller/callee no longer ping-pong).
 
-==**Procedure layout / I-cache**==: repeated `A()→B()` in loop, A and B far apart → I-cache thrash. Fix: (1) inline B into A via `__attribute__((always_inline))`; (2) **linker layout** A and B adjacent (PGO can guide).
+**Procedure layout / I-cache**: repeated `A() → B()` in loop, `A` and `B` far apart → I-cache thrash. Fix: (1) `__attribute__((always_inline))`; (2) **linker layout** A and B adjacent (PGO can guide).
 
 ### 4.4 `switch` Codegen
 
 > [!IMPORTANT]
-> ==**`switch` is NOT always faster than `if-else`**==. Depends on generated code.
+> **`switch` is NOT always faster than `if-else`** — depends on generated code.
 
-| Case pattern               | Codegen                       | Consequence                                |
-| -------------------------- | ----------------------------- | ------------------------------------------ |
-| **dense / continuous**     | `jump table` + indirect branch | ≈ O(1), but **target-prediction is hard**  |
-| **sparse / few**           | compare-branch chain          | similar to `if-else`, sometimes slower     |
+| Case pattern           | Codegen                          | Consequence                                |
+| ---------------------- | -------------------------------- | ------------------------------------------ |
+| **dense / continuous** | jump table + indirect branch     | ≈ O(1), but **target-prediction is hard**  |
+| **sparse / few**       | compare-branch chain             | similar to `if-else`, sometimes slower     |
 
 ## 5. Memory Aliasing
 
-==**Problem**==: `*a` and `*b` may alias → compiler reloads/stores every iter conservatively:
+`*a` and `*b` may alias → compiler conservatively reloads / stores every iter:
 
 ```c
 void sum_rows1(double *a, double *b, long n) {
@@ -179,7 +174,7 @@ void sum_rows1(double *a, double *b, long n) {
 }
 ```
 
-==**Fixes**==:
+**Fixes**:
 
 ```c
 // (1) Local accumulator
@@ -191,16 +186,16 @@ b[i] = val;                                            // single store
 void sum_rows1(double *restrict a, double *restrict b, long n);
 ```
 
-> Quiz: `*a, *b` not aliased but compiler doesn't reg-allocate → **(3) `restrict` + (4) manual local copies**. NOT switching compilers, NOT just `-O3`.
+> Quiz: `*a, *b` not aliased but compiler doesn't reg-allocate → **`restrict` + manual local copy**. ❌ NOT switching compilers, NOT just `-O3`.
 
-==**Compiler diagnostics**==: "data dependence" / "cannot vectorize" / "cannot reorder mem ops" → **alias blocks**.
+**Compiler diagnostics** to detect alias-blocked opts:
 
 ```bash
 gcc   -O3 -fopt-info-missed=missed.txt   my_program.c
 clang -O3 -Rpass-missed='.*' -Rpass-analysis='.*'  my_program.c
 ```
 
-==**Function calls in loops**==:
+**Function calls in loops**:
 
 ```c
 for (i = 0; i < strlen(s); i++) ...    // QUADRATIC: strlen each iter
@@ -209,7 +204,7 @@ size_t n = strlen(s);
 for (i = 0; i < n; i++) ...
 ```
 
-> If loop modifies `s`, hoisting `strlen` is **wrong**. GCC knows `strlen` is "pure" but if loop modifies, must recall.
+> If loop modifies `s`, hoisting `strlen` is **wrong** — even "pure" functions must be recalled.
 
 ## 6. Loop Optimizations
 
@@ -235,9 +230,9 @@ for (; i < nelts; i++) A[i] = B[i]*k + C[i];        // cleanup
 ```
 
 > [!IMPORTANT]
-> ==**Loop unrolling ≠ locality opt**== — wins are branch overhead ↓ + ILP/SIMD ↑. Loop **interchange / fusion / tiling** are locality opts.
+> ==**Loop unrolling ≠ locality opt**== — wins are branch overhead ↓ + ILP / SIMD ↑. Loop interchange / fusion / tiling are the locality opts.
 
-### 6.2 Instruction Scheduling
+### 6.2 Scheduling (Compiler-Side)
 
 ```c
 // Hoist loads above ops; cannot move across possible aliases
@@ -255,19 +250,19 @@ for (i = 0; i+4 < n; i += 4) {
 
 ==**CPE**== (Cycles Per Element): $\text{total cycles} = CPE \times n + \text{overhead}$. ==**CPE = slope**==, NOT absolute.
 
-One accumulator critical path:
+One-accumulator critical path:
 
 | OP          | `+` (int) | `*` (int) | `+` (FP) | `*` (FP) |
 | ----------- | --------- | --------- | -------- | -------- |
 | **Min CPE** | 1         | 3-5       | 3-4      | 4-5      |
 
-==**With `k` independent accumulators**==: $CPE \ge \max(L/k, \text{issue\_limit}, \text{bw\_limit})$.
+With `k` independent accumulators: $CPE \ge \max(L/k,\ \text{issue\_limit},\ \text{bw\_limit})$.
 
-==**Reassoc trap**==: `(a+b)+(c+d)` exposes 2 indep adds → CP = $2L$ vs `(((a+b)+c)+d)` fully serial = $3L$. **Strict FP can't reassoc** without `-Ofast` / `-ffast-math` / `-ffp-contract=fast`.
+**Reassoc trap**: `(a+b)+(c+d)` exposes 2 indep adds → CP = $2L$ vs `(((a+b)+c)+d)` fully serial = $3L$. **Strict FP can't reassoc** without `-Ofast` / `-ffast-math` / `-ffp-contract=fast`.
 
-==**combine4 wins**==: hoist `vec_length`; get data ptr once; accumulate in **local scalar** (no alias block); store `*dest` once at end.
+**`combine4` wins**: hoist `vec_length`; get data ptr once; accumulate in **local scalar** (no alias block); store `*dest` once at end.
 
-==**CPE progression**==:
+**CPE progression**:
 
 | Version    | `combine1` no opt | `-O1` | `-O3` | **`combine4`** | **+ unroll + k accs** |
 | ---------- | ----------------- | ----- | ----- | -------------- | --------------------- |
@@ -286,7 +281,7 @@ for (long i = 0; i+3 < n; i += 4) {
 double sum = (s0+s1) + (s2+s3);
 ```
 
-==**SIMD reduction**==: multi-elem per instr (e.g., 4× double per AVX op), then horizontal reduce. Modern compilers auto-vectorize at `-O2`/`-O3`.
+**SIMD reduction**: multi-elem per instr (e.g. 4× double per AVX op), then horizontal reduce. Modern compilers auto-vectorize at `-O2` / `-O3`.
 
 ## 9. Latency vs Bandwidth Bound
 
@@ -297,7 +292,7 @@ double sum = (s0+s1) + (s2+s3);
 | **branch**     | unpredictable                   | branchless / better layout                   |
 | **cache**      | high miss rate                  | blocking, contiguous, alignment              |
 
-==**Latency-bound**==: single account query, **linked-list end search**, **binary-tree search**. NOT large matmul (bandwidth/locality dominated).
+**Latency-bound**: single account query, **linked-list end search**, **binary-tree search**. NOT large matmul (bandwidth / locality dominated).
 
 ## 10. Data Structure & Layout Fixes
 
@@ -311,7 +306,7 @@ double sum = (s0+s1) + (s2+s3);
 | **software prefetch**           | predictable miss far ahead                | hide latency; can hurt bw / pollute cache    |
 | **AoS → SoA**                   | vectorize / scan one field of many objs   | contiguous fields                            |
 
-==**Pointer-heavy → fixes**==:
+**Pointer-heavy fixes**:
 
 | Bad                          | Good                                |
 | ---------------------------- | ----------------------------------- |
@@ -323,16 +318,16 @@ double sum = (s0+s1) + (s2+s3);
 
 > Multiple in-flight mem requests + non-blocking cache + MSHRs → **MLP**.
 
-## 11. Modern CPU Design
+## 11. Modern CPU (OoO View)
 
 | Part                       | Components                                                                          |
 | -------------------------- | ----------------------------------------------------------------------------------- |
-| **Instruction Control**    | Fetch → I-Cache → Decode → μops; Retirement Unit; Register File; Branch Prediction  |
+| **Instruction Control**    | Fetch → I-Cache → Decode → μops; Retirement; Register File; Branch Prediction       |
 | **Execution**              | parallel FUs (Branch, Arith×N, Load, Store); results bus → RF; D-Cache → Loads/Stores |
 
-==**OoO dispatch**==: instr issues as soon as inputs ready + FU free — even if later than waiting older instrs.
+**OoO dispatch**: instr issues as soon as inputs ready + FU free — even if later than waiting older instrs.
 
-==**Programmer hints**==:
+**Programmer hints** (compiler can't do alone):
 
 | Compiler can't               | You should                       |
 | ---------------------------- | -------------------------------- |
@@ -351,4 +346,4 @@ double sum = (s0+s1) + (s2+s3);
 | FP reassoc is safe               | only with `-Ofast` / `-ffast-math` / proven               |
 | moving loads before stores       | only if no alias / no trap                                |
 | inline always helps              | bloat / I-cache / register pressure                       |
-| **CPE = total cycles**           | **CPE = slope** (cycles/elem), NOT total                  |
+| **CPE = total cycles**           | **CPE = slope** (cycles / elem), NOT total                |
