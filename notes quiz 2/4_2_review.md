@@ -99,30 +99,34 @@ MemRW  = Store                       // 1 only for stores
 | **Use**    | load / store / JALR addr / branch target / U | R / I-ALU       |
 | **ALUSel** | ADD                                          | decode by funct |
 
-> If not `BranchComp` → 01
-
 ==**`funct3` / `funct7[5]` decoding**==:
 
-| `funct3`          | `000`         | `001`        | `010`        | `011`          | `100`        | `101`            | `110`      | `111`        |
-| ----------------- | ------------- | ------------ | ------------ | -------------- | ------------ | ---------------- | ---------- | ------------ |
-| **`funct7[5]=0`** | `ADD `        | `SLL / SLLI` | `SLT / SLTI` | `SLTU / SLTIU` | `XOR / XORI` | `SRL / SRLI`     | `OR / ORI` | `AND / ANDI` |
-| **`funct7[5]=1`** | **`SUB`** (R) | invalid      | invalid      | invalid        | invalid      | **`SRA / SRAI`** | invalid    | invalid      |
+| `funct3` | `000`       | `001`        | `010`        | `011`          | `100`       | `101`             | `110`      | `111`       |
+| -------- | ----------- | ------------ | ------------ | -------------- | ----------- | ----------------- | ---------- | ----------- |
+| R-type, `funct7[5]=0` | `ADD` | `SLL` | `SLT` | `SLTU` | `XOR` | `SRL` | `OR` | `AND` |
+| R-type, `funct7[5]=1` | `SUB` | invalid | invalid | invalid | invalid | `SRA` | invalid | invalid |
+| I-type | `ADDI` | `SLLI` | `SLTI` | `SLTIU` | `XORI` | `SRLI/SRAI` | `ORI` | `ANDI` |
 
-```verilog
+```systemverilog
 always_comb begin
-  case (alu_op)
-    2'b00 : alu_sel = ALU_ADD;            // L/S/JALR/branch target
-    2'b01 : alu_control = ALU_SUB;        // if no branchcmp
-    2'b10 : case (funct3)
-        3'b000: alu_sel = funct7_5 ? ALU_SUB : ALU_ADD;
+  alu_sel = ALU_ADD; // default: avoid latch
+  unique case (alu_op)
+    2'b00: alu_sel = ALU_ADD; // L/S/JALR/branch target
+    2'b01: alu_sel = ALU_SUB; // if no BranchComp
+    2'b10: begin // R / I ALU
+      unique case (funct3)
+        3'b000: alu_sel = (is_r_type && funct7_5) ? ALU_SUB : ALU_ADD;
         3'b001: alu_sel = ALU_SLL;        // SLL / SLLI
         3'b010: alu_sel = ALU_SLT;        // SLT / SLTI
-        3'b011: alu_sel = ALU_SLTU;       
-        3'b100: alu_sel = ALU_XOR;
-        3'b101: alu_sel = funct7_5 ? ALU_SRA : ALU_SRL;
-        3'b110: alu_sel = ALU_OR;
-        3'b111: alu_sel = ALU_AND;
+        3'b011: alu_sel = ALU_SLTU;       // SLTU / SLTIU
+        3'b100: alu_sel = ALU_XOR;        // XOR / XORI
+        3'b101: alu_sel = funct7_5 ? ALU_SRA : ALU_SRL; // SRL/SRA or SRLI/SRAI
+        3'b110: alu_sel = ALU_OR;         // OR / ORI
+        3'b111: alu_sel = ALU_AND;        // AND / ANDI
+        default: alu_sel = ALU_ADD;       
       endcase
+    end
+    default: alu_sel = ALU_ADD;
   endcase
 end
 ```
@@ -142,26 +146,4 @@ end
 | ==**A-input**==  | `Asel`    | `R[rs1]` (0) or `PC` (1)               | EX    |
 | ==**WB-input**== | `WBSel`   | mem (0), ALU (1), `PC+4` (2)           | WB    |
 
-## 4. Worked Examples
-
-```text
-sw  x2, off(x1):   addr = R[x1]+S-imm;   mem[addr] = R[x2]
-beq x1, x2, imm :  target = PC + B-imm;  if R[x1]==R[x2] take, else PC+4
-```
-
-Same column order as §1:
-
-| Instr     | `PCSrc`        | `ImmSel` | `RegWr` | `BrUn` | `Bsel`  | `Asel`     | `ALUSel` | `MemRW` | `WBSel` |
-| --------- | -------------- | -------- | ------- | ------ | ------- | ---------- | -------- | ------- | ------- |
-| **`sw`**  | 0              | S        | 0       | ×      | 1 (imm) | 0 (rs1)    | ADD      | **1**   | ×       |
-| **`beq`** | `BrEq ? 1 : 0` | B        | 0       | 0      | 1 (imm) | **1** (PC) | ADD      | 0       | ×       |
-
 > ALU computes **address** for `sw` and **branch target** (`PC+imm`) for `beq`; **BranchComp** does the actual `rs1==rs2` test and emits `BrEq` to Control, which sets `PCSrc`.
-
-## 5. Single-Cycle Drawback
-
-Clock = `lw` critical path: `PC → IMem → Regfile → ALU(addr) → DMem → WBmux → Regfile setup` + clk-to-Q + skew. Shorter instrs (R, branch) **waste** the long clock. → Solution: pipeline stages.
-
-> ==**RISC-V regularity simplifies control**==: fixed instr size, regular field positions, 12b/20b imm only, reg/imm operands only.
-
-> Branch datapath details (comparator vs ALU subtract, why 2 adders) → [4_1_review.md §6](4_1_review.md).

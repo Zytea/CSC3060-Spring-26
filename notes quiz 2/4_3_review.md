@@ -4,37 +4,22 @@
 
 - ==**Pipeline**==: improves **throughput**, NOT single-instr latency (may **increase** due to pipeline-reg overhead).
   - ==**5 stages**==: **IF → ID → EX → MEM → WB**.
-  - ==**Ideal N-stage cycles**== = $n + N - 1$ for `n` instrs (drain = $N-1$).
+  -  $n + \text{Stage} - 1$ for `n` instrs
   - **Speedup** = $\frac{n \cdot T_{long}}{(n+N-1) \cdot T_{stage}} \xrightarrow{n\to\infty} \frac{T_{long}}{T_{stage}} \le N$ (balanced).
-  - ==**Scalar CPI ≈ 1**==; ==**CPI < 1** requires superscalar / multi-issue==.
   - **Loss sources**: slowest stage, imbalanced stages, pipeline-reg overhead, hazards, fill/drain.
-
 - ==**Pipeline-friendly RISC-V**==: fixed 32b base, regular field positions, load/store-only memory, simple ALU/addressing.
-
 - **Deep pipeline trap**: 5→20 stages ≠ 4× faster. Branch/data penalties grow; pipeline-reg overhead grows; CPI ↑. **Throughput** modest gain; **latency** does not improve.
   - **Bad for deep pipeline**: frequent branch mispred, heavy data deps, frequent I-cache miss.
-
 - **Long-latency ops** (mul/div/FP): **stall** at EX/ID OR **separate iterative/pipelined FU** OR **OoO + ROB**.
-
 - ==**In-order retirement at WB**==: ensures **precise architectural state** for traps. RV avoids int arith exceptions, so **OoO exec + in-order retirement** is viable.
-
 - **Pipeline regs carry**: control bits, data, addresses, register designators.
   - ==**WB signals propagated**== (3 cy after ID): `rd`, `RegWr/WRen`, `WBSel`. **NOT** `ALUCtrl` (dies after EX).
   - **EX signals** (1 cy): `ALUOp/ALUCtrl, ASel, BSel, BrUn`.
   - **MEM signals** (2 cy): `MemRW`, `PCSel`, `BrEq/BrLt`.
   - ==**Pipeline regs least info**==: **MEM/WB** (only data + WB control).
-
 - **Regfile trick**: write in 1st half of cycle, read in 2nd half → same-cycle WB→ID forwarding via regfile.
 
 ## 1. Timing & Latency vs Throughput
-
-```text
-Cycle:  1   2   3   4   5   6   7
-I1:     IF  ID  EX  MEM WB
-I2:         IF  ID  EX  MEM WB
-I3:             IF  ID  EX  MEM WB
-I4:                 IF  ID  EX  MEM WB
-```
 
 > [!IMPORTANT]
 > ==**Pipeline raises throughput at the cost of (possibly) higher per-instr latency**==.
@@ -124,13 +109,3 @@ Decoded in **ID**, propagated forward:
 | **Signals**| `ASel/BSel`, `ALUCtrl`, `BrUn`         | `MemRW`, `PCSel`, `BrEq/BrLt` | `RegWr/WRen`, `WBSel`, `rd` |
 
 ==**Quiz**==: signals propagated to WB = `Rd`, `WRen`, `WBSel`. **NOT** `ALUCtrl` ❌ (dies after EX).
-
-## 10. Hazards Preview
-
-| Hazard            | Cause                                          | Fix                                              |
-| ----------------- | ---------------------------------------------- | ------------------------------------------------ |
-| ==**Structural**==| resource conflict (unified mem for IF/MEM)     | duplicate / pipeline / split I/D cache           |
-| ==**Data**==      | value not ready in time                        | forwarding, stall, scheduling, OoO               |
-| ==**Control**==   | next-PC unknown / wrong                        | prediction, BTB/BHT/RAS, flush                   |
-
-> Detail in [4_4_review.md](4_4_review.md).
