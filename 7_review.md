@@ -2,6 +2,8 @@
 
 ## Exam Facts
 
+==**Linking**== = combine `.o` files + libraries into an ==**exe / `.so`**== via ==**`ld`**== (standard Unix linker). Linker does ==**symbol resolution + relocation + section merging + library handling**==. ==**NOT loading**== (that's the loader / dynamic linker). Two library models: ==**static (`.a`)**== — embedded at link-time; ==**shared (`.so`)**== — resolved at load/run-time via ==**GOT + PLT**==.
+
 - ==**Linking**==: combine `.o`s + libs → executable / `.so`. Done by the **linker**.
   - **Standard Unix linker**: ==**`ld`**==; `gcc` is a compiler **driver** that invokes it.
   - **ELF tools**: ==**`readelf`**== full details; `objdump` disasm + relocs; `nm` symbol list.
@@ -280,7 +282,16 @@ dlclose(h);
 
 > Used for plugins / hot-swappable modules.
 
-==**Interposition**==: `LD_PRELOAD=./wrap.so prog` loads wrap **first** → same-name fns intercept later library calls (instrumentation, leak detection). Limit: cannot replace code already executed before interposition (e.g., `_start`).
+==**Interposition**==: `LD_PRELOAD=./wrap.so prog` loads wrap **first** → same-name fns intercept later library calls (instrumentation, leak detection).
+
+> [!IMPORTANT] ==**LD_PRELOAD interceptable scope**==
+> ❌ Cannot intercept ==**`_start`**== — it lives in `crt1.o` and is **statically linked** before dyld runs.
+> ✅ Can intercept ==**`__libc_start_main`**==, `malloc`, `free`, `printf`, etc. — anything resolved via the dynamic linker.
+
+==**Static lib disadvantages**== (motivate shared libs):
+1. **Duplication in stored exe**: every program embeds its copy of `libc` code → disk bloat.
+2. **Duplication in running memory**: every process loads its own copy → RAM bloat.
+3. **Bug-fix requires relinking every consumer** (see CVE-2015-7547 glibc `getaddrinfo` — every static-linked binary needed a rebuild).
 
 ## 9. PIC, GOT, PLT
 
@@ -311,3 +322,15 @@ Later calls: GOT.plt[func] = real addr → direct jump
 | **Executable**   | ✅      | ✅         | ❌         | ❌                   | ❌               |
 
 > ==**PLT in `.text` (or `.plt`)**==; ==**GOT and `.got.plt` in `.data`-like writable region**==.
+
+==**5-step PLT walkthrough**== (`main` calls `printf` from `libc.so`):
+
+| Step | Phase                    | Action                                                                |
+| ---- | ------------------------ | --------------------------------------------------------------------- |
+| 1    | **Compile (static)**     | compiler emits pseudo-instr `call printf`                             |
+| 2    | **Assemble (static)**    | expands to `auipc ra, %pcrel_hi(printf@plt); jalr ra, ...` + **reloc entry** |
+| 3    | **Link (static)**        | linker creates `.plt` stub: `auipc t3, %hi(printf@got); ld t3; jalr t0,t3` |
+| 4    | **Link (static)**        | linker reserves 1 entry in **`.got.plt`** (4B for 32-bit / 8B for 64-bit) |
+| 5    | **Dynamic-link (run)**   | ==**dyld fills real `printf` addr into `.got.plt` on first call**== (lazy bind) |
+
+> ==**GOT vs `.got.plt`**==: **GOT** holds global *data* addresses; **`.got.plt`** holds external *function* addresses (resolved lazily via PLT trampolines).

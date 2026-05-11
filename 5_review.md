@@ -2,9 +2,11 @@
 
 ## Exam Facts
 
-- **Optimization levers**: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
+==**Performance = IC × CPI × cycle-time**==. Lever it at multiple levels: ==**algorithm**== (programmer), ==**data layout + annotations**== (programmer: `restrict`, AoS→SoA), ==**compiler flags**== (`-O2/-O3/-flto/-march`), ==**μarch awareness**== (cache locality + ILP via multi-acc / unrolling / SIMD). ==**Compiler cannot change algorithm**== and ==**must preserve observable behavior**==, so semantic limits (aliasing, FP non-assoc, side effects, separate compilation) block many transforms — programmer hints (`restrict`, local copies, `-ffast-math`, `-flto`) unlock them.
 
-- **Compiler flags**:
+- ==**Optimization levers**==: algorithm, data layout, compiler flags, locality, ILP, SIMD, alias info.
+
+- ==**Compiler flags**==:
   - `-O0` debug; `-O1` basic safe.
   - **`-O2`** ★ default — safe + stable + small bloat.
   - `-O3` aggressive (unrolling, vectorization, inlining); may bloat.
@@ -14,19 +16,19 @@
   - `-march=native` / `-mtune=native` = local CPU ISA / scheduling.
   - `-fprofile-generate` / `-fprofile-use` = PGO.
 
-- **Semantic limits** (why compilers can't optimize freely): ==**pointer aliasing**==, **FP non-associativity**, `volatile`/atomics, fn side effects, exceptions, separate compilation.
+- ==**Semantic limits**== (why compilers can't optimize freely): ==**pointer aliasing**==, **FP non-associativity**, `volatile`/atomics, fn side effects, exceptions, separate compilation.
 
 - ==**Basic compiler optimizations**==: constant folding, **DCE**, **CSE**, **LICM**, **strength reduction**, inlining, register allocation, scheduling.
   - **CFG** = control flow; **DFG** = value flow; **DDG** = scheduling deps.
   - ==**Cascading DCE**==: one constant kills branch → calls → loop → **1000× speedup** possible.
 
-- **Loop unrolling**: reduces branch+index overhead, exposes ILP/SIMD. ==**NOT a locality opt**== ❌.
+- ==**Loop unrolling**==: reduces branch+index overhead, exposes ILP/SIMD. ==**NOT a locality opt**== ❌.
   - **Locality opts**: loop interchange / fusion / tiling.
   - Without a **cleanup loop**, unroll-by-`k` is wrong when `n` not a multiple of `k`.
 
-- **`switch` codegen**: dense → jump table (indirect `JALR`, hard to predict); sparse → branch chain (≈ `if-else`).
+- ==**`switch` codegen**==: dense → jump table (indirect `JALR`, hard to predict); sparse → branch chain (≈ `if-else`).
 
-- **Inlining**: small fns, constant args, called once, inside loop. ❌ recursive, deep call graph, many call sites.
+- ==**Inlining**==: small fns, constant args, called once, inside loop. ❌ recursive, deep call graph, many call sites.
   - Also improves **I-cache locality** (hot caller/callee stop ping-ponging).
 
 - ==**CPE**== (Cycles Per Element): $\text{total} = CPE \times n + \text{overhead}$; ==**CPE = slope**==, NOT total cycles.
@@ -35,11 +37,11 @@
 
 - **Non-aliased `*a, *b` but compiler keeps reloading**: use **`restrict`** OR **manual local copy**. ❌ NOT switching compiler / `-O3` alone.
 
-- **FP CSE** `(a+b+c+d) ≡ (a+d+b+c)`: legal for `long long`/`char` ✅; **`float`/`double` ❌** (FP non-assoc).
+- ==**FP CSE**== `(a+b+c+d) ≡ (a+d+b+c)`: legal for `long long`/`char` ✅; **`float`/`double` ❌** (FP non-assoc).
 
 - **Compiler diagnostics**: "data dependence" / "cannot vectorize" / "cannot reorder mem ops" → aliasing blocks reorder. Use `restrict` / local copy.
 
-- **Latency-bound vs bandwidth-bound**: latency-bound = account query, linked-list / tree search. Bandwidth-bound = large matmul, streaming.
+- ==**Latency-bound vs bandwidth-bound**==: latency-bound = account query, linked-list / tree search. Bandwidth-bound = large matmul, streaming.
 
 ## 1. Program Optimization
 
