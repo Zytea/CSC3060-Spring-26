@@ -3,8 +3,7 @@
 ## Exam Facts
 
 - **Byte-addressed memory**: pointer = virtual address of first byte; pointer **type** decides interpretation/stride.
-- ==**Word size**==: nominal pointer/GPR size; `w`-bit machine has addresses `0..2^w-1`.
-- **32b address space**: $2^{32}$ bytes = **4 GiB**. **64b**: $2^{64}$ B = 16 EiB.
+- ==**Word size**==: nominal pointer/GPR size; `w`-bit machine has addresses `0..2^w-1` (`w=32` → 4 GiB, `w=64` → 16 EiB).
 - **LP64 sizes** (64b Linux/RV64): `char 1`, `short 2`, `int 4`, `long 8`, ptr 8, `float 4`, `double 8`. ILP32 (RV32): `long 4`, ptr 4.
 - ==**LP64 won over ILP64**==: keeps `int=4B` for **data portability** with old binary files (storage doubles otherwise).
 - **`INT_MAX = 2^31-1 = 0x7FFFFFFF`**, **`INT_MIN = -2^31 = 0x80000000`**.
@@ -21,6 +20,7 @@
 - **Signed `>>k` rounds toward `−∞`**: e.g. `(-3)>>1 = -2`, while C `-3/2 == -1`. To round toward 0: `x<0 ? (x+(1<<k)-1)>>k : x>>k`.
 - **Bitwise vs logical**: `2 & 1 = 0`, `2 && 1 = 1`. `&&`/`||` short-circuit (`a && n/a` safe when `a==0`).
 - **IEEE 754-1985**: fp32 + fp64. **IEEE 754-2008**: adds fp16 + quad. **bfloat16/FP8/FP4 are AI formats, not core IEEE**.
+- ==**Data format standards**==: signed int = **2's complement**; fp32/fp64/fp16 = **IEEE 754**; English chars = **ASCII**; international chars = **Unicode**; FP8/FP4/HP8 = AI mini-floats, not core IEEE.
 - **fp32**: `s|exp8|frac23`, bias `127`. **fp64**: `s|exp11|frac52`, bias `1023`. **fp16**: `s|exp5|frac10`, bias `15`.
 - **bfloat16**: `s|exp8|frac7` (fp32 exp range, less precision; ML-friendly).
 - **fp32 exact int range**: 0 to $2^{24}=16{,}777{,}216$; above that, gaps grow ≥1.
@@ -31,6 +31,7 @@
 - **`+0.0` and `-0.0` exist** in IEEE FP (and 1's complement / sign-mag), **not** in 2's complement.
 - **`1/+0=+∞`, `1/-0=-∞`, `sqrt(-1)=NaN`**.
 - **Saturation arithmetic**: clip overflow at bounds (`120+20→127` for int8); used in audio/video/quantized AI, **not** standard FP.
+- ==**Sub-word SIMD**==: pack many 8/16b media values in one word/register; partition ALU carry chains so lanes compute in parallel (MMX/SSE/AVX/AMX style).
 - **Latencies**: int mul 3–5, int div ~32, FP add 4, FP mul 5, FMA 5–6, FP→int 3–5.
 
 ## 1. Information Storage
@@ -459,6 +460,27 @@ For `s|k exp|n frac`, **bias** $B=2^{k-1}-1$ (default, e.g. fp32: k=8 → B=127;
 
 > Same template applies to other `(k, n)` minifloat sizes — substitute `B = 2^{k-1}-1` and recompute.
 
+==**Decimal → minifloat conversion** (round-to-nearest-even)==:
+
+```text
+Goal: encode 12 in s|eeee|fff (k=4, B=7)
+1. sign s=0.
+2. binary 12 = 1100 = 1.100 × 2^3.
+3. biased exp E = 3 + 7 = 10 = 1010.
+4. frac = 100 (fits in n=3).
+→ 0 1010 100   value = 1.100 × 2^3 = 12.0 (exact).
+
+Goal: encode 11 (= 1.011 × 2^3, need frac=011 → fits 3 bits, exact)
+→ 0 1010 011 = 1.011 × 8 = 11.0.
+
+Goal: encode 13 = 1.101 × 2^3 → frac=101 → 0 1010 101 = 13.0.
+
+Goal: encode 0.625 = 0.101 × 2^0 = 1.01 × 2^-1.
+  E = -1 + 7 = 6, frac = 010 → 0 0110 010 = 0.625.
+```
+
+> Round-to-even when low bit drops: tie → bit just-above-LSB even.
+
 ==**FP halve / double bit-level**== (Quiz CMU f04):
 
 | Case | **Halve** (÷2) | **Double** (×2) |
@@ -587,3 +609,5 @@ sat int8: 120 + 20 →   127    // clip
 ```
 
 Used: audio samples, video pixels, quantized AI (`int4`/`int8`); MMX/SSE multimedia instructions. **NOT** for normal int/FP.
+
+==**Sub-word parallelism**==: one wide register holds many small values (`16x int8`, `8x int16`, ...); HW blocks carries between lanes so each lane saturates/wraps independently.

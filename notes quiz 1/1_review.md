@@ -5,8 +5,9 @@
 - ==**Computer system**==: **hardware + system software** that run application programs.
 - ==**Computer architecture**==: **interface between SW and HW**; broad sense = `ISA + microarchitecture + system design`. *Not* "the components" or "rules a programmer must follow" alone.
 - **System programs**: `OS`, compiler, assembler, linker, loader.
+- ==**Moore's Law (1975)**==: transistor count roughly doubles every **2 years**; architecture decides how to turn transistors into perf/cost/energy wins (pipeline, OoO, multicore, cache, SIMD/vector).
 - ==**Bits + context**==: same bits → `int` / FP / instruction / address / char bytes / array/struct fields.
-- **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; C strings store ASCII bytes such as `'0'=0x30`, `'1'=0x31`,… `'9'=0x39`; terminator `\0=0x00`.
+- **Character encoding**: **ASCII = 7-bit**; extended ASCII = 8-bit; C strings store as `'0'=0x30`; terminator `\0=0x00`.
 - **128 all-0 bits**: 4 fp32 `+0.0` / 2 fp64 `+0.0` / 1 fp128 `+0.0` / int zeros; **not** ASCII `"0..0"` (those are `0x30` bytes).
 - ==**RV32I about**==: 32b addresses (`4 GiB`), byte-addressable, 32 GPRs `x0..x31`; ISA does **not** require on-chip caches.
 - ==**RV32 valid extensions**==: base **must be `I` or `E`**; `RV32EM` ✓, `RV32IM` ✓; `RV32MI` ✗ (`M` is not a base), `RV32ME` ✗.
@@ -20,7 +21,6 @@
 - **Memory hierarchy illusion**: memory appears **fast + large + inexpensive**.
 - **Locality**: ==temporal== (reuse soon) + ==spatial== (neighbors soon).
 - **Architecture state must be saved on interrupt** so program can resume; microarch state can be regenerated.
-- **Amdahl**: speedup limited by unimproved fraction; serial fraction $\beta$ → max speedup `1/β`.
 
 ## 1. Information is Bits + Context
 
@@ -36,10 +36,7 @@
 | `0xffffffff` | `unsigned UMax` / `signed -1` / `fp32 NaN` / top of address space |
 | `0x30` | ASCII `'0'` (**not** numeric 0) |
 
-> [!IMPORTANT]
-> All-zero bits do **not** mean ASCII zeros. `"0000"` C-string bytes are `30 30 30 30 00`.
-
-> Quiz pattern: "128 bits all-0 is NOT" → **NOT a character string** `"000…"`. It CAN be 4×fp32 `+0.0`, 1× fp128 `+0.0`, or 2×fp64 `+0.0`.
+> `"0000"` C-string bytes are `30 30 30 30 00` (ASCII), **not** zero bytes.
 
 ## 2. Program Compilation: 4 Phases
 
@@ -105,10 +102,7 @@ PC → fetch instruction → decode → execute / load / store / branch → writ
 
 | Component | Role |
 |---|---|
-| ==**Bus**== | shared interconnect/protocol carrying **address + data + control** lines |
-| ==**Address bus**== | `addr=0x1000` |
-| ==**Data bus**== | `data=0x12345678` |
-| ==**Control bus**== | read / write / strobe |
+| ==**Bus**== | shared interconnect carrying **address + data + control** lines |
 | I/O devices | keyboard, display, disk, NIC |
 | Main memory | byte array of **instructions + data** |
 | ==**CPU**== | engine interpreting instrs; contains **PC + regfile + ALU** |
@@ -253,12 +247,7 @@ T_{new}=(1-\alpha)T_{old}+\frac{\alpha T_{old}}{k}; \quad
 Speedup=\frac{1}{(1-\alpha)+\alpha/k}\le\frac{1}{1-\alpha}
 $$
 
-- Serial fraction $\beta=1-\alpha$ caps speedup at `1/β`.
 - **Focus optimization on the largest time-consuming part.**
-
-> Examples (apply only one formula, don't pad):
-> - 80% parallel, $k=\infty$: max `1/0.2 = 5×`.
-> - 90% improvable, target `4×`: $4=1/(0.1+0.9/k) \Rightarrow k=6$.
 
 ### 6.2 Concurrency vs Parallelism vs ILP/DLP/TLP/MLP
 
@@ -266,19 +255,10 @@ $$
 |---|---|---|
 | **concurrency** | multiple activities in progress | time-slicing, context switch |
 | **parallelism** | actually executing simultaneously | multiple resources |
-| ==**ILP**== | many instrs from **one thread** overlap/issue | pipeline, superscalar, OoO, scheduling, branch prediction |
+| ==**ILP**== | many instrs from **one thread** overlap/issue | pipeline, superscalar, OoO, scheduling, branch prediction, non-blocking cache |
 | ==**DLP**== / SIMD | same op over many data | SIMD/vector/RVV/sub-word; **GPU is DLP-style** |
-| ==**TLP**== | independent threads/tasks in parallel | multicore, SMT/HT, OS threads |
+| ==**TLP**== | independent threads/tasks in parallel | multicore, SMT/HT, OS threads, , snoopy caches, inclusive caches |
 | ==**MLP**== | multiple outstanding memory ops/misses | non-blocking cache + **MSHR**, interleaved DRAM banks, OoO mem |
 
 > [!IMPORTANT]
 > **Parallelism ⇒ concurrency, but concurrency does NOT imply parallelism.** Multiprogramming on 1 core = concurrent, not parallel.
-
-Quiz feature → parallelism mapping:
-
-| Feature | Type |
-|---|---|
-| branch predictor, OoO, non-blocking cache, pipelining | ILP (non-blocking-cache also MLP) |
-| MSHR, interleaved memory banks | MLP |
-| vector instr, sub-word parallel, GPU | DLP |
-| multi-cores, SMT, snoopy caches, inclusive caches | TLP |

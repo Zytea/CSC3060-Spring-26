@@ -39,6 +39,7 @@
 - ==**TLB miss may trigger page fault**== (if PTE invalid → OS swap-in or kill).
 - **VIPT** (virtually indexed, physically tagged) cache can **overlap address translation** with cache access.
 - **Virtual-tagged cache**: complicated by **synonyms / aliasing** (2 VAs → 1 PA).
+- ==**Set index uses middle bits**==: block-offset consumes low bits; middle bits spread nearby sequential blocks across sets. MSB indexing would map nearby addresses to same set too often → wastes spatial locality.
 - **TLB and victim cache are usually fully associative**.
 - **Direct-mapped vs set-assoc** (same C, B):
   - **DM has lowest tag overhead + simplest replacement** ✓
@@ -143,6 +144,8 @@ addr = [    tag    |  set index  |  block offset  ]
 4. block offset selects byte/word.
 5. **miss**: pick victim; if dirty under write-back, write back; fill new line; set valid+tag.
 
+==**Why index = middle bits**==: block offset takes the LOW bits (intra-line); set index takes the **middle bits** so that **sequentially adjacent blocks land in different sets** → spatial scan spreads load across sets. Using high bits as index would pack a long contiguous run into one set → conflict-miss disaster.
+
 ==**Cache-like structures**==:
 
 | Structure | What it caches | Tagged? |
@@ -152,6 +155,8 @@ addr = [    tag    |  set index  |  block offset  ]
 | **BTB** | branch target PCs | ✓ partially tagged |
 | **BHT/PHT** | branch direction history | **untagged** |
 | single-level page table | VPN-indexed PTE array | no tag (VPN is index) |
+
+> CSC3050 anchor: **BTB, TLB, L3 cache, branch prediction table** are all cache-like. **BHT/PHT may have no tag bits** because direction bits are tiny and IF needs fast/cheap access.
 
 > Quiz 4 #2: NOT stored per cache line: ==**set number**== (it's part of the address). What IS stored: data, tag, valid bit, dirty bit (write-back).
 
@@ -224,6 +229,8 @@ tag   = block / S
 ```
 
 > Two addresses hit the same line iff **same tag AND same set**.
+
+> ==**Why middle bits for `set_index`?**== Low `b` bits are byte-in-line; using next `s` bits makes adjacent blocks cycle through sets. If MSBs indexed the cache, common sequential arrays would pound one/few sets before high bits change.
 
 ### 3.4 Direct-Mapped Trace Pattern
 
@@ -333,7 +340,7 @@ for (j=0; j<C; j++)
 
 | Org | Meaning | Pros / Cons |
 |---|---|---|
-| ==**direct-mapped**== | E=1 | fastest hit; many conflicts; lowest tag overhead |
+| ==**direct-mapped**== | E=1 | simplest hit path; many conflicts; lowest tag overhead |
 | ==**set-associative**== | E>1 | balanced |
 | ==**fully associative**== | S=1 | least conflicts but costly tag search |
 
@@ -346,6 +353,7 @@ for (j=0; j<C; j++)
 | fully-assoc = 1-way | **false** (it's **1-set**, all lines in one set) |
 | DM = 1-set | **false** (it's **1-way**, multiple sets) |
 | 2-way has more sets than 4-way | **true** |
+| DM always faster hit than set-assoc | **false as "always"**; usually simpler/faster, but not guaranteed |
 | **DM has lowest tag overhead** | **true** ✓ |
 | **DM has simplest replacement** | **true** ✓ (no choice — only one line per set) |
 | fully-assoc has more lines | **false** (line count = C/B, same) |
@@ -675,10 +683,13 @@ PTE valid=0 → PAGE FAULT → OS brings page from disk or kills process
 
 | Item | Answer |
 |---|---|
+| VM purpose | VA space > PA, demand paging, isolation/protection, sharing (`mmap`, shared libs) |
 | page table location | **main memory**, pointed to by a CPU register (e.g., `satp`) |
 | PTE contents | **physical page number + valid + permission + status bits** |
 | invalid/not-present PTE | may point to disk/swap; reference → page fault |
+| page replacement | like cache replacement, but OS can use more complex policies because disk fault cost ≫ cache miss |
 | TLB purpose | avoid slow page-table walk on most accesses |
+| reduce TLB miss | larger / more-assoc TLB, multi-level TLB, large pages, PTE prefetch |
 
 ==**Address splits**== (just the formula, not deep walks):
 
@@ -710,6 +721,8 @@ PA = (PPN << VPO_bits) | VPO
 | chained hash | **open addressing** |
 | traverse 1 at a time | **batch independent traversals** (multiple in-flight) |
 | many small allocs | **pool / arena allocator** |
+
+==**Vector loads/stores vs cache**==: vector ISA exposes regular memory streams (good for bandwidth / latency hiding); data caches are better for unpredictable locality from pointer aliasing and irregular objects.
 
 ==**Sorting locality**== (Quiz 4 #35):
 
@@ -791,6 +804,8 @@ PA = (PPN << VPO_bits) | VPO
 | sorting w/ high data locality | Quicksort, Insertion, Bubble |
 | TLB miss may → | **page fault** |
 | page table location | **main memory** |
+| cache-like structures | BTB, TLB, L3, branch prediction table |
+| branch prediction table no tags? | **BHT/PHT can be untagged** |
 | no-tag mapping table | **single-level page table** |
 | caches usually fully assoc | **TLB, victim cache** |
 | address aliasing complicates | **virtual-address-tagged cache** |

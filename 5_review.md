@@ -430,6 +430,18 @@ double sum = (s0+s1) + (s2+s3);
 
 ## 10. Data Structure Fixes
 
+==**Memory locality transformations**== (CA3060 Review):
+
+| Technique | Use when | Main win / trap |
+|---|---|---|
+| **loop interchange** | row-major code scans columns | make innermost loop stride-1 |
+| **loop fusion** | two loops touch same arrays | reuse data while hot; avoid if deps/pressure bad |
+| **loop fission / distribution** | one loop has long dep chain / too much pressure | split independent work; may hurt locality if split arrays reused |
+| **tiling / blocking** | matrix transpose / multiply | keep working set in cache |
+| **array padding / alignment** | conflict misses from power-of-2 spacing | change set mapping; padding must be used so compiler keeps it |
+| **software prefetch** | predictable miss far enough ahead | hide latency; can hurt bandwidth/cache pollution |
+| **AoS → SoA** | vectorize / scan one field of many objects | contiguous fields; worse if whole object always used |
+
 ==**Pointer-heavy** (slow on pipelined CPUs)==:
 
 - linked lists.

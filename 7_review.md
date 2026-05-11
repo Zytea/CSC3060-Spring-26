@@ -11,6 +11,7 @@
 - ==**Three object file kinds**==: ==**relocatable `.o`**==, ==**executable `a.out`**==, ==**shared object `.so`**==. (Static archive `.a` is NOT a 4th kind — it's a **collection of `.o`s + index**, Quiz 5 #11.)
 - ==**Benefits of linking**==: **modularity, separate compilation, library reuse, easier maintenance, time efficiency** (parallel/incremental compile), space efficiency. NOT "simpler to build an executable" (Quiz 5 #9).
 - ==**ELF sections**==: `.text` (code), `.rodata` (read-only), `.data` (initialized globals), `.bss` (zero globals), `.symtab` (symbols), `.rel.text/.rel.data` (relocations), `.debug` (debug info), section header table.
+- ==**ELF executable contains**== machine code + global data + symbol/reloc/debug metadata as sections; **NOT** the user stack or register file (runtime state).
 - **Symbols in `.symtab`** (Quiz 5 #15): **global vars, external funcs, static local symbols** (file-local + function-scope `static`). **NOT** ordinary local variables (those are stack temporaries).
 - ==**Strong vs Weak**==: **strong** = function definitions + initialized globals; **weak** = uninitialized globals (or `extern` declarations).
 - ==**Duplicate rules**==:
@@ -150,7 +151,7 @@ After deciding final section/symbol addresses, linker patches code/data referenc
 | `.debug` | debug info (`gcc -g`) |
 | Section header table | metadata for sections |
 
-> ELF sections include `.text/.rodata/.data/.bss/.symtab` etc. **NOT** ELF sections: stack, register file, ".static" (no such section).
+> ELF sections include `.text/.rodata/.data/.bss/.symtab` etc. **NOT** ELF sections: **user stack**, register file, ".static" (no such section).
 
 ## 6. Linker Symbols
 
