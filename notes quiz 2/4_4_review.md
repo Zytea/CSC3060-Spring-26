@@ -2,183 +2,263 @@
 
 ## Exam Facts
 
-- **Three hazards**: ==**structural, data, control**==; "forward hazard" is **not** one.
-- **Actual CPI**: `ideal CPI + stall cycles per instruction`.
-- ==**Structural hazard**==: not enough hardware resources.
-- **Data-hazard fixes**: `forwarding/bypassing`, stalls/interlocks, compiler scheduling, OoO.
-- **Load-use hazard**: usually needs **1 bubble** even with forwarding.
-- **Control-hazard fixes**: dynamic prediction, BHT, BTB, RAS, static layout, early resolution.
-- **BHT / BTB / RAS**: BHT predicts **whether**; BTB predicts **where**; RAS predicts returns.
-- **Prediction stage**: branch prediction should happen in **IF**.
-- **Correlated predictor index**: current PC combined with global history, often `PC xor GHR`.
-- **Hard target prediction**: indirect `JALR` from `switch`/vtable/function pointer; returns use RAS.
-- **High-performance cores**: static-only prediction is not plausible.
+- ==**Three hazards**==: ==**Structural, Data, Control**==. **"Forward hazard" is NOT one** (Quiz 3 #1).
+- $$CPI_{actual} = CPI_{ideal} + StallCycles/Instr$$
+- $$AddedCPI_{control} = BranchFreq \times MispredictRate \times Penalty$$
+- ==**Structural hazard**==: insufficient HW (e.g., unified mem for IF+MEM, non-pipelined divider, too few regfile ports, early WB conflict).
+- **Von Neumann bottleneck in pipeline = structural hazard** (Quiz 3 #8).
+- ==**Why split I/D cache**==: avoid IF/MEM **structural hazard** + **higher access bandwidth**. NOT primarily for hit rate / reliability.
+- **Data hazard fixes** (HW or SW): **forwarding/bypassing** (HW), **stall/interlock** (HW), **OoO** (HW), **compiler scheduling** (SW).
+- **Deeper pipeline does NOT fix data hazards** (it makes them worse).
+- ==**Load-use hazard**==: even with forwarding, needs **1 bubble** (load data ready after MEM, too late for next EX).
+- ==**Control hazard fixes**==: **BHT** (predicts whether), **BTB** (predicts where), **RAS** (predicts returns), static predict, early resolution. NOT data forwarding.
+- ==**BHT vs BTB vs RAS**==: BHT = direction (taken/NT); BTB = target PC; RAS = return target stack.
+- **Branch prediction stage**: ==**IF**== (must predict next PC at fetch).
+- ==**Correlated (2-level) predictor index**== = **PC ⊕ Global History Register** (most common). Or **PC + GHR**.
+- **Hardest branch to predict**: ==**indirect `JALR`**== for switch jump-tables / vtables / function pointers. Returns are easy (RAS).
+- **Modern high-perf CPUs use dynamic prediction**, not static-only. Apple M4 → not "static branch prediction".
+- **Static rules**: ==**predict backward branch taken**== (loop), forward branch fall-through (then-path), default-NT for `beq rs1,x0` forward, default-taken for backward `blt`.
+- **Untagged BHT**: simple, fast, cheap, low energy. **NOT** "good for high-performance" (high-perf CPUs use tagged or correlated).
+- ==**Branch resolution stage → flush**==: MEM→**3 bubbles** (textbook); EX→**2 bubbles** (class); ID→**1 bubble**; IF (BTB+BHT correct)→**0**.
+- **A57 example** (16 stages, 20% branch, 15-cycle penalty, no pred): added CPI = 0.2×15 = 3; penalty = 3/(1+3) = **75%**.
+- **Pentium 4 example** (31 stages, 20% branch, 2% mispred, 30-cycle penalty, base CPI=1): added CPI = 0.2×0.02×30 = 0.12 → **12% slowdown**.
+- **Without prediction, only-taken branches flush**: use `BranchFreq × TakenRate × Penalty`.
+- **2-bit FSM accuracy**: 85–95%; 1-bit BHT: 70–80%; correlated 2-level: 94–96%; tournament: 96–97%; TAGE: 97–99%.
+- **1-bit BHT mispredicts twice per inner loop** (last iter wrong + first iter next time wrong).
+- **Tree/list traversal hazard**: ==**data hazards** (pointer load-use chain) **+ control hazards** (branch on data)==.
+- **Compiler scheduling limits**: memory aliasing unknown, mem latency unknown, scope limited by branches/calls/traps/volatile/IO.
+- **Branch target adder in ID**: would help only **direct predicted-taken branches**; not used much in modern HW (BTB already gives target in IF).
 
 ## 1. Hazard Overview
 
+==**Pipeline equation**==:
+
 $$
-CPI_{actual}=CPI_{ideal}+StallCycles/Instruction
+CPI_{actual} = CPI_{ideal} + \frac{Stall\ Cycles}{Instr}
 $$
 
-Hazards insert bubbles or flush wrong-path instrs.
+==**Pipeline loss sources**==:
 
-Pipeline loss sources: unbalanced stages, fill/drain, and structural/data/control hazards.
+- unbalanced stages.
+- pipeline-reg overhead.
+- fill/drain.
+- ==**structural / data / control hazards**==.
+
+> Quiz: **"forward hazard" is NOT a real hazard** (it's the *fix*, not the problem).
 
 ## 2. Structural Hazards
 
-==**Structural hazard**==: two stages need same resource in same cycle.
+==**Structural hazard**==: two stages need the **same HW resource** in the same cycle.
 
 | Cause | Example | Fix |
 |---|---|---|
-| unified I/D memory | IF and MEM conflict | split I/D cache |
-| non-pipelined divider | back-to-back divide | pipeline or stall |
-| too few regfile ports | two writes same cycle | more ports or schedule |
-| too few adders | `PC+4` and branch target | add adder |
-| early WB design | ALU instr writes in stage 4 while load writes in WB | keep common WB stage or add ports/scheduling |
+| **unified I/D mem** (Von Neumann) | IF + MEM conflict | **split I/D cache** (Harvard) |
+| non-pipelined divider | back-to-back `div` | pipeline divider; or stall |
+| too few regfile ports | 2 writes same cycle | more ports; schedule |
+| too few adders | `PC+4` + branch target | add 2nd adder in EX |
+| early R-WB design | R-type WB at stage 4 vs load WB at stage 5 | keep common WB; or extra ports |
 
-Von Neumann bottleneck in pipeline = structural hazard.
+> ==**Von Neumann bottleneck in pipelined data path = structural hazard**== (Quiz 3 #8 → answer A).
 
-Split I/D caches help because they avoid IF/MEM conflict and increase access bandwidth; not primarily for hit rate.
-
-Quiz anchor: a **vanilla unified-memory Von Neumann** organization is a poor fit for single-cycle/pipelined/superscalar instruction+data overlap; multi-cycle can time-share the memory more naturally.
+==**Why split I/D cache**==: (Quiz 3 #14) → **avoid structural hazards** + **higher access bandwidth**. NOT for hit rate / reliability. Also: I-cache and D-cache can be managed differently (e.g., I has no writes from CPU).
 
 > [!IMPORTANT]
-> Moving R-type WB earlier can create a structural hazard with other instrs that write the regfile at the normal WB time.
+> ==Moving R-type WB earlier (to stage 4) **creates a structural hazard** with loads writing the regfile at stage 5==. Class answer: keep all WB at stage 5.
 
 ## 3. Data Hazards
 
 ### 3.1 Dependence Types
 
-| Type | Meaning | Importance |
+| Type | Meaning | Hazard? |
 |---|---|---|
-| RAW | read after write | true dependence |
-| WAR | write after read | name/order dependence |
-| WAW | write after write | output/order dependence |
-| RAR | read after read | not a hazard |
+| ==**RAW**== (Read After Write) | reader needs producer's value | **TRUE dependence** (real) |
+| **WAR** (Write After Read) | later write must wait for earlier read | name/order — removable by **renaming** |
+| **WAW** (Write After Write) | later write defines final value | name/order — removable by **renaming** |
+| RAR | both read | **NOT a hazard** |
+
+> Quiz 2 #12: "True Dependence" = ==**RAW**==.
 
 ### 3.2 Without Forwarding
 
-Producer writes in WB, consumer reads in ID.
+Producer writes in WB; consumer reads in ID. Without forwarding:
 
 ```text
-add x5,...
-sub x6,x5,...
+add x5, ...   IF ID EX MEM WB
+sub x6, x5, ...  IF ID ID ID EX MEM WB    ← stall 2-3 cycles
 ```
 
-May need up to 2-3 bubbles depending on regfile write/read timing.
+Up to **2-3 bubbles** depending on regfile write/read timing (with WB-first-half + ID-second-half trick → 2 bubbles).
 
-Quiz 2 sequence without forwarding: **9 bubbles**:
+==**Quiz 2 sequence (no forwarding) → 9 bubbles**==:
 
 ```text
-2->3:2, 3->4:2, 5->6:2, 6->7:2, 9->11:1
+1. LW S1, 8(S0)
+2. LW S2, 16(S0)
+3. SUB T4, S2, S1     ← 2 bubbles (RAW on S2 from instr 2; on S1 from instr 1)
+4. AND T5, T4, T3     ← 2 bubbles (RAW on T4 from instr 3)
+5. SUB S4, T4, T3     ← 0 bubbles (T4 already produced; covered by half-cycle write)
+6. ADD T6, S4, T4     ← 2 bubbles (RAW on S4 from instr 5)
+7. SW T6, 4(S7)       ← 2 bubbles (RAW on T6 from instr 6)
+8. LW S3, 24(S7)
+9. LW S1, 8(S7)
+10. LW S5, 32(S0)
+11. ADD T7, S3, S1    ← 1 bubble (RAW on S1 from instr 9, 1 cycle apart)
+12. LW S6, 64(S0)
 ```
 
-### 3.3 Forwarding Equations
+Total: 2 + 2 + 2 + 2 + 1 = **9 bubbles**.
 
-EX/MEM to EX:
+### 3.3 Forwarding Equations (Bypass)
+
+==**EX/MEM → EX**== (most recent producer):
 
 ```text
-EX/MEM.RegWr && EX/MEM.rd!=0 && EX/MEM.rd==ID/EX.rs1 -> ForwardA=EX/MEM
-EX/MEM.RegWr && EX/MEM.rd!=0 && EX/MEM.rd==ID/EX.rs2 -> ForwardB=EX/MEM
+IF (EX/MEM.RegWr) AND (EX/MEM.rd != 0):
+  IF (EX/MEM.rd == ID/EX.rs1) → ForwardA = EX/MEM.ALUresult
+  IF (EX/MEM.rd == ID/EX.rs2) → ForwardB = EX/MEM.ALUresult
 ```
 
-MEM/WB to EX:
+==**MEM/WB → EX**== (older producer):
 
 ```text
-MEM/WB.RegWr && MEM/WB.rd!=0 && MEM/WB.rd==ID/EX.rs1 -> ForwardA=MEM/WB
-MEM/WB.RegWr && MEM/WB.rd!=0 && MEM/WB.rd==ID/EX.rs2 -> ForwardB=MEM/WB
+IF (MEM/WB.RegWr) AND (MEM/WB.rd != 0):
+  IF (MEM/WB.rd == ID/EX.rs1) → ForwardA = MEM/WB.value
+  IF (MEM/WB.rd == ID/EX.rs2) → ForwardB = MEM/WB.value
 ```
 
-If both match, newer EX/MEM wins. Never forward from `x0` or non-writing instr.
+> [!IMPORTANT]
+> ==**Both must check `RegWr=1` AND `rd != x0`**==. Otherwise: stores/branches/`x0` create false forwards.
 
-Forwarding checks must include both `RegWr=1` and `rd != x0`; otherwise stores/branches/`x0` create false forwards.
+> If both EX/MEM and MEM/WB match, **EX/MEM wins** (more recent value).
 
 ### 3.4 Load-Use Hazard
 
 ```asm
-lw  x5,0(x1)
-add x6,x5,x2
+lw  x5, 0(x1)
+add x6, x5, x2     ← load data ready after MEM, too late for next EX
 ```
 
-Load data ready after MEM, too late for next EX -> **1 bubble** with forwarding.
+==**Even with forwarding, needs 1 bubble**==:
 
-Compiler may place independent instr between them.
+```text
+lw  x5  IF ID EX MEM WB
+add x6      IF ID -- EX MEM WB    ← 1 bubble
+```
 
-### 3.5 Compiler Scheduling Limits
+==**Compiler fix**==: place an independent instr between `lw` and consumer.
+
+```asm
+lw  x5, 0(x1)
+addi t0, t0, 1    # independent, fills the bubble
+add  x6, x5, x2
+```
+
+### 3.5 With Forwarding: Quiz 2 → 1 Bubble Remains
+
+With both forwarding paths active, the only unavoidable bubble in the Quiz 2 sequence is at the **load-use** between instr 2 (`LW S2`) and instr 3 (`SUB T4, S2, S1`).
+
+### 3.6 Compiler Scheduling Limits
 
 Scheduling helps but is limited by:
 
-- possible memory aliasing.
-- unknown cache/memory latency.
-- calls, branches, traps, volatile/I/O.
+- ==**memory aliasing**== (load/store across each other only safe if proven non-aliasing).
+- ==**unknown memory latency**== (cache hit/miss).
+- calls/branches/traps shrink scheduling scope (basic block).
+- volatile / I/O / atomics.
+
+> Quiz 3 #28: compiler limits = **B (alias) + D (latency)**.
+
+==**MIPS history**==: "Microprocessor without Interlocked Pipeline Stages" — compiler-only hazard avoidance. **Failed due to compatibility/scalability** (Quiz 3 #11 → A).
 
 ## 4. Control Hazards
 
-==**Control hazard**==: correct next PC unknown or predicted wrong.
+==**Control hazard**==: correct next-PC is unknown or predicted wrong.
 
-Branch penalty contribution:
+==**Branch penalty contribution**==:
 
 $$
 AddedCPI = BranchFreq \times MispredictRate \times Penalty
 $$
 
-No-prediction taken-branch case uses taken fraction instead of mispredict rate.
-
-Correctness vs performance:
+> No-prediction case: replace `MispredictRate` with `TakenRate` (only taken branches flush).
 
 | Mechanism | Role |
 |---|---|
-| stall/flush | handles wrong/unknown control flow but pays penalty |
-| BHT/BTB/static layout | reduces control-hazard penalty by predicting earlier |
-| data forwarding/bypassing | data hazard fix, not control hazard fix |
+| stall / flush | handles wrong control flow but pays full penalty |
+| **BHT, BTB, RAS, static layout** | reduce penalty via early prediction |
+| data forwarding/bypassing | **NOT** a control-hazard fix (Quiz 3 #18 wrong distractor) |
 
-### 4.1 Resolution Stage -> Flush Count
+### 4.1 Resolution Stage → Flush Count
 
-| Branch resolved at | Penalty idea |
+| Branch resolved at | Bubbles |
 |---|---:|
-| MEM | 3 bubbles |
-| EX | 2 bubbles |
-| ID | 1 bubble |
-| IF via BTB+BHT | 0 if correct |
+| MEM (textbook) | **3** |
+| **EX (class default)** | **2** |
+| ID (direct branch + early compare) | **1** |
+| IF (BTB+BHT correct) | **0** |
 
-Textbook 3 vs class 2: textbook redirects fetch one stage later; class assumes EX can resteer sooner.
+==**Discrepancy textbook 3 vs class 2**==: textbook redirects fetch one stage later (after MEM); class assumes EX can resteer immediately. Quiz 2 #6d explanation.
 
-If no prediction and only taken branches flush, use `BranchFreq x TakenRate x Penalty`.
+==**Worked penalty examples**==:
 
-### 4.2 Penalty Examples
-
-| Case | Calculation | Result |
+| Case | Calc | Result |
 |---|---|---|
-| A57 no prediction, 20% branches, 15-cycle penalty | added CPI `0.2*15=3`; total `4` | branch stalls `3/4=75%` |
-| Pentium 4, 20% branches, 2% mispred, 30-cycle penalty | `0.2*0.02*30` | 0.12 added CPI = 12% if base CPI=1 |
+| **A57**: 16 stages, 20% branch, 15-cycle penalty, NO pred | added CPI `0.2*15=3`; total CPI `1+3=4`; penalty `3/4` | **75%** ★ Quiz 2 #6 |
+| **Pentium 4**: 31 stages, 20% branch, 2% mispred, 30-cycle penalty | `0.2*0.02*30=0.12` added CPI; base 1 → 12% | **12%** ★ Quiz 3 #32 |
+| 5-stage, 20% branch, **50% taken**, MEM resolve (3-cycle penalty), no pred | `0.2*0.5*3=0.3` added CPI; ≈30% slowdown | 30% |
 
 ## 5. Branch Prediction
 
 ### 5.1 Static and Dynamic
 
-| Method | Accuracy idea |
+| Method | Accuracy |
 |---|---:|
-| always not taken | 30-40% |
-| backward taken, forward not taken | 60-70% |
-| compiler/profile static | 65-90% |
-| 1-bit BHT | 70-80% |
-| 2-bit counter | 85-95% |
-| correlated/2-level | 94-96% |
-| tournament/TAGE-like | 96-99% |
+| always not-taken | 30–40% |
+| backward-taken / forward-not-taken | 60–70% |
+| compiler-static / profile-guided | 65–90% |
+| 1-bit BHT | 70–80% |
+| ==**2-bit FSM (saturating counter)**== | **85–95%** |
+| correlated / 2-level (global) | 94–96% |
+| local 2-level | 93–97% |
+| tournament | 96–97% |
+| **TAGE** (Intel/AMD/ARM/Apple) | **97–99%** |
 
-Static useful rules:
+==**Static rules**==:
 
-- backward branch taken.
-- forward `beq rs1,x0` often not taken in class quiz.
-- if a BHT entry has no history, the simple default is **not taken**.
+| Pattern | Predict |
+|---|---|
+| backward branch (loop back-edge) | **taken** |
+| forward `beq rs1, x0` | **not taken** (often error/exception path) |
+| if-then with then in fall-through | not taken |
+| BHT entry no history | **NT** (default) |
+
+> Quiz 3 #23 (effective static): **predict backward taken**, predict forward `beq rs1,x0` not-taken. **NOT**: `beq rs1,rs2` NT (no info), `blt` taken (no info), `JALR` NT.
 
 ### 5.2 1-bit vs 2-bit BHT
 
-1-bit loop issue: inner-loop branch often mispredicts on loop exit and first iteration next time.
+==**1-bit BHT inner-loop problem**==: **mispredicts twice per outer iteration**:
 
-2-bit counter:
+```
+outer:
+  inner:
+    ...
+    beq ..., inner   # last inner iter: was T → predict T → actually NT (mispredict)
+                     # next time inner: state=NT → predict NT → actually T (mispredict)
+```
 
-| State | Predict | T -> | NT -> |
+==**2-bit saturating counter**== (FSM): only changes prediction on **two successive mispredictions**.
+
+```text
+States:  SNT (00) → WNT (01) → WT (10) → ST (11)
+Predict: NT       NT          T          T
+
+      T→ST          T→ST
+       ↑             ↑
+SNT ←T─ WNT          WT ←T─ ST
+   →NT  →NT  T→         →NT  →NT  
+```
+
+| State | Predict | T → | NT → |
 |---|---|---|---|
 | SNT | NT | WNT | SNT |
 | WNT | NT | WT | SNT |
@@ -187,69 +267,109 @@ Static useful rules:
 
 ### 5.3 Untagged BHT
 
-Why untagged:
+==**Why untagged**== (Quiz 3 #24):
 
-- simple.
-- fast IF access.
-- low energy.
-- cheap/cost-effective.
+- **simple**.
+- **fast IF access**.
+- **low energy**.
+- **cost-effective**.
 
-Cost: aliasing between branches.
+==**NOT**== "good for high-performance" — high-perf CPUs prefer **tagged or correlated**. Cost: aliasing between branches.
 
-High-performance predictors may add tags or richer metadata; "good for high-performance" is **not** the reason an untagged BHT is used.
-
-Simple BHT indexing often uses lower PC bits; correlated/2-level predictors combine PC with history.
+> Indexed by **lower PC bits** typically.
 
 ### 5.4 Correlated / 2-Level
 
-Uses recent branch history:
+Use recent branch outcomes:
 
 ```text
-GHR = shift register of recent outcomes
-index = PC xor GHR   # common quiz answer
-PHT[index] = 2-bit counter
+GHR (Global History Register) = shift register of last k outcomes
+index = PC XOR GHR     ★ Quiz 2 #11 / Quiz 3 #22 answer
+PHT[index] = 2-bit saturating counter
 ```
 
-Useful when branches are correlated, e.g., third branch depends on previous two outcomes.
+==**When useful**==: branches whose outcome depends on previous outcomes:
+
+```c
+if (a==2) a=0;       // B1
+if (b==2) b=0;       // B2
+if (a!=b) {...}      // B3 — depends on B1, B2 outcomes
+```
+
+If B1=T && B2=T → B3=NT predictable.
 
 ### 5.5 BHT vs BTB vs RAS
 
-| Structure | Predicts |
-|---|---|
-| BHT / direction predictor | taken/not-taken |
-| BTB | target PC |
-| RAS | return target |
+| Structure | Predicts | Implementation |
+|---|---|---|
+| ==**BHT / direction predictor**== | taken/NT | array of 2-bit counters indexed by PC (or PC⊕GHR) |
+| ==**BTB**== | **target PC** | small **tagged cache**; one tag = branch PC, payload = target PC |
+| ==**RAS** (Return Address Stack)== | **return target** | hardware stack: push at `JAL` call; pop at `JALR x0,ra,0` |
 
-Hard branch/jump targets:
+==**Hard-to-predict branches**== (Quiz 3 #34):
 
-- indirect `JALR` for switch jump table.
-- virtual calls/function pointers.
-- returns if RAS mismatch.
-- binary-tree/linked-list traversal often causes **data hazards** (pointer load-use chain) plus **control hazards** (branch direction depends on data).
+- ==**Indirect `JALR` for switch jump tables**== ★ (target depends on data).
+- virtual calls / function pointers.
+- returns when RAS mismatches (deep recursion or RAS overflow).
+- binary-tree / linked-list traversal: **data hazards** (pointer load-use) + **control hazards** (data-dependent branch direction).
 
-Switch vs if-chain:
+==**Switch vs if-chain**==:
 
-- dense/continuous cases -> compiler may use jump table -> indirect `JALR`, fast but harder target prediction.
-- sparse/few cases -> compiler may emit conditional branch chain; not necessarily faster than `if/else`.
+- **dense / continuous cases** → compiler emits **jump table** → indirect `JALR`, fast but **harder target prediction**.
+- **sparse / few cases** → compare-branch chain, similar to `if/else`.
 
 ## 6. Branch Target at ID Stage
 
-Computing `PC+imm` in ID can help predicted-taken direct branches.
+==**Computing `PC + B-imm` in ID**== could help **predicted-taken direct branches** (IF can fetch target one cycle earlier).
 
-Not usually a strong modern design reason:
+==**But not really useful in modern HW**== (Quiz 2 #6b):
 
 - BTB already gives target in IF.
-- only helps direct branches, not indirect `JALR`.
-- adds ID-stage adder/delay.
+- Only helps **direct branches**, not indirect `JALR` or returns.
+- Adds an ID-stage adder (delay + cost).
 
-Future improvement focus: indirect branches and returns.
+==**Future improvement focus**== (Quiz 2 #6c): better prediction for **indirect branches + returns** (the hardest category).
 
 ## 7. Control Signals in Pipeline
 
-Control decoded in ID must move with its instruction.
+Decoded in **ID**, propagated forward via pipeline regs.
 
-| Stage | Data/control needed |
+| Stage | Data + Control needed |
 |---|---|
-| EX | operands, imm, `ALUCtrl`, compare mode |
-| MEM | ALU address/result, store data, `MemRW` |
-| WB | ALU/mem/PC+4, `rd`, `RegWr`, `WBSel` |
+| **EX** | operands (`R[rs1], R[rs2]`), imm, `ALUCtrl`, `ASel/BSel`, `BrUn` |
+| **MEM** | ALU result (addr), store-data, `MemRW`, branch result for `PCSel` |
+| **WB** | ALU result / mem-data / `PC+4`, `rd` desig, `RegWr/WRen`, `WBSel` |
+
+==**WB-stage signals (3 cycles after ID)**==: `Rd`, `WRen`, `WBSel`. **NOT `ALUCtrl`** (used in EX, dies after).
+
+## 8. Data Structures and Data Hazards (Quiz 2 #5)
+
+==**Pipeline-hostile data structures**==: linked lists, trees, queues/stacks (as nodes), hash tables with chained collisions. Cause:
+
+- **Pointer chase** (`while (p) p = p->next`): RAW on `p` every iter; load-use 1-bubble + every load may miss cache.
+- **Tree search**: data hazards (pointer chase) + control hazards (compare-and-branch on data).
+
+==**Programmer fixes**== (Quiz 2 #5):
+
+| Fix | How |
+|---|---|
+| **Prefer contiguous structures** | use **arrays**; B/B+ trees instead of binary trees; **open addressing** instead of collision chains |
+| **Avoid one-at-a-time** | traverse multiple **independent** streams together; batch lookups; allow multiple in-flight memory requests |
+
+## 9. Quick Quiz Anchors
+
+| Q | Answer |
+|---|---|
+| three hazards | structural, data, control (NOT "forward") |
+| binary-tree search → which hazards? | **data + control** (Quiz 3 #30) |
+| linked-list pointer chase → hazard | **data** (Quiz 3 #5) |
+| split I/D cache reasons | structural-hazard avoidance + bandwidth (NOT hit rate) |
+| MIPS interlock-free design failed because | compatibility & scalability |
+| what HW reduces data hazard penalty | forwarding + bypassing |
+| HW + SW reducing data hazard | forwarding + OoO + scheduling (NOT deeper pipe) |
+| 5→20 stages effects | branch penalty ↑, data penalty ↑, CPI ↑, more pipeline regs |
+| Microarch states | **BHT, BTB, pipeline regs** (NOT FP regs, NOT PC) |
+| WB-propagated signals | `Rd, WRen, WBSel` (NOT `ALUCtrl`) |
+| comparison unit reason | avoid subtract-overflow compare bug |
+| return prediction structure | RAS (Return Address Stack) |
+| post-incr load rejected reason | needs 2 write ports + breaks regularity |

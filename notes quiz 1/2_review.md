@@ -2,26 +2,36 @@
 
 ## Exam Facts
 
-- **Byte-addressed memory**: pointer = virtual address of first byte; pointer type controls interpretation.
+- **Byte-addressed memory**: pointer = virtual address of first byte; pointer **type** decides interpretation/stride.
 - ==**Word size**==: nominal pointer/GPR size; `w`-bit machine has addresses `0..2^w-1`.
-- **32b address space**: $2^{32}$ bytes = **4 GiB**.
-- **LP64 sizes**: `char 1`, `short 2`, `int 4`, `long 8`, pointer 8, `float 4`, `double 8`.
-- ==**ABI**==: ISA + OS + calling convention; binary code is not portable across incompatible ABIs.
-- **Little endian**: least significant byte at lowest address.
-- **Unsigned conversion trap**: if either C integer operand is `unsigned`, the other becomes `unsigned`.
-- ==**Two's complement**==: `TMin=-2^{w-1}`, `TMax=2^{w-1}-1`, `UMax=2^w-1`; `-TMin == TMin`.
-- **RISC-V integer overflow**: does **not** trap; software checks if needed.
-- **Right shift**: signed usually arithmetic; unsigned logical.
-- **IEEE fp32/fp64**: `s|exp8|frac23`, bias 127; `s|exp11|frac52`, bias 1023.
-- **IEEE standards**: IEEE 754-1985 covers fp32/fp64; IEEE 754-2008 adds fp16/quad; bfloat16/FP8/FP4 are AI formats, not core IEEE formats.
-- **Exact binary decimal**: after reducing fraction, denominator must be a power of 2.
-- **Quiz exact decimals**: `0.5`, `0.0625` exact; `0.1`, `0.2`, `0.3` not exact.
-- **Strict FP**: `+,-,*` are not associative; compiler cannot freely reassociate without fast-math.
-- ==**FMA**==: `a*b+c` with one final rounding; about `5-6` cycles, not multiply+add latency.
-- **`bfloat16`**: `s|exp8|frac7`; fp32 exponent range, less precision.
-- **FP4/FP8 use**: ML throughput/power/bandwidth, **not** accuracy.
-- **Saturation arithmetic**: clips overflow at bounds; high-yield for audio/video/quantized AI.
-- **Latency facts**: int multiply `3-5`, int divide `~32`, SP FP add `4`, SP FP multiply `5`, FP->int `3-5`.
+- **32b address space**: $2^{32}$ bytes = **4 GiB**. **64b**: $2^{64}$ B = 16 EiB.
+- **LP64 sizes** (64b Linux/RV64): `char 1`, `short 2`, `int 4`, `long 8`, ptr 8, `float 4`, `double 8`. ILP32 (RV32): `long 4`, ptr 4.
+- ==**LP64 won over ILP64**==: keeps `int=4B` for **data portability** with old binary files (storage doubles otherwise).
+- **`INT_MAX = 2^31-1 = 0x7FFFFFFF`**, **`INT_MIN = -2^31 = 0x80000000`**.
+- **Avoid wrap when may exceed `2^32`**: use `long`/`long long`; or `double`; or explicit overflow check.
+- ==**ABI**==: **ISA + OS + calling convention**. Determines binary compatibility.
+- **Endianness matters when**: byte-level accessed (cast `int*`→`char*`), binary file moved between machines, network protocol, debugger byte dump, bit-fields. **Doesn't matter** when storing & reading same type same machine.
+- **Little endian**: LSB at lowest address. RV/x86/ARM (most) are LE.
+- **Unsigned conversion trap**: any `unsigned` operand in C makes the other `unsigned` too.
+- ==**Two's complement**==: `TMin=-2^{w-1}`, `TMax=2^{w-1}-1`, `UMax=2^w-1`; **`-TMin == TMin`** (overflow on negate).
+- **Why 2's complement wins**: one zero, simple add HW, no end-around carry.
+- **RISC-V integer overflow**: does **NOT trap**; SW must check. Reasons: rare event, traps expensive, hurts OoO/precise exceptions, unsigned wrap useful (hashing/crypto).
+- **FP overflow**: HW sets a flag; SW must poll if it cares.
+- **Right shift**: signed → arithmetic (replicates sign); unsigned → logical (zero-fill).
+- **Signed `>>k` rounds toward `−∞`**: e.g. `(-3)>>1 = -2`, while C `-3/2 == -1`. To round toward 0: `x<0 ? (x+(1<<k)-1)>>k : x>>k`.
+- **Bitwise vs logical**: `2 & 1 = 0`, `2 && 1 = 1`. `&&`/`||` short-circuit (`a && n/a` safe when `a==0`).
+- **IEEE 754-1985**: fp32 + fp64. **IEEE 754-2008**: adds fp16 + quad. **bfloat16/FP8/FP4 are AI formats, not core IEEE**.
+- **fp32**: `s|exp8|frac23`, bias `127`. **fp64**: `s|exp11|frac52`, bias `1023`. **fp16**: `s|exp5|frac10`, bias `15`.
+- **bfloat16**: `s|exp8|frac7` (fp32 exp range, less precision; ML-friendly).
+- **fp32 exact int range**: 0 to $2^{24}=16{,}777{,}216$; above that, gaps grow ≥1.
+- **Exact binary decimal**: reduce → denominator must be $2^k$. **`0.5, 0.0625, 1.625` ✓**; **`0.1, 0.2, 0.3, 1.405, 1.35, 1.245, 1.11` ✗**.
+- **Strict FP**: `+,-,*` are **NOT associative**; commutativity OK for finite normals.
+- **Round-to-nearest-even** (default IEEE): `12.5→12`, `13.5→14`. 4 modes total: even/0/+∞/−∞.
+- ==**FMA**==: `a*b+c` with **one final rounding**, ~5–6 cycles. More precise + faster than `FMUL;FADD` (which rounds twice).
+- **`+0.0` and `-0.0` exist** in IEEE FP (and 1's complement / sign-mag), **not** in 2's complement.
+- **`1/+0=+∞`, `1/-0=-∞`, `sqrt(-1)=NaN`**.
+- **Saturation arithmetic**: clip overflow at bounds (`120+20→127` for int8); used in audio/video/quantized AI, **not** standard FP.
+- **Latencies**: int mul 3–5, int div ~32, FP add 4, FP mul 5, FMA 5–6, FP→int 3–5.
 
 ## 1. Information Storage
 
@@ -30,26 +40,27 @@
 | Term | Meaning |
 |---|---|
 | bit | 0/1 |
-| byte | 8 bits, smallest addressable unit |
+| byte | 8 bits, smallest **addressable** unit |
+| word | nominal CPU/pointer size (32b or 64b) |
 | address | byte index in virtual/physical memory |
 | pointer | address + type-directed interpretation |
-| word size | nominal pointer/GPR size; controls address-space size |
-| virtual address | process-visible address |
-| physical address | DRAM address after MMU/page-table translation |
+| VA / PA | process-visible / DRAM physical address (after MMU translation) |
 
-Useful powers: `2^10=1 KiB`, `2^20=1 MiB`, `2^30=1 GiB`, `2^32=4 GiB`.
+Useful powers: $2^{10}=1\,\text{KiB}$, $2^{20}=1\,\text{MiB}$, $2^{30}=1\,\text{GiB}$, $2^{32}=4\,\text{GiB}$, $2^{40}=1\,\text{TiB}$.
 
-If an unsigned `int` computation can exceed $2^{32}-1$ but stays below $2^{64}$, use `uint64_t` / `unsigned long long`.
+> Quiz: int can exceed $2^{32}-1$ but $<2^{64}$ → use `long`/`long long`/`uint64_t`; or `double`; or explicit overflow check.
 
-### 1.2 Decimal, Binary, Hex
+### 1.2 Decimal / Binary / Hex
 
 1 hex digit = 4 bits.
 
 | Binary | Hex | Decimal |
 |---|---|---:|
-| `1111` | `f` | 15 |
-| `1000 0000` | `0x80` | 128 unsigned / -128 int8 |
-| `1111 1111` | `0xff` | 255 unsigned / -1 int8 |
+| `1111` | `0xf` | 15 |
+| `1000 0000` | `0x80` | 128 unsigned / `-128` int8 |
+| `1111 1111` | `0xff` | 255 unsigned / `-1` int8 |
+
+> $4141_{10}$ in 16b → `0b 0001 0000 0010 1101 = 0x102D`.
 
 ### 1.3 C Data Sizes
 
@@ -58,28 +69,38 @@ If an unsigned `int` computation can exceed $2^{32}-1$ but stays below $2^{64}$,
 | `char` | 1 | 1 |
 | `short` | 2 | 2 |
 | `int` | 4 | 4 |
-| `long` | 4 | 8 |
+| `long` | 4 | **8** |
 | `long long` | 8 | 8 |
-| pointer | 4 | 8 |
+| pointer | 4 | **8** |
 | `float` | 4 | 4 |
 | `double` | 8 | 8 |
+| `int32_t` / `uint32_t` | 4 | 4 |
+| `int64_t` / `uint64_t` | 8 | 8 |
 
-LP64 won over ILP64 in mainstream 64b systems: `int` stays 4B for data compatibility; `long`/pointers become 8B.
+==**Why LP64 won over ILP64**==: storage compatibility — many old binary data files used 4B `int`s; **doubling `int` to 8B** doubles storage and breaks portability. Pointers/longs grow to 8B; `int` stays 4B.
 
 ## 2. Byte Ordering and Pointer Casts
 
 ### 2.1 Big vs Little Endian
 
-For `int x = 0x12345678` stored at address `p`:
+For `int x = 0x12345678` at address `p`:
 
 | Endian | `p` | `p+1` | `p+2` | `p+3` |
 |---|---|---|---|---|
-| big | `12` | `34` | `56` | `78` |
-| little | `78` | `56` | `34` | `12` |
+| **big** | `12` | `34` | `56` | `78` |
+| **little** | `78` | `56` | `34` | `12` |
 
-Endian matters when reading bytes of a multi-byte object, binary files, network data, debugger dumps.
+==**Endianness matters when**==:
 
-### 2.2 `show_bytes` / Cast Traps
+- read multi-byte object byte-by-byte (cast `int*`→`char*`).
+- binary file/network data crosses machines.
+- bit-fields, debugger byte dump, mixed-size pointer aliasing.
+
+> Quiz: store as `long` and read as `long` on the **same machine** → same answer regardless of endian. Store as `char[]`, read as `int` → endian-dependent.
+
+Today: x86, RV, most ARM = **little endian**. (Mainframes/CRAY/SPARC/old MIPS were big.)
+
+### 2.2 `show_bytes` Output
 
 ```c
 typedef unsigned char *byte_pointer;
@@ -90,377 +111,440 @@ For `int x=12345=0x00003039`:
 
 | Machine | Bytes |
 |---|---|
-| little | `39 30 00 00` |
-| big | `00 00 30 39` |
+| Linux32 / Win / Linux64 (LE) | `39 30 00 00` |
+| Sun (BE) | `00 00 30 39` |
 
-`"12345"` bytes are always `31 32 33 34 35 00`.
+`"12345"` C-string bytes are **always** `31 32 33 34 35 00` (ASCII; endian-independent).
+
+For `float 12345.0`:
+
+| LE | `00 e4 40 46` |
+| BE | `46 40 e4 00` |
 
 > [!IMPORTANT]
 > `*((char*)p + k)` reads byte `k`. `((T*)p)[k]` advances by `k*sizeof(T)`.
 
-==**C string**==: byte array terminated by `0`; common encoding is ASCII, e.g. `'0'` = `0x30`.
+==**C string**==: byte array terminated by `\0`. Common encoding: ASCII (`'0'=0x30`, `'A'=0x41`, `'a'=0x61`, … `'9'-'0'=0x09`). Text strings are platform-independent; binary code depends on **ABI = ISA + OS + calling convention**.
 
-Text strings are usually more portable than binary data. Binary code depends on the ABI: ISA + OS + calling convention.
-
-## 3. Boolean, Bitwise, Logical, Shift
+## 3. Boolean / Bitwise / Logical / Shift
 
 ### 3.1 Bitwise vs Logical
 
 | C op | Meaning |
 |---|---|
-| `& | ^ ~` | bitwise on every bit |
-| `&& || !` | logical, nonzero = true, `&&/||` short-circuit |
+| `& \| ^ ~` | bitwise on every bit |
+| `&& \|\| !` | logical, treat nonzero=true; **short-circuit** |
 
 ```c
 2 && 1 == 1
-2 & 1  == 0
+2 &  1 == 0
 ```
 
-**Short-circuit** examples: `a && n/a` avoids divide-by-0 when `a==0`; `p && p->next` avoids null dereference.
+**Short-circuit examples**: `a && n/a` (no DIV0 when `a==0`), `p && p->next` (no NULL deref).
+
+> [!IMPORTANT]
+> Common bug: `if (A && B)` typed as `if (A & B)`. With `A=2` (`10`), `B=1` (`01`): `&&` is true, `&` is `0` false.
 
 ### 3.2 Shifts
 
-| Operation | Fill |
+| Op | Behavior |
 |---|---|
-| `x << k` | low bits 0; overflow/discard high bits |
-| unsigned `x >> k` | high bits 0 |
-| signed `x >> k` | usually sign bit |
+| `x << k` | low bits 0; discard high bits |
+| **unsigned** `x >> k` | logical: high bits 0 |
+| **signed** `x >> k` | arithmetic: replicate sign bit |
 
-Arithmetic right shift rounds toward $-\infty$, not toward 0. Thus `(-3)>>1 == -2` on the class model, while `-3/2 == -1` in C.
+Arithmetic right shift rounds toward $-\infty$, **not** toward 0:
+
+```c
+(-3)>>1 == -2     // class model
+-3/2    == -1     // C division (toward 0)
+```
 
 For signed division by $2^k$ rounding toward 0:
 
 ```c
-x / (1<<k) == (x < 0 ? x + (1<<k)-1 : x) >> k
+x / (1<<k) == ((x < 0 ? x + (1<<k)-1 : x) >> k)
 ```
+
+`x<0 ⇔ (x>>31) & 1` for 32b int.
 
 ## 4. Integer Representation
 
 ### 4.1 Unsigned and Two's Complement
 
 $$
-B2U_w(x)=\sum_{i=0}^{w-1}x_i2^i
-$$
-
-$$
-B2T_w(x)=-x_{w-1}2^{w-1}+\sum_{i=0}^{w-2}x_i2^i
+B2U_w(x)=\sum_{i=0}^{w-1}x_i 2^i; \quad
+B2T_w(x)=-x_{w-1} 2^{w-1}+\sum_{i=0}^{w-2}x_i 2^i
 $$
 
 | 8b bits | unsigned | signed |
 |---|---:|---:|
 | `00000000` | 0 | 0 |
-| `01111111` | 127 | 127 |
-| `10000000` | 128 | -128 |
+| `01111111` | 127 | 127 (`TMax`) |
+| `10000000` | 128 | -128 (`TMin`) |
 | `11111111` | 255 | -1 |
 
-Other signed encodings:
+==**Encodings with both `+0` and `-0`**==:
 
-| Encoding | Has +0 and -0? |
+| Encoding | +0 ≠ -0? |
 |---|---|
 | sign-magnitude | yes |
-| one's complement | yes |
-| two's complement | no |
+| 1's complement | yes |
+| **2's complement** | **NO** (single zero) |
 | IEEE FP | yes |
 
-Why two's complement dominates: one zero, simple add/sub hardware, no end-around carry.
+==**Why 2's complement won**==: single zero, simple uniform add HW, no end-around carry.
 
-### 4.2 Signed <-> Unsigned
+### 4.2 Signed ↔ Unsigned
 
 Bit pattern unchanged; interpretation changes.
 
 $$
 U = S \bmod 2^w =
 \begin{cases}
-S,&S\ge0\\
-S+2^w,&S<0
+S, & S\ge 0 \\
+S+2^w, & S<0
 \end{cases}
 $$
 
 > [!IMPORTANT]
-> C comparison trap: `-1 < 0U` is false because `-1` becomes `UMax`.
-
-Integer promotions:
+> C comparison trap: `-1 < 0U` is **false** because mixed sign forces unsigned: `-1` becomes `UMax`.
 
 ```c
 signed char c = -1;
-unsigned int u = c;     // c -> int -1 -> unsigned 0xffffffff
+unsigned int u = c;     // c → int -1 (sign-extend) → unsigned 0xffffffff
 ```
 
 ### 4.3 Extension and Truncation
 
-| Operation | Rule |
+| Op | Rule |
 |---|---|
-| zero extend | add high 0 bits |
-| sign extend | replicate sign bit |
-| truncate to k bits | keep low k bits; value mod $2^k$ then reinterpret |
+| zero-extend | prepend `0`s |
+| sign-extend | replicate sign bit |
+| truncate to k bits | keep low k bits → `mod 2^k`, then reinterpret |
 
 ## 5. Integer Arithmetic
 
-### 5.1 Add/Sub/Overflow
+### 5.1 Add/Sub & Overflow
 
-Fixed-width arithmetic is modulo $2^w$.
-
-Real C: signed overflow is undefined; unsigned overflow is defined mod $2^w$.
+Fixed-width arithmetic = modulo $2^w$. **Real C**: signed overflow is **UB**; unsigned wraps mod $2^w$.
 
 > [!IMPORTANT]
-> Do **not** detect signed overflow by first doing overflowing signed arithmetic, e.g., `if (a+b < 0)`. In C, signed overflow is UB; precheck, use unsigned logic, or widen first.
+> Do **NOT** detect signed overflow by `if (a+b < 0)` — already UB. Pre-check, use unsigned, or widen first.
 
-Unsigned addition:
+==**Unsigned overflow tests**==:
 
-$$
-x +^u_w y = (x+y)\bmod 2^w
-$$
-
-Unsigned overflow tests:
-
-| Op | Overflow/underflow test |
+| Op | Test |
 |---|---|
-| `s = x+y` | `s < x` or `s < y` |
+| `s = x+y` | `s < x` (or `s < y`) |
 | `d = x-y` | `d > x` |
 
-Signed add overflow:
+==**Signed add overflow**==:
 
 ```text
-same sign operands && different sign result
-overflow = !(sa ^ sb) && (sa ^ ss)
+both operands same sign && result different sign
+overflow = !(sa ⊕ sb) && (sa ⊕ ss)
 ```
 
-Subtraction: `a-b = a + (~b+1)`.
+Sub: `a-b = a + (~b+1)`.
 
-Two's-complement negation:
-
-```text
--x = ~x + 1
--TMin = TMin
-```
+Negation: `-x = ~x + 1`. `-TMin = TMin` (only int with this property).
 
 ### 5.2 RISC-V Overflow Policy
 
-- Integer ALU ops wrap silently; no condition-code register.
-- Software must check if overflow matters.
-- **Reason**: overflow is rare, traps are expensive, precise exceptions/OoO are harder, and unsigned wrap is useful.
-- FP hardware may set flags; software must explicitly check/poll if it cares.
+- ALU ops **wrap silently**; no condition-code register.
+- SW must check if overflow matters.
+- **Why no HW trap**: rare, traps expensive, breaks OoO/precise exceptions, unsigned wrap useful (hashing, crypto).
+- FP HW may set flags; SW polls.
+
+> Alt approaches: Python (dynamic int size), Rust (checked arith), Fortran/Ada (HW exception), MMX/SSE (saturation).
 
 ### 5.3 Adders / SLT
 
 One-bit full adder:
 
 ```text
-sum = a ^ b ^ cin
-cout = (a&b) | (a&cin) | (b&cin)
+sum  = a ⊕ b ⊕ cin
+cout = a·b + a·cin + b·cin
 ```
 
-Carry-lookahead:
+==**Carry-Lookahead Adder (CLA)**==: parallelize carry to `O(log n)`.
 
 $$
-g_i=A_iB_i,\quad p_i=A_i\oplus B_i,\quad C_{i+1}=g_i+p_iC_i
+g_i=A_i B_i \text{ (generate)};\quad p_i=A_i\oplus B_i \text{ (propagate)};\quad C_{i+1}=g_i+p_i C_i
 $$
 
-Signed `SLT` from subtraction:
+==**SLT from subtraction**==:
 
 ```text
-set = sign(A-B) ^ overflow
+signed:   set = sign(A-B) ⊕ overflow      // overflow correction needed
+unsigned: set = ~cout(A-B)                 // borrow detection
 ```
+
+ALU 4 ops: `AND`, `OR`, `ADD`, `SLT/LESS`. `Bnegate=1, CarryIn0=1` → subtraction.
 
 ### 5.4 Multiply / Divide
 
-| Op | Cost idea |
+| Op | Cost |
 |---|---:|
 | add/logic | 1 cycle |
-| int multiply | 3-5 cycles |
-| int divide | ~32 cycles, hard to pipeline |
+| shift | 1 |
+| int multiply | 3–5 cycles |
+| **int divide** | **~32 cycles**, hard to pipeline |
 
-Multiplier idea: tree of adders reduces delay from linear toward log-depth; divider is iterative/control-heavy.
+**Faster mul**: tree of adders → delay `O(log n)` instead of `O(n)`. **Divider**: iterative, control-heavy, hardest to pipeline.
 
-Project add/sub:
+==**Quick divide by power-of-2**==:
 
 ```c
-sum_no_carry = a ^ b;
-carry = (a & b) << 1;
-sub(a,b) = add(a, add(~b,1));
+unsigned: x / N == x >> log2(N)
+signed:   x / N == ((x<0) ? x + N-1 : x) >> log2(N)
+ceil:     ceil(x/N) == (x + N - 1) >> log2(N)
 ```
+
+==**Project add/sub (no `+/-` allowed)**==:
+
+```c
+sum_no_carry = a ^ b
+carry        = (a & b) << 1   // values to add in next iter
+sub(a,b)     = add(a, add(~b, 1))
+```
+
+> Quiz: `(a & b) << 1` represents the **carry bits to add in next iteration**.
 
 ### 5.5 Integer Expression Quiz Traps
 
-Assume 32b two's-complement wrap where needed; C signed overflow is still undefined in real C.
+Assume 32b 2's-complement wrap (real C signed overflow is UB).
 
-| Expr | Always? | Key counter/reason |
+| Expr | ∀? | Counter / Reason |
 |---|---|---|
-| `(x > 0) || ((x-1) < 0)` | no | `x=TMin`, `x-1 -> TMax` |
-| `(x & 7) != 7 || (x << 29 < 0)` | yes | if low 3 bits all 1, bit2 becomes sign bit |
-| `(x*x) >= 0` | no | overflow can make negative |
-| `x < 0 || -x <= 0` | yes | nonnegative `x` negates to <=0; `TMin` covered by first term |
-| `x > 0 || -x >= 0` | no | `x=TMin`, `-x=TMin` |
-| `x+y == uy+ux` | yes bitwise | same modulo bit pattern |
-| `x*~y + uy*ux == -x` | yes bitwise | `~y=-y-1` |
-| `(x<y) == (-x>-y)` | no | `x=TMin,y=0` |
-| `((x+y)<<4)+y-x == 15*x+17*y` | yes bitwise | modulo arithmetic distributes over `+`, `*`, `<<` |
-| `~x+~y+1 == ~(x+y)` | yes | `~a=-a-1` |
-| `((x>>1)<<1) <= x` | yes class model | arithmetic shift rounds down; then clears low bit |
+| `(x>0) \|\| ((x-1)<0)` | no | `x=TMin`, `x-1` wraps to `TMax` |
+| `(x & 7) != 7 \|\| (x<<29 < 0)` | yes | low 3 bits all-1 → bit2=1 → after `<<29` becomes sign |
+| `(x*x) >= 0` | no | `x=0xFFFF`: `x*x = 0xFFFE0001 < 0` |
+| `x < 0 \|\| -x <= 0` | yes | nonneg negates to ≤0; `TMin` covered by first |
+| `x > 0 \|\| -x >= 0` | no | `x=TMin`, `-x=TMin` (both <0) |
+| `x+y == uy+ux` | yes (bitwise) | same modulo bit pattern |
+| `x*~y + uy*ux == -x` | yes (bitwise) | `~y=-y-1` ⇒ `x(-y-1)+xy = -x` |
+| `(x<y) == (-x>-y)` | no | `x=TMin,y=0`: `-x=TMin`, both negate UB-ish |
+| `((x+y)<<4)+y-x == 15*x+17*y` | yes (bitwise) | mod-arith distributes over `+,*,<<` |
+| `((x+y)<<4)+y-x == 17*y+15*x` | yes (bitwise) | same |
+| `~x+~y+1 == ~(x+y)` | yes | `(-x-1)+(-y-1)+1 = -(x+y)-1 = ~(x+y)` |
+| `((x>>1)<<1) <= x` | yes (class) | arith `>>` rounds down then clear low bit |
 | `(double)x+(double)y == (double)(x+y)` | no | `x+y` may overflow before cast |
-| `x<0 => x*3<0` | no | `x=TMin` overflow |
-| `(x-y)>0 => -x < -y` | no | `x=-1,y=TMin` overflow |
-| `((y-x)<<3)+x-2*y == 6*y-7*x` | yes bitwise | distribute in modulo arithmetic |
-| `ux-x == 0` | yes bitwise | same bits: `ux + ~x + 1 == 0` |
-| `x>0 => !(x>>31 \| !x)` | yes | sign bit 0 and `x` nonzero |
+| `x<0 ⇒ x*3<0` | no | `x=TMin` overflow on `*3` |
+| `(x-y)>0 ⇒ -x < -y` | no | `x=-1,y=TMin`: `x-y` overflows |
+| `((y-x)<<3)+x-2*y == 6*y-7*x` | yes (bitwise) | distribute mod |
+| `ux-x == 0` | yes (bitwise) | `ux + ~x + 1 == 0` |
+| `ux-uy == -(y-x)` | yes (bitwise) | wraps to same bits |
+| `x>0 ⇒ !(x>>31 \| !x)` | yes | sign-bit 0 AND nonzero |
 | `((ux>>1)<<1) == ux` | no | any odd `ux` loses low bit |
-| `dx/3.0 == x/3` | no | integer division truncates |
-| `x-(int)dx == 0` | yes | 32b int exactly representable in double |
+| `(x>=0) \|\| (x<ux)` | no | `x=-1`: mixed forces `ux<ux` false |
+| `dx/3.0 == x/3` | no | int div truncates (C toward 0) |
+| `x-(int)dx == 0` | yes | 32b int exactly fits in 53-bit double |
+| `(int)(double)x == x` (int x) | yes | double exact for 32b int |
+| `(double)(float)x == (double)x` (32b int x) | no | float has 24-bit precision |
+| `dx+dy+dz == dz+dy+dx` (int-derived) | yes | each fits exactly in double |
+| `dx*dy*dz == dz*dy*dx` | no | large products round differently |
+| `dx + dy == (double)(x+y)` | no | `x=y=TMin`: `x+y` overflows in int |
 
 ## 6. Floating-Point Representation
 
 ### 6.1 Binary Fractions and Exactness
 
-A decimal is exactly representable in binary iff, after reduction, denominator is $2^k$.
+A decimal is exactly representable iff after reduction **denominator is $2^k$**.
 
 | Decimal | Exact? | Reason |
 |---|---|---|
-| `0.5` | yes | `1/2` |
-| `0.0625` | yes | `1/16` |
-| `1.625` | yes | `13/8` |
-| `0.1`, `0.2`, `0.3` | no | denominator has factor 5 |
-| `1.405` | no | denominator has factor 5 |
+| `0.5` | ✓ | 1/2 |
+| `0.0625` | ✓ | 1/16 |
+| `1.625` | ✓ | 13/8 |
+| `0.1`, `0.2`, `0.3` | ✗ | denom has factor 5 |
+| `1.405`, `1.35`, `1.245`, `1.11` | ✗ | denom has factor 5 |
 
-### 6.2 IEEE Layout and Value
+> Useful: `0.11111₂ = 31/32`, `1.000001₂ = 1+1/64`.
 
-| Format | Layout | Bias |
-|---|---|---:|
-| fp32 | `s|exp8|frac23` | 127 |
-| fp64 | `s|exp11|frac52` | 1023 |
-| fp16 | `s|exp5|frac10` | 15 |
-| bfloat16 | `s|exp8|frac7` | 127; fp32-like range |
-| fp8/minifloat | often `s|exp4|frac3` | AI throughput/bandwidth format |
-| fp4/nibble-float | often `s|exp2|frac1` | AI format, throughput/bandwidth/power |
+### 6.2 IEEE Layout & Value
 
-`float` exactly represents all integers from `0` through $2^{24}$; above that, spacing exceeds 1.
+| Format | Layout | Bias | Use |
+|---|---|---:|---|
+| **fp32** | `s\|exp8\|frac23` | 127 | scientific |
+| **fp64** | `s\|exp11\|frac52` | 1023 | default `double` |
+| **fp16** | `s\|exp5\|frac10` | 15 | ML, IEEE 754-2008 |
+| **bfloat16** | `s\|exp8\|frac7` | 127 | ML; same range as fp32, less precision |
+| **fp8** (`s\|exp4\|frac3`) | — | 7 | AI throughput (Hopper H100, 2022) |
+| **fp4** (`s\|exp2\|frac1`) | — | 1 | AI (Blackwell B100/B200, 2025) |
+| quad-precision | `s\|exp15\|frac112` | 16383 | IEEE 754-1985 |
 
-Normalized:
+> Quiz: IEEE 754-2008 added **fp16 + quad**; bfloat16/FP8/FP4 are **AI custom**, not IEEE core.
 
-$$
-V=(-1)^s(1.f)_2 2^{e-Bias}
-$$
+==**Normalized**==:
 
-Subnormal:
+$$V=(-1)^s \cdot (1.f)_2 \cdot 2^{e-Bias}$$
 
-$$
-V=(-1)^s(0.f)_2 2^{1-Bias}
-$$
+==**Subnormal**== (denormalized; **no hidden 1**, exponent `1-Bias`):
+
+$$V=(-1)^s \cdot (0.f)_2 \cdot 2^{1-Bias}$$
 
 > [!NOTE]
-> Subnormal/denormal uses exponent $1-Bias$, not $0-Bias$, so values are continuous at the normal/subnormal boundary.
+> Subnormal exp is `1-Bias`, **not** `0-Bias`, so values are continuous at the normal/subnormal boundary.
 
-### 6.3 FP Classes
+`float` exactly represents all integers from `0` through $2^{24}=16{,}777{,}216$. Above: `2^26=67M`, gap `ULP=2^{e-23}`; e.g., `123456789` rounds to `123456792`.
+
+### 6.3 FP Classes (single-precision)
 
 | Exp | Frac | Class |
 |---|---|---|
-| all 0 | 0 | `+0` / `-0` |
+| all 0 | 0 | `±0` |
 | all 0 | nonzero | subnormal |
-| 1..max-1 | any | normalized |
-| all 1 | 0 | `+inf` / `-inf` |
+| `1..max-1` | any | normalized |
+| all 1 | 0 | `±∞` |
 | all 1 | nonzero | NaN |
 
-fp32 constants:
+==**fp32 hex anchors**==:
 
 | Hex | Value |
 |---|---|
 | `0x00000000` | `+0.0` |
 | `0x80000000` | `-0.0` |
-| `0x3f800000` | `1.0` |
-| `0x40800000` | `4.0` |
+| `0x3f800000` | `+1.0` |
+| `0x40800000` | `+4.0` |
 | `0xc0800000` | `-4.0` |
-| `0x7f800000` | `+inf` |
-| `0xffffffff` | NaN |
+| `0x7f800000` | `+∞` |
+| `0xff800000` | `-∞` |
+| `0x7fc00000` | quiet NaN |
+| `0xffffffff` | NaN (exp all 1, frac nonzero) |
 
-### 6.4 Custom Minifloat Template
+> Quiz: `F1=0x40800000=4.0`, `F2=0x3f800000=1.0`, `F3=0xc0800000=-4.0`. Then `F3+F1=0` ✓, `F3<F2<F1` ✓, `F3=-(F1*F2)=-4` ✓; only `F2=F1/F3=-1` is wrong.
 
-For `s|k exp bits|n frac bits`, bias $B=2^{k-1}-1$ unless specified.
+### 6.4 Custom Minifloat Worked Template
 
-| Value asked | Formula |
+For `s|k exp|n frac`, bias $B=2^{k-1}-1$ (default).
+
+| Quantity | Formula |
 |---|---|
-| smallest positive subnormal | $2^{-n}2^{1-B}$ |
-| largest subnormal | $(1-2^{-n})2^{1-B}$ |
-| smallest normal | $1.0\cdot2^{1-B}$ |
-| largest normal | $(2-2^{-n})2^{(2^k-2)-B}$ |
+| smallest +subnormal | $2^{-n} \cdot 2^{1-B}$ |
+| largest subnormal | $(1-2^{-n}) \cdot 2^{1-B}$ |
+| smallest +normal | $1.0 \cdot 2^{1-B}$ |
+| largest normal | $(2-2^{-n}) \cdot 2^{(2^k-2)-B}$ |
 
-Example `s|eeee|fff`, bias 7:
+Example `s|eeee|fff`, k=4, n=3, B=7:
 
-| Bits | Value |
+| Bits | E | M | $2^E\cdot M$ | Decimal |
+|---|---:|---:|---|---|
+| `0 0000 000` | -6 | 0 | 0 | 0.0 |
+| `0 0000 001` | -6 | 1/8 | $2^{-6} \cdot 2^{-3}=2^{-9}$ | 1/512 ≈ 0.00195 |
+| `0 0000 111` | -6 | 7/8 | $7\cdot 2^{-9}$ | 7/512 (largest subnormal) |
+| `0 0001 000` | -6 | 1 | $2^{-6}$ | 1/64 (smallest normal) |
+| `0 0111 000` | 0 | 1 | 1 | 1.0 |
+| `0 1110 111` | 7 | 15/8 | $128 \cdot 15/8$ | 240 (largest normal) |
+| `0 1111 000` | — | — | — | +∞ |
+
+==**FP halve / double bit-level**==:
+
+| Case | Halve (÷2) |
 |---|---|
-| `0 0000 001` | $1/8\cdot2^{-6}=1/512$ |
-| `0 0001 000` | $1\cdot2^{-6}=1/64$ |
-| `0 1110 111` | $(1+7/8)2^7=240$ |
+| exp all 1 | unchanged (NaN/∞) |
+| normal, exp>1 | decrement exp |
+| exp==1 | becomes subnormal (shift mantissa right) |
+| subnormal/0 | shift frac right (apply rounding) |
 
-FP halve/double bit-level pattern:
-
-| Case | Divide by 2 |
-|---|---|
-| exp all 1 | unchanged NaN/inf |
-| normalized exp > 1 | decrement exp |
-| exp == 1 | becomes subnormal: shift hidden `1.frac` right |
-| subnormal/zero | shift frac right; apply specified rounding |
-
-For multiply by 2, increment exp for normals; subnormal may normalize when hidden bit appears.
+Double: increment exp for normals; subnormal may renormalize when hidden bit appears.
 
 ## 7. FP Rounding, Ops, Casts
 
 ### 7.1 Rounding
 
-Default: round to nearest, ties to even.
+Default = ==**round-to-nearest-even**== (ties to even):
 
-| Value | Rounded integer |
+| Value | Rounded int |
 |---|---:|
-| `12.5` | 12 |
-| `13.5` | 14 |
+| `12.5` | 12 (even) |
+| `13.5` | 14 (even) |
+| `2.5` | 2 |
+| `3.5` | 4 |
 
-IEEE rounding modes: nearest-even, toward 0, toward $+\infty$, toward $-\infty$.
+4 IEEE modes: nearest-even, toward 0, toward $+\infty$, toward $-\infty$.
 
 ### 7.2 FP Operation Traps
 
 | Claim | Truth |
 |---|---|
-| `(X+Y)+Z == X+(Y+Z)` | not always |
-| `X+Y == Y+X` | usually yes for finite normal add |
-| `1/+0` / `1/-0` | `+inf` / `-inf` |
+| `(X+Y)+Z == X+(Y+Z)` | NOT always (associativity broken) |
+| `X+Y == Y+X` | usually yes (commutative) for finite normal |
+| `1/+0` | `+∞` |
+| `1/-0` | `-∞` |
 | `sqrt(-1)` | NaN |
+| `0.0 == -0.0` | true |
+| `NaN == NaN` | **false** |
 
-`(3.14+1e10)-1e10` may be `0`, but `3.14+(1e10-1e10)=3.14`.
+> Demo: `(3.14 + 1e10) - 1e10 = 0.0` (3.14 lost to rounding); `3.14 + (1e10 - 1e10) = 3.14`.
+
+==**Compiler implications**==: cannot freely reassociate FP `+,-,*` unless `-Ofast` / `-ffast-math` / `-ffp-contract=fast`. So `(B+C)` is NOT a CSE in `(A+B+C)` vs `(A+(B+C))`.
 
 ### 7.3 Casts
 
 | Cast | Rule |
 |---|---|
-| `int -> float` | may round |
-| `int -> double` | exact for 32b int |
-| `float -> double` | exact |
-| `double -> float` | may round/overflow/underflow |
-| `float/double -> int` | rounds toward 0; overflow undefined/implementation-specific |
+| `int → float` | may round (24-bit precision) |
+| `int (32b) → double` | **exact** (53-bit precision) |
+| `float → double` | exact |
+| `double → float` | may round / overflow / underflow to `±∞` |
+| `float/double → int` | **rounds toward 0**; overflow undefined |
 
-High-yield cast traps:
+Intel pattern on overflow `float→int`: result = `0x80000000` (=`TMin`, "integer indefinite"). E.g., `(int)+1e10 = -2147483648`. Formula: `result = (int)(value mod 2^32)`.
 
-| Expr | Always? | Reason |
+==**High-yield cast traps (`A` int, `dx=(double)x`)**==:
+
+| Expr | ∀? | Reason |
 |---|---|---|
-| `A == (int)(double)A` for 32b `int A` | yes | double has 53-bit precision |
-| `(double)(float)x == (double)x` for 32b `int x` | no | float has only 24-bit precision |
-| `dx+dy+dz == dz+dy+dx` for int-derived doubles | yes | 32b ints and their sum fit exactly in double |
-| `dx*dy*dz == dz*dy*dx` | no | large products round differently |
+| `A == (int)(double)A` | yes | double has 53-bit precision |
+| `(double)(float)x == (double)x` (32b int) | no | float only 24-bit |
+| `dx+dy+dz == dz+dy+dx` (ints fit) | yes | all exact in double |
+| `dx*dy*dz == dz*dy*dx` | no | products can overflow/round |
+| `dx + dy == (double)(x+y)` | no | `x+y` overflows int |
+| `x - (int)dx == 0` | yes | 32b int exact in double |
 
-### 7.4 FMA / bfloat16
+### 7.4 FP Adder / Multiplier / FMA Pipeline
 
-==**FMA / FMAC**== computes `a*b+c` with **one final rounding**. Separate `FMUL; FADD` rounds twice, so FMA is often more accurate and faster than the serialized pair.
+==**FADD pipeline (3–4 cycles)**==: align exponents → add mantissas → normalize → round.
 
-Low precision on GPUs:
+==**FMUL pipeline (4–5 cycles)**==: skip alignment → multiply (partial products + reduce) → add exponents → normalize → round. (One cycle longer than FADD due to partial-product reduction.)
 
-- more values per load/register/vector lane.
-- higher compute and memory bandwidth.
-- acceptable for approximate ML.
+==**FMA / FMAC pipeline (5–6 cycles, ~not 9!)**==: `a*b+c` with **single final rounding**.
 
-`bfloat16` beats fp16 for many ML uses because it keeps fp32's 8-bit exponent range.
+Stages:
+1. Partial Product Generation (mul) **‖ exponent alignment of `c`** (parallel)
+2. Partial Product Reduction (mul)
+3. Final add (combined with last reduction step) — saves vs separate FADD
+4. Normalize + Round (one shot, not twice)
 
-Saturation math:
+> Quiz: why FMA is **5–6 not 9 cycles**? FMUL needs partial-product reduction (multi-cycle); during reduction, FADD's exp alignment runs **in parallel**. After reduction, we add directly, skipping intermediate normalize/round. Saves ~3 cycles.
 
-```text
-normal int8:  120 + 20 -> -116   # wrap
-saturating:   120 + 20 -> 127    # clip
+==**FMA Benefits**==: 2 FLOPs/cycle, lower latency, **higher precision** (one round vs two), smaller code, less power.
+
+```bash
+gcc -O3 -march=native -mfma -ffp-contract=fast
 ```
 
-Used for audio/video pixels/samples and quantized AI (`int4/int8`), not text or normal FP arithmetic.
+### 7.5 bfloat16 vs fp16 (Why GPUs Use Low Precision)
+
+==**Why low precision on GPUs**==:
+- More values per load/register/SIMD lane → higher memory + compute bandwidth.
+- One AVX-512 instr can do 32 bfloat16 ops/cycle.
+- AI is approximate (predictions); precision loss tolerable.
+
+==**Why bfloat16 beats fp16 for ML**==:
+- **8-bit exp** (vs fp16's 5-bit) → **same range as fp32** → fewer overflow/underflow problems on gradients.
+- Fewer mantissa bits OK because AI is approximate.
+- Easier conversion to/from fp32.
+
+### 7.6 Saturation Arithmetic
+
+Clip overflow at bounds (no wrap):
+
+```text
+int8:    120 + 20  →  -116   // wrap
+sat int8: 120 + 20 →   127    // clip
+```
+
+Used: audio samples, video pixels, quantized AI (`int4`/`int8`); MMX/SSE multimedia instructions. **NOT** for normal int/FP.

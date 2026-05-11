@@ -226,7 +226,7 @@ Who the fucking know what is so-called ` 20b imm × 2 `? If you have read `notes
 
 
 # Harness
-你负责审查并优化的是*_review.md，共计12份。目标是涵盖可信任源的所有知识点，同时符合readme的convention要求，以保证这些md将作为CSC3060 Final 开卷考试时我快捷，准确，优质的参考。（终极目标是，即使是一个根本没上过这门课的人，靠这12份资料也能满分完成2h的CSC3060 final）
+你负责审查并优化的是*_review.md，共计12份。最低目标是涵盖可信任源的所有知识点，同时符合readme的convention要求，以保证这些md将作为CSC3060 Final 开卷考试时我快捷，准确，优质的参考。（终极目标是，即使是一个根本没上过这门课的人，靠这12份资料也能满分完成2h的CSC3060 final）
 你可信任并作为你的md基础的参考的是CSC3060 quiz/ppt/我自己的md (1.md,...,4.md,CA3060-4-1-ProcessorArchitecture.md, etc.)
 次一级的是CSC3050 quiz，大部分题目是重合的，但是你的更改需要审查
 最次的是CMU exam，小部分重合，你的更改更需要审查

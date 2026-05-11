@@ -2,302 +2,422 @@
 
 ## Exam Facts
 
-- ==**Linking**==: combines object files and libraries into an executable/shared object.
-- **Benefits**: modularity, separate compilation, library reuse, easier maintenance, time/space efficiency.
-- **Standard linker**: Unix `ld`; compiler driver `gcc` invokes it.
-- **ELF tools**: `readelf` for details; `objdump` for code/relocs; `nm` for symbols.
-- **Linker jobs**: **symbol resolution, relocation, section merging, library handling**, and may coordinate LTO/layout/page alignment.
-- **Performance layout**: linker can tune page/section/function placement; placing hot caller/callee code together can reduce I-cache misses.
-- **Not linker job**: loading into memory; that is loader/dynamic linker work.
-- **Object file kinds**: relocatable `.o`, executable, shared object `.so`.
-- **ELF sections**: `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.rel.text`, `.rel.data`, `.debug`, section header table.
-- **Linker symbols**: global, external, local static; automatic locals are **not** linker symbols.
-- **Strong/weak**: strong = functions + initialized globals; weak/common = uninitialized globals in old common model.
-- **Duplicate rules**: multiple strong -> error; strong beats weak; multiple weak -> arbitrary/common; linker **does not type-check**.
-- **Static library order**: put libraries after objects that need them.
-- **Dynamic linking data structures**: **GOT + PLT**.
-- **Placement**: PLT in executable code (`.plt/.text`); GOT/GOT.plt writable data.
+- ==**Linking**==: combine object files + libraries → executable / shared object. Performed by the **linker**.
+- ==**Standard Unix linker**==: **`ld`**; `gcc` is a compiler **driver** that invokes it (Quiz 5 #1).
+- ==**ELF inspection tools**==: ==**`readelf`**== for full ELF details ★ (Quiz 5 #2); `objdump` for disasm + relocs; `nm` for symbol list.
+- ==**Linker jobs**==: **symbol resolution + relocation + section merging + library handling** + may coordinate **LTO** + **layout / page alignment**.
+- ==**NOT a linker job**==: ==**loading into memory**== (loader / dynamic linker does it; Quiz 5 #3).
+- **Performance via linker**: page sizes, alignments, **function/code layout** for I-cache locality (place hot caller/callee adjacent).
+- ==**Three object file kinds**==: ==**relocatable `.o`**==, ==**executable `a.out`**==, ==**shared object `.so`**==. (Static archive `.a` is NOT a 4th kind — it's a **collection of `.o`s + index**, Quiz 5 #11.)
+- ==**Benefits of linking**==: **modularity, separate compilation, library reuse, easier maintenance, time efficiency** (parallel/incremental compile), space efficiency. NOT "simpler to build an executable" (Quiz 5 #9).
+- ==**ELF sections**==: `.text` (code), `.rodata` (read-only), `.data` (initialized globals), `.bss` (zero globals), `.symtab` (symbols), `.rel.text/.rel.data` (relocations), `.debug` (debug info), section header table.
+- **Symbols in `.symtab`** (Quiz 5 #15): **global vars, external funcs, static local symbols** (file-local + function-scope `static`). **NOT** ordinary local variables (those are stack temporaries).
+- ==**Strong vs Weak**==: **strong** = function definitions + initialized globals; **weak** = uninitialized globals (or `extern` declarations).
+- ==**Duplicate rules**==:
+  1. **Multiple strong → ERROR**.
+  2. **Strong + weak → strong wins**, weak refs resolved to strong.
+  3. **Multiple weak → arbitrary** (linker picks one); use `-fno-common` to force error.
+  4. ==**Linker does NOT type-check**== — silent garbage on type mismatch.
+- **Two weak symbols are allowed (legacy "common" model)**; Quiz 5 #16: incorrect rule = "two weak symbols are NOT allowed".
+- ==**Static library order matters**==: put `-lfoo` **after** the `.o`s that need it (`gcc main.o -lfoo`).
+- ==**Dynamic linking data structures**==: ==**GOT (Global Offset Table) + PLT (Procedure Linkage Table)**==. NOT JT, NOT SHT (Quiz 5 #12).
+- ==**GOT/PLT placement**== (Quiz 5 #14):
+  - **PLT in `.text` (executable code)** ✓
+  - **GOT in `.data` (writable, non-exec)** ✓
+  - **`.got.plt` in `.data`** ✓
+  - GOT in `.text` ✗ (would be non-writable).
+- ==**Dynamic-link advantages**== (Quiz 5 #13): **memory savings + centralized security/bug-fix updates + fast build-time linking**. **NOT** "faster execution" (PLT/GOT add indirection).
+- ==**Where reloc info comes from**== (Quiz 5 #18): **compiler/assembler emits `.rel.text` + `.rel.data`**, linker consumes them. NOT linker, NOT loader, NOT dynamic linker.
+- **`.so` and `.a`**: `.so` for shared object; `.a` for archived static lib; `.o` for relocatable. `.a` = collection of `.o`s + index.
+- ==**Static linker scan algorithm**==: left-to-right; `.o` always included; archive members **only if they resolve current unresolved refs**.
+- ==**`malloc` override pattern**==: if user `.o` defines `malloc` and is scanned **before** `libc.a`, libc's `malloc` is **never pulled** (already resolved).
+- ==**Inline candidates good for I-cache locality**==: hot caller/callee that ping-pong far cache lines → inline OR linker-layout adjacent.
+- **Loader maps ELF segments**: low-page unmapped, `.text/.rodata` r-x/r--, `.data/.bss` rw-, heap → upward, mmap/.so middle, stack → downward, kernel space protected.
+- **Dynamic exe**: kernel maps program + `ld-linux.so` (named in `PT_INTERP`); dynamic linker maps `.so` deps, relocates, jumps to start.
+- **Runtime interposition**: `LD_PRELOAD=./wrap.so prog` loads first → same-name funcs intercept later library calls.
 
-## 1. Linking
+## 1. What Is Linking?
+
+==**Linking**== combines code + data from multiple `.o`s and libraries into a single object that can be loaded + executed.
 
 ```text
-main.c -> main.o
-sum.c  -> sum.o
-main.o + sum.o + libs -> linker -> executable
+main.c → cpp → cc1 → as → main.o   ┐
+sum.c  → cpp → cc1 → as → sum.o    ├→  ld  →  prog (executable)
+libc.a / libfoo.so                  ┘
 ```
 
-`gcc -o prog main.c sum.c` performs all phases, then invokes `ld`.
+==**`gcc` is a compiler driver**==: orchestrates `cpp/cc1/as` then invokes `ld`.
 
-Compiler driver path: `cpp/cc1/as` produce relocatable `.o`; `ld` produces the executable.
+```bash
+gcc -Og -o prog main.c sum.c
+```
 
-## 2. Why Linkers?
+> ==**Why linkers are essential**==: separate compilation. Edit one file → recompile only it → relink. Without linker, every change requires recompiling everything.
+
+## 2. Why Linkers? (Quiz 5 #9)
 
 | Benefit | Meaning |
 |---|---|
-| modularity | split code into files |
-| separate compilation | recompile changed module only |
-| libraries | reuse libc/libm/project libs |
-| easier maintenance | independent modules |
-| time efficiency | compile in parallel/incrementally |
-| space efficiency | static archives pull used members; shared libs share code pages |
+| **modularity** | split code into smaller files |
+| **separate compilation** | recompile only what changed |
+| **libraries** (code reuse) | libc, libm, libfoo,... |
+| **easier maintenance** | independent modules |
+| **time efficiency** | parallel compile, incremental |
+| **space efficiency** | static `.a` pulls only needed members; `.so` shares pages across processes |
+
+> Quiz 5 #9 distractor: "simpler to build an executable" is NOT a benefit (linking adds complexity).
+
+==**Two library models**==:
+
+| Static (`.a`) | Shared (`.so`) |
+|---|---|
+| copied **at link time** into exe | mapped **at load/run time** by dynamic linker |
+| larger exe, **no runtime dep** | smaller exe, **runtime dep on `.so`** |
+| update lib → must **relink** | ABI-compat update → users **don't relink** |
+| **pay-as-you-go**: only used members included | one copy in memory shared by all processes |
 
 ## 3. What Linkers Do
 
 ### 3.1 Symbol Resolution
 
-Bind every symbol reference to exactly one definition.
+Bind every **symbol reference** to exactly one **symbol definition**.
 
 ```c
-void swap(){}   // defines swap
-swap();         // references swap
-int *xp=&x;     // defines xp, references x
+void swap() { ... }   // defines swap
+swap();               // references swap
+int *xp = &x;         // defines xp, references x
 ```
+
+==**Symbol classification (linker view)**==:
+
+| Type | Examples |
+|---|---|
+| **global defined here** | non-static funcs, non-static globals |
+| **external reference** | `printf`, `sum` declared but not defined here |
+| **local linker symbol** | `static` funcs, `static` file-scope globals, `static` function-scope vars |
+
+==**NOT linker symbols**==:
+
+- ordinary local (auto) variables — they're stack temporaries.
+- function parameters.
+- register temporaries.
 
 ### 3.2 Relocation
 
-After deciding final section/symbol addresses, linker patches code/data references using relocation entries.
+After deciding final section/symbol addresses, linker patches code/data references using **relocation entries**:
 
 ```text
-merge .text/.data
-assign final addresses
-patch calls/global-address loads/data pointers
+1. merge .text from all .o → one big .text
+   merge .data → one big .data, etc.
+2. assign final addresses to each symbol.
+3. patch every reloc entry: fix calls, global-data loads, jump targets.
 ```
 
-### 3.3 Other Jobs
+### 3.3 Other Jobs (linker can do)
 
 - scan static archives.
-- section alignment/page layout.
-- function/code layout for locality when profile/layout info is available.
-- may tune performance via page sizes / alignments.
-- dynamic relocation metadata.
+- section alignment / page layout.
+- function/code layout for I-cache (with PGO/profile).
+- **page sizes / alignments** for performance.
+- emit dynamic relocation metadata.
 - LTO if `-flto`.
 
-## 4. Object File Kinds
+## 4. Object File Kinds (Quiz 5 #11)
 
 | Kind | Extension | Use |
 |---|---|---|
-| relocatable | `.o` | input to linker |
-| executable | `a.out`/no ext | load/run |
-| shared object | `.so` | dynamically loaded library |
+| ==**relocatable**== | **`.o`** | input to linker |
+| ==**executable**== | `a.out` (or no ext) | load + run |
+| ==**shared object**== | **`.so`** (Linux) / `.dll` (Windows) | dynamically loaded library |
 
-`.a` is an archive of `.o` files plus index, not a fourth ELF object kind.
+> ==**`.a` archive is NOT a 4th kind**== — it's a collection of `.o`s + index. Quiz 5 #17: "all of these descriptions are correct" → **NONE incorrect**.
 
 ## 5. ELF Object File Format
 
-| Section/table | Meaning |
-|---|---|
-| ELF header | word size, endian, type, machine |
-| program header | loadable segments for executable/shared object |
-| `.text` | code |
-| `.rodata` | constants/jump tables/strings |
-| `.data` | initialized globals/statics |
-| `.bss` | zero globals/statics; no file bytes |
-| `.symtab` | symbol table |
-| `.rel.text/.rela.text` | code relocation entries |
-| `.rel.data/.rela.data` | data relocation entries |
-| section header table | section metadata |
+==**Generic ELF binary**==: one format for `.o`, exe, and `.so`.
 
-ELF sections include `.text/.data/.bss/.symtab`; stack/register file/`.static` are **not** ELF sections.
+| Section / Table | Contents |
+|---|---|
+| **ELF header** | word size, endian, file type, machine type |
+| Program header (segments, exec only) | loadable mem segments + sizes |
+| **`.text`** | machine code |
+| **`.rodata`** | read-only constants, jump tables, string literals |
+| **`.data`** | initialized globals/statics |
+| **`.bss`** | uninit globals/statics ("Block Started by Symbol" / "Better Save Space") — **header only, no file bytes** |
+| **`.symtab`** | symbol table — name, size, location, scope |
+| **`.rel.text` / `.rela.text`** | relocations for code |
+| **`.rel.data` / `.rela.data`** | relocations for data pointers |
+| `.debug` | debug info (`gcc -g`) |
+| Section header table | metadata for sections |
+
+> ELF sections include `.text/.rodata/.data/.bss/.symtab` etc. **NOT** ELF sections: stack, register file, ".static" (no such section).
 
 ## 6. Linker Symbols
 
 | Type | Example |
 |---|---|
-| global defined here | non-static function/global |
-| external reference | `printf`, `sum` declared but defined elsewhere |
-| local linker symbol | `static` function/global |
+| **global defined here** | non-static func, non-static global |
+| **external reference** | `printf`, `sum` declared but defined elsewhere |
+| **local linker symbol** | `static` func, `static` file-scope global, **function-scope `static` vars** |
 
-Not linker symbols:
+==**NOT linker symbols**==: ordinary `auto` local vars, params, register temps.
 
-- automatic local variables.
-- parameters.
-- register temporaries.
-
-### 6.1 `.symtab` Pattern
+### 6.1 `.symtab` Quiz Pattern
 
 ```c
-int incr=1;                 // global symbol
-static int foo(int a){      // local linker symbol
-  int b=a+incr;             // a,b not linker symbols
-  return b;
+int incr = 1;                // global symbol ★
+static int foo(int a) {      // local linker symbol ★
+    int b = a + incr;         // a, b NOT linker symbols (auto locals)
+    return b;
 }
-int main(){ printf("%d",foo(5)); } // main, printf ref
+int main(int argc, char *argv[]) {
+    printf("%d\n", foo(5));   // main = global ★; printf = external ref ★
+    return 0;
+}
 ```
 
-Symbols: `incr`, `foo`, `main`, `printf`; string literals may appear as compiler-generated local objects.
+==**Symbols in `.symtab` of `symbols.o`**==: `incr, foo, main, printf` (and possibly `"%d\n"` as a `.rodata` constant string).
+
+==**Verify with**==: `readelf -s symbols.o`.
 
 ### 6.2 Static Local Variables
 
 ```c
-int f(){ static int x=17; return x++; }
+int f() { static int x = 17; return x++; }
 ```
 
-Function-scope `static` has storage in `.data/.bss` and a compiler-generated local linker symbol. Ordinary local variables do not.
+Function-scope `static` has storage in `.data`/`.bss` and a **compiler-generated local linker symbol** (e.g., `x.1721`). Ordinary local vars do NOT.
 
 ## 7. Duplicate Symbol Resolution
 
-| Declaration/definition | Strength |
+| Declaration / Definition | Strength |
 |---|---|
-| function definition | strong |
-| initialized global | strong |
-| uninitialized global | weak/common in traditional model |
-| `extern int x;` | reference only |
+| **function definition** | **strong** |
+| **initialized global** (`int x = 5;`) | **strong** |
+| uninitialized global (`int x;`) | **weak** (legacy "common" model) |
+| `extern int x;` | reference only (no def) |
 
-Rules:
+==**Linker rules**==:
 
-1. two strong same name -> link error.
-2. one strong + weak(s) -> choose strong.
-3. multiple weak -> arbitrary/common.
+1. **Two strong same name → ERROR** (multiple definition).
+2. **One strong + N weak → choose strong**; weak refs all resolve to strong.
+3. **Multiple weak → arbitrary** (linker picks one); use `gcc -fno-common` to force error.
 
-`static` file-scope symbols are local to one object file; same name in another file is not a global duplicate.
+> Quiz 5 #16: incorrect rule = ==**"two weak symbols are not allowed"**== (actually they ARE allowed in legacy common model).
 
-### 7.1 Silent Error Pattern
+> Quiz 5 #17: `static` file-scope symbols are local to one `.o`; same name in another file is **not** a global duplicate.
+
+### 7.1 Insidious Silent Errors
 
 ```c
-// a.c
-double x = 3.14;   // strong
+// File 1
+int x = 15213;                     // strong
+int main() { f(); printf("%d\n", x); return 0; }
 
-// main.c
-long x;            // weak/common
+// File 2
+int x;                             // weak / common
+void f() { x = 15212; }
 ```
 
-May link with garbage behavior because linker does not type-check.
+Compiles + links cleanly; **prints `15212`** because both refer to same `x`.
 
-Recommendations:
+==**Type mismatch** (linker doesn't type-check)==:
 
-- use `static` for file-local.
-- initialize intended globals.
-- put `extern` declarations in headers.
-- one definition in one `.c`.
-- use `-fno-common`.
+```c
+// main.c
+long int x;                  // weak symbol, 8 bytes (LP64)
 
-Header pattern: declarations use `extern`; exactly one `.c` file owns the definition/initialization.
+// vars.c
+double x = 3.14;             // strong, 8 bytes
+```
+
+Linker uses `double` storage; `printf("%ld", x)` reinterprets bytes → **garbage**.
+
+==**Linker puzzle table**==:
+
+| Files | Outcome |
+|---|---|
+| `int x; p1() {}` and `p1() {}` | **link error** (two strong `p1`) |
+| `int x; p1() {}` and `int x; p2() {}` | both refer to **same uninitialized int** (probably what user wants?) |
+| `int x; p1() {}` and `double x; p2() {}` | writes to `x` in `p2` may **overwrite y** (evil!) |
+| `int x = 7; p1() {}` and `int x; p2() {}` | both refer to **same initialized int** ✓ |
+
+### 7.2 Recommendations
+
+- **Avoid global vars** if you can.
+- Otherwise: use `static` for file-local; **initialize** intended globals; use `extern` for external refs.
+- Put `extern` declarations in `.h` headers; one `.c` owns the definition + initialization.
+- Use **`-fno-common`** to force errors on common symbols.
+
+```c
+// global.h
+extern int g;
+int f(void);
+
+// c1.c
+#include "global.h"
+int f(void) { return g + 1; }
+
+// c2.c
+#include "global.h"
+int g = 0;                  // exactly one definition
+int main(void) { ... }
+```
 
 ## 8. Relocation
 
-Relocation entry includes:
+==**Relocation entry**==:
 
 | Field | Meaning |
 |---|---|
-| offset | where to patch |
-| symbol | target symbol |
-| type | encoding/computation rule |
-| addend | constant adjustment |
+| **offset** | where to patch (byte index in section) |
+| **symbol** | target symbol |
+| **type** | encoding/computation rule |
+| **addend** | constant adjustment |
 
-Compiler/assembler emits `.rel.text/.rel.data` or `.rela.*`; linker consumes them because it does not know final addresses before layout.
+==**Compiler/assembler emits `.rel.text` + `.rel.data`**== because final addrs unknown. Linker consumes after layout.
 
-### 8.1 RISC-V Relocation Shape
+> Quiz 5 #18: "the **compiler or assembler** leaves reloc info in `.rel.text` and `.rel.data`" — answer **1** ✓.
+
+### 8.1 RISC-V Relocation Patterns
+
+==**Global data load** (PC-relative)==:
 
 ```asm
-auipc a0,%pcrel_hi(array)
-addi  a0,a0,%pcrel_lo(array)
+auipc a0, %pcrel_hi(array)         # R_RISCV_PCREL_HI20
+addi  a0, a0, %pcrel_lo(array)     # R_RISCV_PCREL_LO12_I
+```
 
-auipc ra,%pcrel_hi(sum)
-jalr  ra,%pcrel_lo(sum)(ra)
+==**Far call / function pointer**==:
+
+```asm
+auipc ra, %pcrel_hi(sum)
+jalr  ra, %pcrel_lo(sum)(ra)        # R_RISCV_CALL_PLT
 ```
 
 | Reloc | Use |
 |---|---|
-| `R_RISCV_PCREL_HI20` | high 20 PC-relative |
-| `R_RISCV_PCREL_LO12_I` | low 12 I-type |
-| `R_RISCV_PCREL_LO12_S` | low 12 S-type |
+| `R_RISCV_PCREL_HI20` | upper 20b of PC-rel address |
+| `R_RISCV_PCREL_LO12_I` | lower 12b for I-type (load/JALR) |
+| `R_RISCV_PCREL_LO12_S` | lower 12b for S-type (store) |
 | `R_RISCV_CALL_PLT` | call via PLT-capable sequence |
 
 ## 9. Loading Executables
 
-Loader maps ELF segments:
-
 ```text
-low unmapped page
-.text/.rodata  r-x/r--
-.data/.bss     rw-
-heap           grows up
-mmap/shared libs
-stack          grows down
-kernel space   protected
+high addr
+┌────────────────────────┐
+│ kernel space (protected)│
+├────────────────────────┤
+│ stack (rw-) ← grows down│
+├────────────────────────┤
+│ mmap / shared libs      │
+├────────────────────────┤
+│ heap (rw-) → grows up   │
+├────────────────────────┤
+│ .data / .bss (rw-)      │
+├────────────────────────┤
+│ .text / .rodata (r-x/r--)│
+├────────────────────────┤
+│ low unmapped page       │
+└────────────────────────┘
+low addr
 ```
 
-Dynamically linked executable:
+==**Dynamic exe boot**==:
 
 ```text
-kernel maps program + ld-linux.so -> dynamic linker maps .so deps -> relocates -> startup -> main
+1. kernel maps program + interpreter (named in PT_INTERP, e.g., /lib/ld-linux.so)
+2. dynamic linker maps needed .so deps
+3. dynamic linker performs relocations, lazy or now
+4. jumps to _start, which calls main
 ```
 
 ## 10. Static Libraries
 
-Create:
+==**Create**==:
 
 ```bash
 ar rs libvector.a addvec.o multvec.o
 ```
 
-Link:
+==**Link**==:
 
 ```bash
 gcc main.o -L. -lvector -o prog
 ```
 
-`-lvector` searches `libvector.a` / `libvector.so`.
+`-lvector` searches `libvector.a` (or `.so`) along `-L` paths.
 
-Static vs shared library:
+==**Static vs shared comparison**==:
 
 | Static `.a` | Shared `.so` |
 |---|---|
-| archive members copied into executable at link time | mapped/relocated by loader/dynamic linker |
-| larger executable, no runtime `.so` dependency | smaller executable, runtime dependency |
-| library update needs relink/rebuild | ABI-compatible update can benefit programs without relink |
+| **archive members copied** into exe at link time | **mapped + relocated** at load by dynamic linker |
+| **larger exe**, no runtime `.so` dep | **smaller exe**, `.so` runtime dep |
+| update lib → **must relink** | ABI-compat update → no relink |
 
-Static archives are **pay-as-you-go**: only needed members are copied.
+==**`.a` is "pay-as-you-go"**==: only members that resolve unresolved references are included.
 
-### 10.1 Static Linker Algorithm
+### 10.1 Static Linker Scan Algorithm
 
-Left-to-right scan:
+==**Left-to-right scan**==:
 
 | Input | Action |
 |---|---|
-| object `.o` | include unconditionally |
-| archive `.a` | include only members resolving current unresolved refs |
+| object `.o` | **always include** |
+| archive `.a` | include **only members resolving current unresolved refs** |
 
-If unresolved after scan -> link error.
+If unresolved refs remain after scan → **link error**.
 
-Own `malloc` override pattern:
+### 10.2 `malloc` Override Pattern
+
+```bash
+gcc main.o my_alloc.o -lc -o prog
+# my_alloc.o defines its own malloc()
+```
 
 | Step | Effect |
 |---|---|
-| earlier `.o` calls `malloc` | `malloc` enters unresolved set |
-| `main.o` defines `malloc` | resolves those refs |
-| linker later scans `libc.a` | libc `malloc` member is not pulled |
+| `main.o` calls `malloc` | adds `malloc` to **unresolved** set |
+| `my_alloc.o` defines `malloc` | resolves; `malloc` no longer unresolved |
+| `libc.a` scanned | libc `malloc` member **NOT pulled** (already resolved) |
 
-### 10.2 Library Order Matters
+Result: program uses your `malloc`, not libc's.
 
-```bash
-gcc main.o -lfoo     # OK if main.o needs foo
-gcc -lfoo main.o     # often fails
-```
-
-Circular libs:
+### 10.3 Library Order Matters
 
 ```bash
-gcc main.o -lA -lB -lA
+gcc main.o -lfoo          # OK if main.o needs foo
+gcc -lfoo main.o          # may fail: at -lfoo time, no unresolved refs to pull
 ```
 
-### 10.3 Link Error Triage
+==**Circular dependencies**==:
+
+```bash
+gcc main.o -lA -lB -lA    # repeat -lA to resolve back-references
+# or use --start-group / --end-group
+```
+
+### 10.4 Link Error Triage
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `undefined reference` | missing object/lib or wrong library order | add object/lib; put `-lfoo` after users |
-| `multiple definition` | duplicate strong global/function | one definition; use `extern` declarations |
-| type garbage but link succeeds | strong/weak mismatch; linker no type check | fix declarations; use headers + `-fno-common` |
+| `undefined reference to 'X'` | missing `.o`/lib OR wrong library order | add `.o`/lib; put `-lfoo` **after** users |
+| `multiple definition of 'X'` | duplicate strong global/func | one definition; use `extern` in headers |
+| **garbage at runtime, link succeeded** | strong/weak mismatch (different types) | fix declarations; use headers + `-fno-common` |
 
 ## 11. Shared Libraries / Dynamic Linking
 
-Advantages:
+==**Advantages**== (Quiz 5 #13):
 
-- significant RAM/disk savings.
-- centralized security/bug-fix updates if ABI compatible.
-- fast link/build time.
+| | Why |
+|---|---|
+| **memory (RAM/disk) savings** | one copy of `.so` shared across processes |
+| **centralized security / bug-fix updates** | replace `.so`, all programs benefit (ABI-compat) |
+| **fast build-time linking** | linker doesn't copy archive members |
 
-Not advantage: faster execution in general.
+==**NOT an advantage**==: faster execution (PLT/GOT add indirection).
 
 ### 11.1 Load-Time Dynamic Linking
 
@@ -306,67 +426,96 @@ gcc -shared -fpic -o libv.so addvec.c multvec.c
 gcc main.o ./libv.so -o prog
 ```
 
-At load: `ld-linux.so` maps deps, resolves needed relocations/lazy bindings.
+==**At load**==: `ld-linux.so` (named in `PT_INTERP`) maps deps, performs needed relocations + lazy bindings.
 
-`PT_INTERP` in the executable names the dynamic linker path; the kernel maps the program and `ld-linux.so`, then the dynamic linker maps needed `.so` files.
-
-Load-time dynamic linking produces a **partially linked executable**; final shared-library addresses are fixed by the dynamic linker at load time.
+> Result: **partially linked executable** — final `.so` addrs fixed at load.
 
 ### 11.2 Run-Time Dynamic Linking
 
 ```c
+#include <dlfcn.h>
 void *h = dlopen("./libv.so", RTLD_LAZY);
-void (*f)(int*,int*,int*,int)=dlsym(h,"addvec");
-f(x,y,z,2);
+void (*f)(int *, int *, int *, int) = dlsym(h, "addvec");
+f(x, y, z, 2);
 dlclose(h);
 ```
 
-Used for plugins/modules.
+Used for plugins / hot-swappable modules.
 
 ### 11.3 Runtime Interposition
 
-`LD_PRELOAD=./wrap.so prog` loads `wrap.so` first, so same-name functions can intercept later library calls.
+```bash
+LD_PRELOAD=./wrap.so prog
+```
 
-Limit: cannot replace code already executed before interposition, such as `_start`; wrappers often intercept `__libc_start_main` or libc functions instead.
+`wrap.so` loaded **first** → its same-name functions intercept later library calls. Useful for instrumentation, leak detection, etc.
 
-## 12. PIC, GOT, PLT
+> Limit: cannot replace code already executed before interposition (e.g., `_start`); wrappers usually intercept libc calls or `__libc_start_main`.
 
-==**PIC**==: position-independent code; shared library code works at any load address.
+## 12. PIC, GOT, PLT (Dynamic-Linking Internals)
 
-Dynamic linking uses **GOT + PLT**; not jump table or section header table.
+==**PIC**== (Position-Independent Code): shared library code works at **any load address**.
 
-PIC data trick: code and data keep a fixed relative distance inside the loaded object, so code can use PC-relative addressing to reach the GOT.
+==**Dynamic linking uses GOT + PLT**== (Quiz 5 #12). NOT JT (jump table), NOT SHT.
 
-### 12.1 GOT
+==**PIC trick**==: code and data keep a **fixed relative distance** within the loaded `.so`, so PC-relative addressing reaches GOT entries reliably.
 
-==**GOT**==: Global Offset Table, writable table of runtime addresses for global data/external symbols.
+### 12.1 GOT (Global Offset Table)
+
+==**GOT**==: writable table of runtime addresses for globals + external symbols.
 
 ```asm
-auipc a0,%got_pcrel_hi(my_var)
-ld    a0,%pcrel_lo(...)(a0)   # address from GOT
-lw    a0,0(a0)                # value
+auipc a0, %got_pcrel_hi(my_var)
+ld    a0, %pcrel_lo(...)(a0)   # a0 = address from GOT
+lw    a0, 0(a0)                # actual value
 ```
 
-### 12.2 PLT
+### 12.2 PLT (Procedure Linkage Table)
 
-==**PLT**==: Procedure Linkage Table, executable stubs for external calls.
+==**PLT**==: executable stubs for external function calls.
 
-Lazy binding:
+==**Lazy binding**==:
 
 ```text
-call -> PLT stub -> GOT.plt entry
-first call -> resolver patches GOT.plt
-later calls -> real function directly via GOT.plt
+call func@plt → PLT stub → indirect-jump via GOT.plt[func]
+First call:  GOT.plt[func] = resolver → resolve real address → patch GOT.plt
+Later calls: GOT.plt[func] = real address → direct jump
 ```
 
-### 12.3 Memory Placement
+### 12.3 Memory Placement (Quiz 5 #14)
 
-| Structure | Place | Writable | Executable |
+| Structure | Section | Writable? | Executable? |
 |---|---|---|---|
-| `.text` | code | no | yes |
-| `.plt` | code stubs | no | yes |
-| `.got` | data table | yes | no |
-| `.got.plt` | lazy function addr table | yes | no |
-| `.data/.bss` | writable data | yes | no |
+| `.text` | code | **no** | **yes** |
+| **`.plt`** | **code stubs** | **no** | **yes** |
+| **`.got`** | data table | **yes** | **no** |
+| **`.got.plt`** | lazy func addr table | **yes** | **no** |
+| `.data` / `.bss` | writable data | yes | no |
 
-PLT is in `.text/.plt`; GOT and GOT.plt are in `.data`-like writable region.
+> ==**PLT in `.text` (or `.plt`)**==; ==**GOT and `.got.plt` in `.data`-like writable region**==.
+
+## 13. Quick Quiz Anchors
+
+| Question | Answer |
+|---|---|
+| Unix standard linker | **`ld`** (NOT `gcc` / `ln` / `link`) |
+| read ELF detail | **`readelf`** |
+| disasm + reloc | `objdump` |
+| symbol list | `nm` |
+| NOT a linker job | **loading into memory** |
+| object file kinds (3) | `.o`, exe, `.so` |
+| `-O3 -flto` enables | cross-module inlining |
+| bug: link succeeds, type mismatch | **linker doesn't type-check** |
+| `-fno-common` | force error on multiple weak |
+| good inline candidates | small + constant args + once-in-loop |
+| dynamic-link advantage NOT | "faster execution" |
+| dynamic-link data structures | **GOT + PLT** |
+| PLT in section | `.text`/`.plt` |
+| GOT in section | `.data`/`.got` |
+| who emits reloc info | **compiler / assembler** in `.rel.text` + `.rel.data` |
+| static lib order | put libs **after** consumers |
+| `-l` searches | `lib<name>.{so,a}` |
+| `.symtab` contains | globals + external refs + static linker symbols (NOT auto locals) |
+| weak/strong rule (incorrect) | "two weak NOT allowed" — actually allowed |
+| benefits of linking (NOT) | "simpler to build executable" |
+| description NOT applicable to `.so/.a/.o` | **NONE** (all 4 descriptions correct) |
