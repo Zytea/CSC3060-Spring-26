@@ -1,3 +1,0 @@
----
-FormatStyle: google
-Checks: '-*,bugprone-*,performance-*,readability-*'
